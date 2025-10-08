@@ -15,7 +15,7 @@ class CalendarScreenRegular extends StatefulWidget {
 class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
   DateTime _focusedMonth = DateTime.now();
   DateTime? _selectedDate = DateTime.now();
-  int _currentIndex = 1; // Default to Calendar tab
+  int _currentIndex = 1;
 
   static const List<String> _monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -27,14 +27,13 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
 
   void _onTabTapped(int index) {
     setState(() => _currentIndex = index);
-
     if (index == 0) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const TasksScreenRegular()),
       );
     } else if (index == 1) {
-      // Calendar — stay here
+      // Calendar
     } else if (index == 2) {
       Navigator.pushReplacement(
         context,
@@ -75,7 +74,6 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
         children: [
           Column(
             children: [
-              // Pink header
               Container(
                 height: 120,
                 decoration: const BoxDecoration(
@@ -87,8 +85,6 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Calendar body
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
@@ -213,26 +209,25 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                               );
                             },
                           ),
-                          const SizedBox(height: 6),
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 80), // Space for button
+              const SizedBox(height: 80),
             ],
           ),
-
-          // Floating Add Task button (centered)
           Positioned(
-            bottom: 75, // keeps distance above navbar
+            bottom: 75,
             child: ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const AddTaskScreen(),
+                    builder: (context) => AddTaskScreen(
+                      selectedDate: _selectedDate ?? DateTime.now(),
+                    ),
                   ),
                 );
               },
@@ -257,8 +252,6 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
           ),
         ],
       ),
-
-      // Bottom navigation bar
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
@@ -282,7 +275,6 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
     );
   }
 
-  /// Helper for nav bar icon styling
   static BottomNavigationBarItem _navItem(
     IconData icon,
     String label, {
