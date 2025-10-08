@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../Assisted Screen/daily_tasks_screen.dart';
 import 'tasks_screen_regular.dart';
-import '../Assisted Screen/profile_screen.dart';
-import '../Assisted Screen/emergency_screen.dart';
+import 'profile_screen_regular.dart';
 import '../Regular Screen/add_task.dart';
+import '../Regular Screen/companion_list.dart';
+import '../Regular Screen/notification_screen.dart';
 
 class CalendarScreenRegular extends StatefulWidget {
   const CalendarScreenRegular({Key? key}) : super(key: key);
@@ -34,15 +35,18 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
         MaterialPageRoute(builder: (context) => const TasksScreenRegular()),
       );
     } else if (index == 1) {
-      // Calendar — stay here
+      // Stay on Calendar
     } else if (index == 2) {
+      // Navigate to Companion List (Alert)
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const EmergencyScreen()),
+        MaterialPageRoute(builder: (context) => const CompanionListScreen()),
       );
     } else if (index == 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Notifications screen coming soon")),
+      // Navigate to Notification Screen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const NotificationScreen()),
       );
     } else if (index == 4) {
       Navigator.pushReplacement(
@@ -96,8 +100,8 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                   children: [
                     const Text(
                       'DATE',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 12),
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -128,7 +132,8 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                                 onChanged: (int? newMonth) {
                                   if (newMonth == null) return;
                                   setState(() {
-                                    _focusedMonth = DateTime(year, newMonth, 1);
+                                    _focusedMonth =
+                                        DateTime(year, newMonth, 1);
                                     _selectedDate =
                                         DateTime(year, newMonth, 1);
                                   });
@@ -151,7 +156,8 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                           const SizedBox(height: 6),
                           GridView.builder(
                             shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
+                            physics:
+                                const NeverScrollableScrollPhysics(),
                             itemCount: gridDates.length,
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
@@ -160,12 +166,14 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                             ),
                             itemBuilder: (context, index) {
                               final date = gridDates[index];
-                              if (date == null) return const SizedBox.shrink();
+                              if (date == null)
+                                return const SizedBox.shrink();
 
                               final bool isToday =
                                   _isSameDay(date, DateTime.now());
-                              final bool isSelected = _selectedDate != null &&
-                                  _isSameDay(date, _selectedDate!);
+                              final bool isSelected =
+                                  _selectedDate != null &&
+                                      _isSameDay(date, _selectedDate!);
 
                               return GestureDetector(
                                 onTap: () {
@@ -174,7 +182,8 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) =>
-                                          DailyTasksScreen(selectedDate: date),
+                                          DailyTasksScreen(
+                                              selectedDate: date),
                                     ),
                                   );
                                 },
@@ -184,16 +193,19 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                                       ? Container(
                                           width: 34,
                                           height: 34,
-                                          decoration: const BoxDecoration(
+                                          decoration:
+                                              const BoxDecoration(
                                             color: Color(0xFFF5AEB3),
                                             shape: BoxShape.circle,
                                           ),
-                                          alignment: Alignment.center,
+                                          alignment:
+                                              Alignment.center,
                                           child: Text(
                                             '${date.day}',
                                             style: const TextStyle(
                                               color: Colors.white,
-                                              fontWeight: FontWeight.w700,
+                                              fontWeight:
+                                                  FontWeight.w700,
                                             ),
                                           ),
                                         )
@@ -220,13 +232,13 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                   ],
                 ),
               ),
-              const SizedBox(height: 80), // Space for button
+              const SizedBox(height: 80),
             ],
           ),
 
-          // Floating Add Task button (centered)
+          // Floating Add Task button
           Positioned(
-            bottom: 75, // keeps distance above navbar
+            bottom: 75,
             child: ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
@@ -246,8 +258,8 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.pink,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 32, vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
@@ -258,7 +270,7 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
         ],
       ),
 
-      // Bottom navigation bar
+      // Bottom Navigation Bar
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
@@ -276,7 +288,8 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
               isSelected: _currentIndex == 2),
           _navItem(Icons.notifications, 'Notifications',
               isSelected: _currentIndex == 3),
-          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
+          _navItem(Icons.person, 'Profile',
+              isSelected: _currentIndex == 4),
         ],
       ),
     );
@@ -295,7 +308,8 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
         height: 55,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
+          color:
+              isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
         ),
         child: Center(
           child: Icon(

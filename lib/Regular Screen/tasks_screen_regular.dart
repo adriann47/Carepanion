@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../Assisted Screen/profile_screen.dart';
-import '../Assisted Screen/emergency_screen.dart';
+import 'profile_screen_regular.dart';
 import 'calendar_screen_regular.dart';
+import 'companion_list.dart';
+import 'notification_screen.dart'; // 👈 Import your notification screen
 
 class TasksScreenRegular extends StatefulWidget {
   const TasksScreenRegular({super.key});
@@ -14,6 +15,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   int _currentIndex = 0;
   final List<bool> _taskDone = [false, false, false, false];
 
+  /// --- NAVIGATION HANDLER ---
   void _onTabTapped(int index) {
     setState(() => _currentIndex = index);
 
@@ -23,9 +25,16 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         MaterialPageRoute(builder: (context) => const CalendarScreenRegular()),
       );
     } else if (index == 2) {
+      // 👇 Redirect to Companion screen instead of Emergency
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const EmergencyScreen()),
+        MaterialPageRoute(builder: (context) => const CompanionListScreen()),
+      );
+    } else if (index == 3) {
+      // 👇 Redirect to Notification screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const NotificationScreen()),
       );
     } else if (index == 4) {
       Navigator.push(
@@ -190,7 +199,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
           _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Alert',
+          _navItem(Icons.family_restroom, 'Companion',
               isSelected: _currentIndex == 2),
           _navItem(Icons.notifications, 'Notifications',
               isSelected: _currentIndex == 3),
@@ -212,13 +221,12 @@ class _TasksScreenState extends State<TasksScreenRegular> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// Timeline dot
           Column(
             children: [
               Container(
                 width: 18,
                 height: 18,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.pinkAccent,
                 ),
@@ -226,13 +234,11 @@ class _TasksScreenState extends State<TasksScreenRegular> {
               Container(
                 width: 2,
                 height: 80,
-                color: Colors.grey.shade400,
+                color: Colors.grey,
               ),
             ],
           ),
           const SizedBox(width: 16),
-
-          /// Task card
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(14),
@@ -282,8 +288,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     return BottomNavigationBarItem(
       label: label,
       icon: Container(
-        width: 50,
-        height: 50,
+        width: 55,
+        height: 55,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
@@ -291,7 +297,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         child: Center(
           child: Icon(
             icon,
-            size: 26,
+            size: 28,
             color: isSelected ? Colors.pink : Colors.black87,
           ),
         ),
