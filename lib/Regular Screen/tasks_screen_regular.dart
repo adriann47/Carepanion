@@ -189,8 +189,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.menu, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.warning_amber_rounded, 'Alert',
+          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
+          _navItem(Icons.family_restroom, 'Alert',
               isSelected: _currentIndex == 2),
           _navItem(Icons.notifications, 'Notifications',
               isSelected: _currentIndex == 3),

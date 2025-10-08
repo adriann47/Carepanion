@@ -272,7 +272,7 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
           _navItem(Icons.calendar_today, 'Calendar',
               isSelected: _currentIndex == 1),
-          _navItem(Icons.warning_amber_rounded, 'Alert',
+          _navItem(Icons.family_restroom, 'Alert',
               isSelected: _currentIndex == 2),
           _navItem(Icons.notifications, 'Notifications',
               isSelected: _currentIndex == 3),
