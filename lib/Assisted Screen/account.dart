@@ -13,7 +13,11 @@ class _AccountPageState extends State<AccountPage> {
   String mobile = "09541234567";
   List<String> guardians = [];
 
-  // Dialog to edit a single field
+  final TextEditingController _currentPass = TextEditingController();
+  final TextEditingController _newPass = TextEditingController();
+  final TextEditingController _confirmPass = TextEditingController();
+
+  // Edit Field Dialog
   void _editField(String title, String currentValue, Function(String) onSave) {
     final controller = TextEditingController(text: currentValue);
 
@@ -47,7 +51,7 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
-  // Dialog to add guardian
+  // Add Guardian Dialog
   void _addGuardian() {
     final controller = TextEditingController();
 
@@ -83,12 +87,13 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
+  // Editable Row (Email, Mobile)
   Widget _buildEditableRow(String label, String value, VoidCallback onEdit) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFB3E5FC), // light blue
+        color: const Color(0xFFB3E5FC),
         borderRadius: BorderRadius.circular(28),
       ),
       child: Row(
@@ -128,37 +133,64 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
-  Widget _buildGuardianRow(String guardian) {
+  // TextField for Reset Password (with lower opacity)
+  Widget _buildPasswordField(String hint, TextEditingController controller) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFFB3E5FC),
+        color: const Color(0x99B3E5FC), // 60% opacity of light blue
         borderRadius: BorderRadius.circular(28),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            guardian,
-            style: GoogleFonts.nunito(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
+      child: TextField(
+        controller: controller,
+        obscureText: true,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: GoogleFonts.nunito(
+            color: Colors.black.withOpacity(0.4),
+            fontWeight: FontWeight.w600,
           ),
-          IconButton(
-            icon: const Icon(Icons.delete, color: Colors.redAccent),
-            onPressed: () {
-              setState(() {
-                guardians.remove(guardian);
-              });
-            },
-          ),
-        ],
+          filled: true,
+          fillColor: const Color(0x66B3E5FC),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        ),
       ),
     );
   }
+
+  Widget _buildGuardianRow(String guardian) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: 14),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFB3E5FC),
+      borderRadius: BorderRadius.circular(28),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          guardian,
+          style: GoogleFonts.nunito(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete, color: Colors.redAccent),
+          onPressed: () {
+            setState(() {
+              guardians.remove(guardian);
+            });
+          },
+        ),
+      ],
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -167,10 +199,10 @@ class _AccountPageState extends State<AccountPage> {
     final h = size.height;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF5F0), // beige background
+      backgroundColor: const Color(0xFFFBF5F0),
       body: Column(
         children: [
-          // Header
+          // 🔹 Header
           Container(
             width: double.infinity,
             height: h * 0.18,
@@ -191,6 +223,7 @@ class _AccountPageState extends State<AccountPage> {
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.arrow_back, color: Color(0xFF3D3D3D)),
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       "ACCOUNT",
                       style: GoogleFonts.nunito(
@@ -205,7 +238,7 @@ class _AccountPageState extends State<AccountPage> {
             ),
           ),
 
-          // Content
+          // 🔹 Content
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(horizontal: w * 0.08, vertical: h * 0.025),
@@ -223,7 +256,58 @@ class _AccountPageState extends State<AccountPage> {
                     });
                   }),
 
+                  SizedBox(height: h * 0.03),
+
+                  // 🔹 Reset Password Section
+                  Center(
+                    child: Text(
+                      "RESET PASSWORD",
+                      style: GoogleFonts.nunito(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _buildPasswordField("CURRENT PASSWORD", _currentPass),
+                  _buildPasswordField("NEW PASSWORD", _newPass),
+                  _buildPasswordField("CONFIRM NEW PASSWORD", _confirmPass),
+
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0x99B3E5FC), // also lighter
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        "SAVE",
+                        style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: h * 0.03),
+
+                  // 🔹 Divider line between sections
+                  const Divider(
+                    color: Colors.black26,
+                    thickness: 1,
+                    indent: 10,
+                    endIndent: 10,
+                  ),
+
                   SizedBox(height: h * 0.02),
+
+                  // 🔹 Guardian Section
                   Center(
                     child: Text(
                       "GUARDIAN’S ACCOUNT",
@@ -236,10 +320,8 @@ class _AccountPageState extends State<AccountPage> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Guardians list
                   ...guardians.map((g) => _buildGuardianRow(g)).toList(),
 
-                  // Add Guardian
                   GestureDetector(
                     onTap: _addGuardian,
                     child: Container(

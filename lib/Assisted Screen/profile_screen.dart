@@ -6,6 +6,7 @@ import 'aboutpage.dart';
 import 'legaldatapage.dart';
 import 'settings.dart'; 
 import 'help.dart';
+import 'profile_page.dart'; // ✅ Import the ProfilePage
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -119,7 +120,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               /// --- MENU BUTTONS ---
               _menuButton(Icons.person, 'PROFILE', const Color(0xFFB2EBF2),
                   onTap: () {
-                // Profile page (current)
+                // ✅ Navigate to ProfilePage
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
               }),
               _menuButton(Icons.settings, 'SETTINGS', const Color(0xFFF8BBD0),
                   onTap: () {
@@ -132,8 +137,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   MaterialPageRoute(builder: (context) => const AboutPage()),
                 );
               }),
-
-              // ✅ FIXED: Help & Support button now navigates
               _menuButton(Icons.help_outline, 'HELP & SUPPORT',
                   const Color(0xFFB3E5FC), onTap: () {
                 Navigator.push(
@@ -142,7 +145,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       builder: (context) => const HelpSupportPage()),
                 );
               }),
-
               _menuButton(Icons.policy, 'LEGAL & DATA', const Color(0xFFF8BBD0),
                   onTap: () {
                 Navigator.push(
@@ -156,8 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
 
-      
-/// --- BOTTOM NAV ---
+      /// --- BOTTOM NAV ---
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
@@ -177,6 +178,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
   /// --- MENU BUTTON WIDGET ---
   static Widget _menuButton(IconData icon, String text, Color color,
       {VoidCallback? onTap}) {
@@ -207,8 +209,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  
-
   /// --- NAV BAR ITEM WITH PINK HIGHLIGHT ---
   static BottomNavigationBarItem _navItem(IconData icon, String label,
       {required bool isSelected}) {
@@ -219,7 +219,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         height: 60,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
+          color:
+              isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
         ),
         child: Center(
           child: Icon(

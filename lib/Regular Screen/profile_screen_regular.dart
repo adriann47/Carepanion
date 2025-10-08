@@ -5,7 +5,8 @@ import 'aboutpage_regular.dart';
 import 'legaldatapage_regular.dart';
 import 'settings_regular.dart';
 import 'help_regular.dart';
-import 'notification_screen.dart'; // ✅ include this so Alert icon goes to notifications
+import 'notification_screen.dart';
+import 'profile_page.dart'; // ✅ Added ProfilePage import
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -77,6 +78,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
+              const SizedBox(height: 20),
+
               // --- GUARDIAN CARD ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 25),
@@ -130,7 +133,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               // --- MENU BUTTONS ---
               _menuButton(Icons.person, 'PROFILE', const Color(0xFFB2EBF2),
-                  onTap: () {}),
+                  onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
+              }),
               _menuButton(Icons.settings, 'SETTINGS', const Color(0xFFF8BBD0),
                   onTap: () {
                 Navigator.push(
@@ -138,7 +146,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   MaterialPageRoute(builder: (context) => const SettingsScreen()),
                 );
               }),
-              _menuButton(Icons.info, 'ABOUT', const Color(0xFFFFE0B2), onTap: () {
+              _menuButton(Icons.info, 'ABOUT', const Color(0xFFFFE0B2),
+                  onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const AboutPage()),
