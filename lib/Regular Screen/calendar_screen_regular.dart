@@ -218,6 +218,8 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
               const SizedBox(height: 80),
             ],
           ),
+
+          // --- ADD TASK BUTTON ---
           Positioned(
             bottom: 75,
             child: ElevatedButton.icon(
@@ -231,27 +233,33 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                   ),
                 );
               },
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
-                'Add Task',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+              icon: const Icon(Icons.add, color: Colors.white, size: 28),
+              label: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 6),
+                child: Text(
+                  'Add Task',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.pink,
+                backgroundColor: Colors.pinkAccent,
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    const EdgeInsets.symmetric(horizontal: 44, vertical: 18),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(40),
                 ),
-                elevation: 4,
+                elevation: 6,
               ),
             ),
           ),
         ],
       ),
+
+      // --- BOTTOM NAVIGATION ---
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
