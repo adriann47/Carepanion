@@ -10,27 +10,23 @@ class WelcomeScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFFEF9F3),
       body: Column(
         children: [
-          // Centered logo + text
           Expanded(
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Row for logo + CARE-PANION text
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Logo
                       Image.asset(
                         "assets/logo.jpg",
                         width: 120,
                         height: 120,
                       ),
                       const SizedBox(width: 20),
-                      // 👇 Shift text left (ignore collision with logo)
                       Transform.translate(
-                        offset: const Offset(-40, 0), // move left by 40px
+                        offset: const Offset(-40, 0),
                         child: Text(
                           "CARE-\nPANION",
                           textAlign: TextAlign.left,
@@ -45,7 +41,6 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  // 👇 Removed SizedBox (subtitle now sticks closer)
                   Text(
                     "A Voice-Driven Reminder App for\nWellness and Daily Care",
                     textAlign: TextAlign.center,
@@ -60,7 +55,6 @@ class WelcomeScreen extends StatelessWidget {
             ),
           ),
 
-          // Buttons at lower part
           Column(
             children: [
               ElevatedButton(
@@ -107,7 +101,7 @@ class WelcomeScreen extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 80), // bottom spacing
+          const SizedBox(height: 80),
         ],
       ),
     );
