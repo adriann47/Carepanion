@@ -2,76 +2,85 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class AddTaskScreen extends StatefulWidget {
-  const AddTaskScreen({Key? key}) : super(key: key);
+  final DateTime? selectedDate; // ✅ made optional
+
+  const AddTaskScreen({Key? key, this.selectedDate}) : super(key: key);
 
   @override
-  State<AddTaskScreen> createState() => _AddTaskScreenState();
+  _AddTaskScreenState createState() => _AddTaskScreenState();
 }
 
 class _AddTaskScreenState extends State<AddTaskScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-
   DateTime? _selectedDate;
-  String? _startTime;
-  String? _endTime;
-  String? _selectedCategory;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+  String _selectedCategory = '';
 
-  final List<String> _categories = ["MEDICATION", "EXERCISE", "OTHER"];
-
-  Future<void> _pickDate() async {
-    DateTime now = DateTime.now();
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? now,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 2),
-    );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-    }
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.selectedDate ?? DateTime.now(); // ✅ Default date
   }
 
-  Future<void> _pickTime(bool isStart) async {
-    final TimeOfDay? picked =
-        await showTimePicker(context: context, initialTime: TimeOfDay.now());
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
+  }
+
+  Future<void> _selectTime(bool isStart) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
     if (picked != null) {
       setState(() {
-        final formatted = picked.format(context);
         if (isStart) {
-          _startTime = formatted;
+          _startTime = picked;
         } else {
-          _endTime = formatted;
+          _endTime = picked;
         }
       });
     }
   }
 
+  void _saveTask() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Task saved successfully!')),
+    );
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFEF8F2),
+      backgroundColor: const Color(0xFFFAF6EF),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header
+            // Top pink header
             Container(
               width: double.infinity,
-              height: 260,
+              height: 320,
               decoration: const BoxDecoration(
-                color: Color(0xFFF5AEB3),
+                color: Color(0xFFFFA8A8),
                 borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(60),
-                  bottomRight: Radius.circular(60),
+                  bottomLeft: Radius.circular(50),
+                  bottomRight: Radius.circular(50),
                 ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Back Button (FIXED)
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                    icon: const Icon(Icons.arrow_back, color: Colors.black),
                     onPressed: () => Navigator.pop(context),
                   ),
                   const SizedBox(height: 10),
@@ -79,77 +88,23 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     "TASK",
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
                   ),
+                  const SizedBox(height: 25),
+                  // Title input
+                  _buildInputField(
+                    label: "TITLE",
+                    controller: _titleController,
+                    icon: Icons.edit,
+                  ),
                   const SizedBox(height: 20),
-                  // Title
-                  const Text(
-                    "TITLE",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black54,
-                    ),
-                  ),
+                  // Date picker
                   Row(
                     children: [
                       Expanded(
-                        child: TextField(
-                          controller: _titleController,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.only(bottom: 4),
-                            enabledBorder: UnderlineInputBorder(
-                              borderSide: BorderSide(color: Colors.black87),
-                            ),
-                            focusedBorder: UnderlineInputBorder(
-                              borderSide: BorderSide(color: Colors.black87),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const Icon(Icons.edit, size: 16, color: Colors.black54),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Date
-                  const Text(
-                    "DATE",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black54,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: _pickDate,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: Text(
-                              _selectedDate == null
-                                  ? ""
-                                  : DateFormat('MMM dd, yyyy')
-                                      .format(_selectedDate!),
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const Icon(Icons.arrow_drop_down, color: Colors.black54),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: _pickDate,
-                        child: const CircleAvatar(
-                          radius: 14,
-                          backgroundColor: Color(0xFFBDE8FF),
-                          child: Icon(Icons.calendar_month,
-                              color: Colors.white, size: 18),
-                        ),
+                        child: _buildDateField(),
                       ),
                     ],
                   ),
@@ -157,195 +112,254 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               ),
             ),
 
-            // Rest of Form
+            const SizedBox(height: 35),
+
+            // Start and End Time
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildTimeField(
+                      label: "START TIME",
+                      time: _startTime,
+                      onTap: () => _selectTime(true),
+                    ),
+                  ),
+                  const SizedBox(width: 30),
+                  Expanded(
+                    child: _buildTimeField(
+                      label: "END TIME",
+                      time: _endTime,
+                      onTap: () => _selectTime(false),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 35),
+
+            // Description
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: _buildInputField(
+                label: "DESCRIPTION",
+                controller: _descriptionController,
+                icon: Icons.edit,
+              ),
+            ),
+
+            const SizedBox(height: 35),
+
+            // Category
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Time Selection
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "START TIME",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black54,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => _pickTime(true),
-                              child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8.0),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      _startTime ?? "",
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                    const Spacer(),
-                                    const Icon(Icons.arrow_drop_down,
-                                        color: Colors.black54),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            Container(height: 1, color: Colors.black87),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "END TIME",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black54,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => _pickTime(false),
-                              child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8.0),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      _endTime ?? "",
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                    const Spacer(),
-                                    const Icon(Icons.arrow_drop_down,
-                                        color: Colors.black54),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            Container(height: 1, color: Colors.black87),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Description
-                  const Text(
-                    "DESCRIPTION",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black54,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _descriptionController,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.only(bottom: 4),
-                            enabledBorder: UnderlineInputBorder(
-                              borderSide: BorderSide(color: Colors.black87),
-                            ),
-                            focusedBorder: UnderlineInputBorder(
-                              borderSide: BorderSide(color: Colors.black87),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const Icon(Icons.edit, size: 16, color: Colors.black54),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Category
                   const Text(
                     "CATEGORY",
+                    textAlign: TextAlign.left,
                     style: TextStyle(
-                      fontSize: 12,
+                      color: Colors.grey,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black54,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 12,
-                    children: _categories.map((cat) {
-                      Color bg;
-                      if (cat == "MEDICATION") {
-                        bg = const Color(0xFFFFD6D6);
-                      } else if (cat == "EXERCISE") {
-                        bg = const Color(0xFFFFEB99);
-                      } else {
-                        bg = const Color(0xFFBDE8FF);
-                      }
-                      final isSelected = _selectedCategory == cat;
-                      return GestureDetector(
-                        onTap: () => setState(() => _selectedCategory = cat),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: bg,
-                            borderRadius: BorderRadius.circular(20),
-                            border: isSelected
-                                ? Border.all(color: Colors.black54, width: 1.2)
-                                : null,
-                          ),
-                          child: Text(
-                            cat,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 36),
-
-                  // Save Button
-                  Center(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Task Saved!")),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF74E0DA),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 50, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: _buildCategoryChip(
+                          "MEDICATION",
+                          const Color(0xFFFFD6D6),
                         ),
                       ),
-                      child: const Text(
-                        "SAVE",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildCategoryChip(
+                          "EXERCISE",
+                          const Color(0xFFFFE28C),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildCategoryChip(
+                          "OTHER",
+                          const Color(0xFFB6EAFF),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
+
+            const SizedBox(height: 40),
+
+            // Save Button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: ElevatedButton(
+                onPressed: _saveTask,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF9BE8D8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  minimumSize: const Size(double.infinity, 45),
+                ),
+                child: const Text(
+                  "SAVE",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 40), // Adjusted spacing after removing navbar
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputField({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.grey,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  contentPadding: EdgeInsets.only(bottom: 5),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black87),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black87),
+                  ),
+                ),
+              ),
+            ),
+            Icon(icon, color: Colors.black54, size: 18),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateField() {
+    return GestureDetector(
+      onTap: _selectDate,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "DATE",
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Row(
+            children: [
+              const Icon(Icons.arrow_drop_down, size: 20, color: Colors.black54),
+              Expanded(
+                child: Text(
+                  _selectedDate != null
+                      ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
+                      : '',
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+              const Icon(Icons.calendar_today, color: Color(0xFFB6EAFF), size: 25),
+            ],
+          ),
+          const Divider(color: Colors.black87, thickness: 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeField({
+    required String label,
+    required TimeOfDay? time,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                time != null ? time.format(context) : '',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const Icon(Icons.arrow_drop_down, size: 20, color: Colors.black54),
+            ],
+          ),
+          const Divider(color: Colors.black87, thickness: 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(String label, Color color) {
+    final bool isSelected = _selectedCategory == label;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedCategory = label),
+      child: Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: isSelected ? Colors.black87 : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
         ),
       ),
     );

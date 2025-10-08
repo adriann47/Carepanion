@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import '../Assisted Screen/daily_tasks_screen.dart';
 import 'tasks_screen_regular.dart';
 import 'profile_screen_regular.dart';
-import '../Regular Screen/add_task.dart';
+
 import '../Regular Screen/companion_list.dart';
 import '../Regular Screen/notification_screen.dart';
+import '../Regular Screen/add_task.dart';
 
 class CalendarScreenRegular extends StatefulWidget {
   const CalendarScreenRegular({Key? key}) : super(key: key);
