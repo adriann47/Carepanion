@@ -4,9 +4,10 @@ import 'calendar_screen.dart';
 import 'emergency_screen.dart';
 import 'aboutpage.dart';
 import 'legaldatapage.dart';
-import 'settings.dart'; 
+import 'settings.dart';
 import 'help.dart';
-import 'profile_page.dart'; // ✅ Import the ProfilePage
+import 'profile_page.dart';
+import 'navbar_assisted.dart'; // ✅ Import the shared navbar
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,29 +17,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _currentIndex = 3; // start on Profile tab
-
-  void _onTabTapped(int index) {
-    setState(() => _currentIndex = index);
-
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const TasksScreen()),
-      );
-    } else if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const CalendarScreen()),
-      );
-    } else if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const EmergencyScreen()),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -120,7 +98,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               /// --- MENU BUTTONS ---
               _menuButton(Icons.person, 'PROFILE', const Color(0xFFB2EBF2),
                   onTap: () {
-                // ✅ Navigate to ProfilePage
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ProfilePage()),
@@ -128,7 +105,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               }),
               _menuButton(Icons.settings, 'SETTINGS', const Color(0xFFF8BBD0),
                   onTap: () {
-                Navigator.pushNamed(context, "/settings");
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                );
               }),
               _menuButton(Icons.info, 'ABOUT', const Color(0xFFFFE0B2),
                   onTap: () {
@@ -158,24 +138,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
 
-      /// --- BOTTOM NAV ---
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.pink,
-        unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        items: [
-          _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.warning_amber_rounded, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 3),
-        ],
-      ),
+      /// ✅ Use shared custom navbar
+      bottomNavigationBar: const NavbarAssisted(currentIndex: 3),
     );
   }
 
@@ -204,30 +168,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const Icon(Icons.arrow_forward_ios, size: 16),
           ],
-        ),
-      ),
-    );
-  }
-
-  /// --- NAV BAR ITEM WITH PINK HIGHLIGHT ---
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {required bool isSelected}) {
-    return BottomNavigationBarItem(
-      label: label,
-      icon: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color:
-              isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            size: 26,
-            color: isSelected ? Colors.pink : Colors.black87,
-          ),
         ),
       ),
     );

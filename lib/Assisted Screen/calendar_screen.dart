@@ -3,6 +3,7 @@ import 'daily_tasks_screen.dart';
 import 'tasks_screen.dart';
 import 'profile_screen.dart';
 import 'emergency_screen.dart';
+import 'navbar_assisted.dart'; // ✅ Import your custom navbar
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({Key? key}) : super(key: key);
@@ -14,9 +15,6 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   DateTime _focusedMonth = DateTime.now();
   DateTime? _selectedDate = DateTime.now();
-
-  // 👇 set to 1 so "Menu" is active when Calendar is opened
-  int _currentIndex = 1;
 
   static const List<String> _monthNames = [
     'January',
@@ -35,29 +33,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
-
-  void _onTabTapped(int index) {
-    setState(() => _currentIndex = index);
-
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const TasksScreen()),
-      );
-    } else if (index == 1) {
-      // Already on CalendarScreen → do nothing
-    } else if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const EmergencyScreen()),
-      );
-    } else if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ProfileScreen()),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +54,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       backgroundColor: const Color(0xFFF8F3ED),
       body: Column(
         children: [
+          /// --- HEADER ---
           Container(
             height: 120,
             decoration: const BoxDecoration(
@@ -90,6 +66,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ),
           const SizedBox(height: 16),
+
+          /// --- MAIN CONTENT ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
@@ -108,6 +86,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
+                      /// Month Dropdown
                       Row(
                         children: [
                           DropdownButton<int>(
@@ -136,6 +115,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
+
+                      /// Weekday Row
                       Row(
                         children: const [
                           Expanded(child: Center(child: Text('SU'))),
@@ -148,6 +129,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ],
                       ),
                       const SizedBox(height: 6),
+
+                      /// Calendar Grid
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -169,7 +152,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           return GestureDetector(
                             onTap: () {
                               setState(() => _selectedDate = date);
-
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -201,9 +183,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                       '${date.day}',
                                       style: TextStyle(
                                         fontSize: 14,
-                                        fontWeight: isToday
-                                            ? FontWeight.w700
-                                            : null,
+                                        fontWeight:
+                                            isToday ? FontWeight.w700 : null,
                                         color: isToday
                                             ? Colors.black
                                             : Colors.black87,
@@ -223,50 +204,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ],
       ),
 
-      /// --- FIXED BOTTOM NAV (Pink accent like TasksScreen) ---
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.pink,
-        unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex, // 👈 highlights "Menu"
-        onTap: _onTabTapped,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        items: [
-          _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.warning_amber_rounded, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 3),
-        ],
-      ),
-    );
-  }
-
-  /// --- NAV ITEM WITH PINK ACCENT HIGHLIGHT ---
-  static BottomNavigationBarItem _navItem(
-    IconData icon,
-    String label, {
-    bool isSelected = false,
-  }) {
-    return BottomNavigationBarItem(
-      label: label,
-      icon: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            size: 32,
-            color: isSelected ? Colors.pink : Colors.black87,
-          ),
-        ),
-      ),
+      /// ✅ Replaced BottomNavigationBar with the reusable navbar
+      bottomNavigationBar: const NavbarAssisted(currentIndex: 1),
     );
   }
 }

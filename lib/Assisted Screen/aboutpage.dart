@@ -3,6 +3,7 @@ import 'tasks_screen.dart';
 import 'calendar_screen.dart';
 import 'emergency_screen.dart';
 import 'profile_screen.dart';
+import 'navbar_assisted.dart'; // ✅ Import your custom navbar
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -12,34 +13,6 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
-  int _currentIndex = 3; // Profile tab highlighted by default
-
-  void _onTabTapped(int index) {
-    setState(() => _currentIndex = index);
-
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const TasksScreen()),
-      );
-    } else if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const CalendarScreen()),
-      );
-    } else if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const EmergencyScreen()),
-      );
-    } else if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ProfileScreen()),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -176,47 +149,8 @@ class _AboutPageState extends State<AboutPage> {
         ),
       ),
 
-      /// --- NAV BAR ---
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.pink, // highlight color
-        unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        items: [
-          _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.warning_amber_rounded, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 3),
-        ],
-      ),
-    );
-  }
-
-  /// --- NAV ITEM WITH SELECTION ---
-  static BottomNavigationBarItem _navItem(
-      IconData icon, String label, {bool isSelected = false}) {
-    return BottomNavigationBarItem(
-      label: label,
-      icon: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            size: 32,
-            color: isSelected ? Colors.pink : Colors.black87,
-          ),
-        ),
-      ),
+      /// ✅ Replaced old BottomNavigationBar with your custom widget
+      bottomNavigationBar: const NavbarAssisted(currentIndex: 3),
     );
   }
 }

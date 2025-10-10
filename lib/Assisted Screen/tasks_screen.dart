@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'profile_screen.dart';
 import 'emergency_screen.dart';
-import 'calendar_screen.dart'; // <-- Import Calendar Screen
+import 'calendar_screen.dart';
+import 'navbar_assisted.dart'; // ✅ Import reusable navbar
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -18,19 +19,16 @@ class _TasksScreen extends State<TasksScreen> {
     setState(() => _currentIndex = index);
 
     if (index == 3) {
-      // Profile tab
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const ProfileScreen()),
       );
     } else if (index == 2) {
-      // Alert tab
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const EmergencyScreen()),
       );
     } else if (index == 1) {
-      // Menu tab (3 lines)
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const CalendarScreen()),
@@ -152,24 +150,9 @@ class _TasksScreen extends State<TasksScreen> {
         ),
       ),
 
-      /// --- NAV BAR ---
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.pink,
-        unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        items: [
-          _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.warning_amber_rounded, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 3),
-        ],
-      ),
+      /// ✅ Reusable navigation bar
+      /// ✅ Custom reusable navigation bar
+      bottomNavigationBar: const NavbarAssisted(currentIndex: 0),
     );
   }
 
@@ -249,29 +232,6 @@ class _TasksScreen extends State<TasksScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  /// --- NAV ITEM WITH HIGHLIGHT ---
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {required bool isSelected}) {
-    return BottomNavigationBarItem(
-      label: label,
-      icon: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            size: 32,
-            color: isSelected ? Colors.pink : Colors.black87,
-          ),
-        ),
       ),
     );
   }

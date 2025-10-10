@@ -3,6 +3,7 @@ import 'tasks_screen.dart';
 import 'calendar_screen.dart';
 import 'profile_screen.dart';
 import 'emergency_alert_screen.dart';
+import 'navbar_assisted.dart'; // ✅ Import your reusable navbar
 
 class EmergencyScreen extends StatefulWidget {
   const EmergencyScreen({super.key});
@@ -14,7 +15,6 @@ class EmergencyScreen extends StatefulWidget {
 class _EmergencyScreenState extends State<EmergencyScreen>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 2; // Start on Alert tab
-
   late AnimationController _controller;
 
   @override
@@ -22,7 +22,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3), // fill duration = 3 seconds
+      duration: const Duration(seconds: 3), // Fill duration = 3 seconds
     );
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
@@ -59,12 +59,12 @@ class _EmergencyScreenState extends State<EmergencyScreen>
   }
 
   void _onLongPressStart(LongPressStartDetails details) {
-    _controller.forward(from: 0.0); // start filling
+    _controller.forward(from: 0.0); // Start filling
   }
 
   void _onLongPressEnd(LongPressEndDetails details) {
     if (_controller.value < 1.0) {
-      // released too early → reset
+      // Released too early → reset
       _controller.reset();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Hold for at least 3 seconds")),
@@ -77,7 +77,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       context,
       MaterialPageRoute(builder: (context) => const EmergencyAlertScreen()),
     ).then((_) {
-      _controller.reset(); // reset when returning
+      _controller.reset(); // Reset when returning
     });
   }
 
@@ -143,47 +143,8 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         ],
       ),
 
-       /// --- CUSTOM NAV BAR ---
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.pink,
-        unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        items: [
-          _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.warning_amber_rounded, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 3),
-        ],
-      ),
-    );
-  }
-
-  /// --- NAV ITEM WITH HIGHLIGHT ---
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {required bool isSelected}) {
-    return BottomNavigationBarItem(
-      label: label,
-      icon: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            size: 32,
-            color: isSelected ? Colors.pink : Colors.black87,
-          ),
-        ),
-      ),
+      /// ✅ Use custom navbar
+       bottomNavigationBar: const NavbarAssisted(currentIndex: 2),
     );
   }
 }

@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'tasks_screen.dart';
 import 'calendar_screen.dart';
 import 'emergency_screen.dart';
-
+import 'navbar_assisted.dart'; // ✅ Import your shared navbar
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -13,27 +13,6 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  int _currentIndex = 3;
-
-  void _onTabTapped(int index) {
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const TasksScreen()),
-      );
-    } else if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const CalendarScreen()),
-      );
-    } else if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const EmergencyScreen()), // Fixed
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -136,26 +115,13 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.pink,
-        unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        items: [
-          _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.warning_amber_rounded, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 3),
-        ],
-      ),
+
+      /// ✅ Replaced repeated BottomNavigationBar
+      bottomNavigationBar: const NavbarAssisted(currentIndex: 3),
     );
   }
 
+  /// --- TEXT FIELD BUILDER ---
   Widget _buildTextField(String label, String hint) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,28 +154,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ],
-    );
-  }
-
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {required bool isSelected}) {
-    return BottomNavigationBarItem(
-      label: label,
-      icon: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            size: 26,
-            color: isSelected ? Colors.pink : Colors.black87,
-          ),
-        ),
-      ),
     );
   }
 }

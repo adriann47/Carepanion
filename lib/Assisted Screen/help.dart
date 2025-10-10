@@ -3,6 +3,7 @@ import 'tasks_screen.dart';
 import 'calendar_screen.dart';
 import 'emergency_screen.dart';
 import 'profile_screen.dart';
+import 'navbar_assisted.dart'; // ✅ Import your custom navbar
 
 class HelpSupportPage extends StatefulWidget {
   const HelpSupportPage({super.key});
@@ -12,34 +13,6 @@ class HelpSupportPage extends StatefulWidget {
 }
 
 class _HelpSupportPageState extends State<HelpSupportPage> {
-  int _currentIndex = 3;
-
-  void _onTabTapped(int index) {
-    setState(() => _currentIndex = index);
-
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const TasksScreen()),
-      );
-    } else if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const CalendarScreen()),
-      );
-    } else if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const EmergencyScreen()),
-      );
-    } else if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ProfileScreen()),
-      );
-    }
-  }
-
   /// --- SHOW FAQ POPUP ---
   void _showFaqDialog(String question, List<String> answers) {
     showDialog(
@@ -244,81 +217,12 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
         ),
       ),
 
-      /// --- BOTTOM NAV ---
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.pink,
-        unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        items: [
-          _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.warning_amber_rounded, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 3),
-        ],
-      ),
-    );
-  }
-  /// --- MENU BUTTON WIDGET ---
-  static Widget _menuButton(IconData icon, String text, Color color,
-      {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 25, vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.black54),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Text(
-                text,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, size: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  
-
-  /// --- NAV BAR ITEM WITH PINK HIGHLIGHT ---
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {required bool isSelected}) {
-    return BottomNavigationBarItem(
-      label: label,
-      icon: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            size: 26,
-            color: isSelected ? Colors.pink : Colors.black87,
-          ),
-        ),
-      ),
+      /// ✅ Replaced old BottomNavigationBar with your custom widget
+      bottomNavigationBar: const NavbarAssisted(currentIndex: 3),
     );
   }
 }
+
 /// --- FAQ QUESTION WIDGET ---
 class _FaqQuestion extends StatelessWidget {
   final String text;

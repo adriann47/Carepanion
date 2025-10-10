@@ -6,6 +6,9 @@ import 'tasks_screen.dart';
 import 'calendar_screen.dart';
 import 'profile_screen.dart';
 import 'emergency_screen.dart';
+import '/screen/welcome_screen.dart';
+import 'navbar_assisted.dart'; // ✅ Import shared navbar
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -14,52 +17,21 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  int _currentIndex = 3; // Start on Profile tab
   int _selectedStars = 0; // For feedback stars
-
-  void _onTabTapped(int index) {
-    setState(() => _currentIndex = index);
-
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const TasksScreen()),
-      );
-    } else if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const CalendarScreen()),
-      );
-      
-    } else if (index == 2) {
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (context) => const EmergencyScreen()), // ✅ Changed
-  );
-}
-
-  
-    else if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ProfileScreen()),
-      );
-    }
-  }
 
   /// --- REPORT BUG DIALOG ---
   void _showReportBugDialog(BuildContext context) {
-    final TextEditingController _controller = TextEditingController();
+    final TextEditingController controller = TextEditingController();
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return _buildCustomDialog(
           title: "REPORT A BUG",
-          textController: _controller,
+          textController: controller,
           hint: "ENTER CONCERN..",
           onSubmit: () {
-            print("Bug reported: ${_controller.text}");
+            print("Bug reported: ${controller.text}");
             Navigator.pop(context);
           },
         );
@@ -67,9 +39,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// --- FEEDBACK DIALOG (with stars that update immediately) ---
+  /// --- FEEDBACK DIALOG (with stars) ---
   void _showFeedbackDialog(BuildContext context) {
-    final TextEditingController _controller = TextEditingController();
+    final TextEditingController controller = TextEditingController();
 
     showDialog(
       context: context,
@@ -78,11 +50,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           builder: (context, setDialogState) {
             return _buildCustomDialog(
               title: "FEEDBACK",
-              textController: _controller,
+              textController: controller,
               hint: "ENTER FEEDBACK...",
-              extraWidget: _buildStars(setDialogState), // pass dialog setState
+              extraWidget: _buildStars(setDialogState),
               onSubmit: () {
-                print("Feedback: ${_controller.text}, Stars: $_selectedStars");
+                print("Feedback: ${controller.text}, Stars: $_selectedStars");
                 Navigator.pop(context);
               },
             );
@@ -92,7 +64,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// --- SHARED DIALOG WIDGET ---
+  /// --- SHARED DIALOG UI ---
   Widget _buildCustomDialog({
     required String title,
     required TextEditingController textController,
@@ -109,7 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start, // Align title & stars left
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               title,
@@ -120,7 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 16),
 
-            if (extraWidget != null) extraWidget, // stars for feedback
+            if (extraWidget != null) extraWidget,
             if (extraWidget != null) const SizedBox(height: 12),
 
             TextField(
@@ -196,16 +168,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// --- STAR RATING WIDGET ---
   Widget _buildStars(StateSetter setDialogState) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.start, // align left with title
+      mainAxisAlignment: MainAxisAlignment.start,
       children: List.generate(5, (index) {
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4.0), // spacing between stars
+          padding: const EdgeInsets.symmetric(horizontal: 4.0),
           child: GestureDetector(
             onTap: () {
               setState(() {
                 _selectedStars = index + 1;
               });
-              setDialogState(() {}); // refresh dialog instantly
+              setDialogState(() {});
             },
             child: Icon(
               index < _selectedStars ? Icons.star : Icons.star_border,
@@ -247,7 +219,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   IconButton(
                     padding: EdgeInsets.zero,
                     onPressed: () {
-                      // Always go back to Profile screen
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(builder: (context) => const ProfileScreen()),
@@ -294,8 +265,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     SizedBox(height: h * 0.015),
 
                     InkWell(
-                      splashColor: Colors.transparent,
-                      highlightColor: Colors.transparent,
                       onTap: () {
                         Navigator.push(
                           context,
@@ -307,8 +276,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _divider(w),
 
                     InkWell(
-                      splashColor: Colors.transparent,
-                      highlightColor: Colors.transparent,
                       onTap: () {
                         Navigator.push(
                           context,
@@ -319,7 +286,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     _divider(w),
 
-                    _buildSettingRow(Icons.logout, "LOGOUT", w, h),
+                    InkWell(
+                      onTap: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+                        );
+                      },
+                      child: _buildSettingRow(Icons.logout, "LOGOUT", w, h),
+                    ),
 
                     SizedBox(height: h * 0.03),
 
@@ -335,24 +310,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     SizedBox(height: h * 0.015),
 
                     InkWell(
-                      splashColor: Colors.transparent,
-                      highlightColor: Colors.transparent,
-                      onTap: () {
-                        _showReportBugDialog(context);
-                      },
+                      onTap: () => _showReportBugDialog(context),
                       child: _buildSettingRow(Icons.bug_report, "REPORT BUG", w, h),
                     ),
                     _divider(w),
 
                     InkWell(
-                      splashColor: Colors.transparent,
-                      highlightColor: Colors.transparent,
-                      onTap: () {
-                        _showFeedbackDialog(context);
-                      },
+                      onTap: () => _showFeedbackDialog(context),
                       child: _buildSettingRow(Icons.chat, "SEND FEEDBACK", w, h),
                     ),
-
                     SizedBox(height: h * 0.05),
                   ],
                 ),
@@ -362,22 +328,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
 
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.pink,
-        unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        items: [
-          _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.warning_amber_rounded, 'Alert', isSelected: _currentIndex == 2),
-          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 3),
-        ],
-      ),
+      /// ✅ Custom reusable navigation bar
+      bottomNavigationBar: const NavbarAssisted(currentIndex: 3),
     );
   }
 
@@ -417,29 +369,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         thickness: 1.0,
         height: 1,
         color: Color(0xFFE8E2DF),
-      ),
-    );
-  }
-
-  /// --- NAV ITEM WITH GRAY CIRCLE & PINK ACCENT WHEN SELECTED ---
-  static BottomNavigationBarItem _navItem(
-      IconData icon, String label, {bool isSelected = false}) {
-    return BottomNavigationBarItem(
-      label: label,
-      icon: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            size: 32,
-            color: isSelected ? Colors.pink : Colors.black87,
-          ),
-        ),
       ),
     );
   }
