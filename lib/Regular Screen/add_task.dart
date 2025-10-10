@@ -25,15 +25,26 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   }
 
   Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-    );
-    if (picked != null) setState(() => _selectedDate = picked);
-  }
+  final DateTime initialDate = _selectedDate ?? DateTime.now();
 
+  // Keep initial date within allowed range (2025–2027)
+  final DateTime safeInitialDate = initialDate.year < 2025
+      ? DateTime(2025)
+      : (initialDate.year > 2027 ? DateTime(2027) : initialDate);
+
+  final DateTime? picked = await showDatePicker(
+    context: context,
+    initialDate: safeInitialDate,
+    firstDate: DateTime(2025, 1, 1),
+    lastDate: DateTime(2027, 12, 31),
+    selectableDayPredicate: (DateTime day) {
+      // Only allow 2025–2027 dates
+      return day.year >= 2025 && day.year <= 2027;
+    },
+  );
+
+  if (picked != null) setState(() => _selectedDate = picked);
+}
   Future<void> _selectTime(bool isStart) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
