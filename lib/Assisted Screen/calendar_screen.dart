@@ -15,7 +15,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   DateTime _focusedMonth = DateTime.now();
   DateTime? _selectedDate = DateTime.now();
 
-  // 👇 set to 1 so "Menu" is active when Calendar is opened
   int _currentIndex = 1;
 
   static const List<String> _monthNames = [
@@ -44,8 +43,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
         context,
         MaterialPageRoute(builder: (context) => const TasksScreen()),
       );
-    } else if (index == 1) {
-      // Already on CalendarScreen → do nothing
     } else if (index == 2) {
       Navigator.pushReplacement(
         context,
@@ -79,6 +76,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       backgroundColor: const Color(0xFFF8F3ED),
       body: Column(
         children: [
+          /// --- HEADER (Pink bar or you can replace with an image later) ---
           Container(
             height: 120,
             decoration: const BoxDecoration(
@@ -89,7 +87,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
           ),
+
           const SizedBox(height: 16),
+
+          /// --- MAIN CONTENT ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
@@ -108,7 +109,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     children: [
+                      /// --- MONTH & YEAR DROPDOWNS ---
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           DropdownButton<int>(
                             value: _focusedMonth.month,
@@ -128,14 +131,49 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             onChanged: (int? newMonth) {
                               if (newMonth == null) return;
                               setState(() {
-                                _focusedMonth = DateTime(year, newMonth, 1);
-                                _selectedDate = DateTime(year, newMonth, 1);
+                                _focusedMonth =
+                                    DateTime(year, newMonth, _focusedMonth.day);
+                                _selectedDate =
+                                    DateTime(year, newMonth, _focusedMonth.day);
+                              });
+                            },
+                          ),
+
+                          /// --- YEAR DROPDOWN ---
+                          DropdownButton<int>(
+                            value: year,
+                            underline: const SizedBox.shrink(),
+                            items: List.generate(
+                              20, // range: 10 years back + 10 years forward
+                              (i) {
+                                int y = DateTime.now().year - 10 + i;
+                                return DropdownMenuItem<int>(
+                                  value: y,
+                                  child: Text(
+                                    '$y',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            onChanged: (int? newYear) {
+                              if (newYear == null) return;
+                              setState(() {
+                                _focusedMonth =
+                                    DateTime(newYear, month, _focusedMonth.day);
+                                _selectedDate =
+                                    DateTime(newYear, month, _focusedMonth.day);
                               });
                             },
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 8),
+
+                      /// --- WEEKDAY LABELS ---
                       Row(
                         children: const [
                           Expanded(child: Center(child: Text('SU'))),
@@ -148,6 +186,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ],
                       ),
                       const SizedBox(height: 6),
+
+                      /// --- CALENDAR GRID ---
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -201,9 +241,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                       '${date.day}',
                                       style: TextStyle(
                                         fontSize: 14,
-                                        fontWeight: isToday
-                                            ? FontWeight.w700
-                                            : null,
+                                        fontWeight:
+                                            isToday ? FontWeight.w700 : null,
                                         color: isToday
                                             ? Colors.black
                                             : Colors.black87,
@@ -223,19 +262,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ],
       ),
 
-      /// --- FIXED BOTTOM NAV (Pink accent like TasksScreen) ---
+      /// --- BOTTOM NAVIGATION BAR ---
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
         selectedItemColor: Colors.pink,
         unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex, // 👈 highlights "Menu"
+        currentIndex: _currentIndex,
         onTap: _onTabTapped,
         showSelectedLabels: false,
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
+          _navItem(Icons.calendar_today, 'Menu',
+              isSelected: _currentIndex == 1),
           _navItem(Icons.warning_amber_rounded, 'Alert',
               isSelected: _currentIndex == 2),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 3),
@@ -244,7 +284,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  /// --- NAV ITEM WITH PINK ACCENT HIGHLIGHT ---
   static BottomNavigationBarItem _navItem(
     IconData icon,
     String label, {

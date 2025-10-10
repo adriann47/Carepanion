@@ -137,14 +137,14 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                                 },
                               ),
 
-                              // Year dropdown
+                              // Year dropdown (2015–2034)
                               DropdownButton<int>(
                                 value: _focusedMonth.year,
                                 underline: const SizedBox.shrink(),
                                 items: List.generate(
-                                  11,
+                                  2034 - 2015 + 1,
                                   (i) {
-                                    int displayYear = DateTime.now().year - 5 + i;
+                                    int displayYear = 2015 + i;
                                     return DropdownMenuItem<int>(
                                       value: displayYear,
                                       child: Text(
@@ -159,13 +159,12 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                                 onChanged: (int? newYear) {
                                   if (newYear == null) return;
                                   setState(() {
-                                    _focusedMonth =
-                                        DateTime(newYear, month, 1);
-                                    _selectedDate =
-                                        DateTime(newYear, month, 1);
+                                    _focusedMonth = DateTime(newYear, month, 1);
+                                    _selectedDate = DateTime(newYear, month, 1);
                                   });
                                 },
                               ),
+
                             ],
                           ),
                           const SizedBox(height: 8),
