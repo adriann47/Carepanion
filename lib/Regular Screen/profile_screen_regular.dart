@@ -54,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: const Color(0xFFF8F4EF),
         elevation: 0,
         centerTitle: true,
+        automaticallyImplyLeading: false, // ✅ Removes the back button
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -143,7 +144,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const SettingsScreen()),
                 );
               }),
               _menuButton(Icons.info, 'ABOUT', const Color(0xFFFFE0B2),
@@ -192,8 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               isSelected: _currentIndex == 2),
           _navItem(Icons.notifications, 'Notifications',
               isSelected: _currentIndex == 3),
-          _navItem(Icons.person, 'Profile',
-              isSelected: _currentIndex == 4),
+          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
     );
@@ -218,8 +219,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Expanded(
               child: Text(
                 text,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w600),
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
             const Icon(Icons.arrow_forward_ios, size: 16),
