@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'companion_list.dart';
@@ -14,6 +16,18 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   int _currentIndex = 3;
+  File? _profileImage; // ✅ Store selected image
+
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _profileImage = File(image.path);
+      });
+    }
+  }
 
   void _onTabTapped(int index) {
     if (index == 0) {
@@ -87,6 +101,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 25),
               Text(
                 'EDIT PROFILE',
@@ -98,12 +113,45 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 18),
-              CircleAvatar(
-                radius: 60,
-                backgroundColor: const Color(0xFFF1D2B6),
-                child: const Icon(Icons.person, size: 70, color: Colors.white),
+
+              // 🖼️ Editable Profile Picture
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  CircleAvatar(
+                    radius: 60,
+                    backgroundColor: const Color(0xFFF1D2B6),
+                    backgroundImage:
+                        _profileImage != null ? FileImage(_profileImage!) : null,
+                    child: _profileImage == null
+                        ? const Icon(Icons.person, size: 70, color: Colors.white)
+                        : null,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 4,
+                    child: GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Colors.pinkAccent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+
               const SizedBox(height: 30),
+
+              // 📝 Profile Form Fields
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Column(
@@ -141,7 +189,8 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ),
-          // Bottom Navigation Bar
+
+      // 🔹 Bottom Navigation Bar
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
@@ -159,13 +208,13 @@ class _ProfilePageState extends State<ProfilePage> {
               isSelected: _currentIndex == 2),
           _navItem(Icons.notifications, 'Notifications',
               isSelected: _currentIndex == 3),
-          _navItem(Icons.person, 'Profile',
-              isSelected: _currentIndex == 4),
+          _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
     );
   }
 
+  // 🧱 Text Field Builder
   Widget _buildTextField(String label, String hint) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,7 +250,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
- /// Helper for nav bar icon styling
+  /// 🧭 Helper for nav bar icon styling
   static BottomNavigationBarItem _navItem(
     IconData icon,
     String label, {
