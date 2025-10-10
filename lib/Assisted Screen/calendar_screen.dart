@@ -16,6 +16,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   DateTime _focusedMonth = DateTime.now();
   DateTime? _selectedDate = DateTime.now();
 
+  int _currentIndex = 1;
+
   static const List<String> _monthNames = [
     'January',
     'February',
@@ -33,6 +35,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
+
+  void _onTabTapped(int index) {
+    setState(() => _currentIndex = index);
+
+    if (index == 0) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const TasksScreen()),
+      );
+    } else if (index == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const EmergencyScreen()),
+      );
+    } else if (index == 3) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const ProfileScreen()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +78,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       body: Column(
         children: [
           /// --- HEADER ---
+          /// --- HEADER (Pink bar or you can replace with an image later) ---
           Container(
             height: 120,
             decoration: const BoxDecoration(
@@ -65,6 +89,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
           ),
+
           const SizedBox(height: 16),
 
           /// --- MAIN CONTENT ---
@@ -87,7 +112,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   child: Column(
                     children: [
                       /// Month Dropdown
+                      /// --- MONTH & YEAR DROPDOWNS ---
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           DropdownButton<int>(
                             value: _focusedMonth.month,
@@ -107,16 +134,50 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             onChanged: (int? newMonth) {
                               if (newMonth == null) return;
                               setState(() {
-                                _focusedMonth = DateTime(year, newMonth, 1);
-                                _selectedDate = DateTime(year, newMonth, 1);
+                                _focusedMonth =
+                                    DateTime(year, newMonth, _focusedMonth.day);
+                                _selectedDate =
+                                    DateTime(year, newMonth, _focusedMonth.day);
+                              });
+                            },
+                          ),
+
+                          /// --- YEAR DROPDOWN ---
+                          DropdownButton<int>(
+                            value: year,
+                            underline: const SizedBox.shrink(),
+                            items: List.generate(
+                              20, // range: 10 years back + 10 years forward
+                              (i) {
+                                int y = DateTime.now().year - 10 + i;
+                                return DropdownMenuItem<int>(
+                                  value: y,
+                                  child: Text(
+                                    '$y',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            onChanged: (int? newYear) {
+                              if (newYear == null) return;
+                              setState(() {
+                                _focusedMonth =
+                                    DateTime(newYear, month, _focusedMonth.day);
+                                _selectedDate =
+                                    DateTime(newYear, month, _focusedMonth.day);
                               });
                             },
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 8),
 
                       /// Weekday Row
+                      /// --- WEEKDAY LABELS ---
                       Row(
                         children: const [
                           Expanded(child: Center(child: Text('SU'))),
@@ -131,6 +192,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       const SizedBox(height: 6),
 
                       /// Calendar Grid
+                      /// --- CALENDAR GRID ---
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -204,7 +266,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ],
       ),
 
-      /// ✅ Replaced BottomNavigationBar with the reusable navbar
+       /// ✅ Replaced BottomNavigationBar with the reusable navbar
       bottomNavigationBar: const NavbarAssisted(currentIndex: 1),
     );
   }
