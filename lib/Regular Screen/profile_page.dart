@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'companion_list.dart';
-import 'notification_screen.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});

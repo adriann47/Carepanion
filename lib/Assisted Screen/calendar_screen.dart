@@ -16,6 +16,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   DateTime _focusedMonth = DateTime.now();
   DateTime? _selectedDate = DateTime.now();
 
+  // ignore: unused_field
   int _currentIndex = 1;
 
   static const List<String> _monthNames = [
@@ -36,6 +37,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  // ignore: unused_element
   void _onTabTapped(int index) {
     setState(() => _currentIndex = index);
 

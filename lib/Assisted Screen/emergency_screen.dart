@@ -14,6 +14,7 @@ class EmergencyScreen extends StatefulWidget {
 
 class _EmergencyScreenState extends State<EmergencyScreen>
     with SingleTickerProviderStateMixin {
+  // ignore: unused_field
   int _currentIndex = 2; // Start on Alert tab
   late AnimationController _controller;
 
@@ -37,6 +38,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     super.dispose();
   }
 
+  // ignore: unused_element
   void _onTabTapped(int index) {
     setState(() => _currentIndex = index);
 

@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'package:softeng/screen/role_selection_screen.dart';
-import 'signin_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/profile_service.dart';
 
 class VerifyEmailScreen extends StatefulWidget {
   final String? email; // email used for registration; enables resend/OTP
-  const VerifyEmailScreen({super.key, this.email});
+  final String? phone; // phone in E.164 format (+63...), enables SMS OTP
+  const VerifyEmailScreen({super.key, this.email, this.phone});
 
   @override
   State<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
@@ -25,8 +25,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   Timer? _cooldownTimer;
   // DEV-ONLY: Toggle to use a locally generated OTP instead of Supabase email OTP
   // Set to false to use Supabase's real OTP flow.
-  final bool _devLocalOtp = true;
+  final bool _devLocalOtp = false; // Step A: use real email OTP
   String? _localOtp; // holds the generated 6-digit code when using local OTP
+  bool _autoSent = false; // ensure we only auto-send once
+  // If SMS is requested but the provider is disabled, allow opting-in to email fallback.
+  bool _forceEmailFallback = false;
 
   String get _otpCode => _otpControllers.map((c) => c.text).join();
   String? get _emailOrSessionEmail {
@@ -36,6 +39,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     if (sessEmail != null && sessEmail.isNotEmpty) return sessEmail;
     return null;
   }
+  String? get _phoneFromWidget => widget.phone?.trim();
+  bool get _useSms => !_forceEmailFallback && (_phoneFromWidget != null && _phoneFromWidget!.isNotEmpty);
 
   @override
   void dispose() {
@@ -47,6 +52,18 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
     _cooldownTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-send OTP on first build when email is available and we're using real email OTP
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!_devLocalOtp && !_autoSent && (_emailOrSessionEmail != null || _useSms)) {
+        _autoSent = true;
+        await _sendOtp();
+      }
+    });
   }
 
   void _fillOtpControllersWith(String code) {
@@ -100,31 +117,75 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       return;
     }
 
-    final email = _emailOrSessionEmail;
-    if (email == null || email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid email first.')),
-      );
-      return;
-    }
+    // Real OTP via Supabase: branch by method (SMS vs Email)
     setState(() => _isSending = true);
     try {
-      await supabase.auth.signInWithOtp(
-        email: email,
-        emailRedirectTo: 'https://eyalgnlsdseuvmmtgefk.supabase.co',
-      );
+      if (_useSms) {
+        final phone = _phoneFromWidget;
+        if (phone == null || phone.isEmpty) {
+          throw AuthException('Phone number is missing');
+        }
+        await supabase.auth.signInWithOtp(phone: phone);
+      } else {
+        final email = _emailOrSessionEmail;
+        if (email == null || email.isEmpty) {
+          throw AuthException('Email is missing');
+        }
+        await supabase.auth.signInWithOtp(
+          email: email,
+          emailRedirectTo: 'https://eyalgnlsdseuvmmtgefk.supabase.co',
+        );
+      }
       if (!mounted) return;
       _startCooldown();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('OTP sent to your email.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_useSms ? 'OTP sent via SMS.' : 'OTP sent to your email.')),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to send OTP: $e')));
+      final msg = e.toString();
+      // If SMS provider isn't configured in Supabase, offer an email fallback (when available)
+      if (_useSms && msg.toLowerCase().contains('phone_provider_disabled')) {
+        await _handleSmsProviderDisabled();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to send OTP: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _handleSmsProviderDisabled() async {
+    final email = _emailOrSessionEmail;
+    final canFallback = email != null && email.isNotEmpty;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('SMS not available'),
+        content: const Text(
+          'Your Supabase project has Phone/SMS auth disabled or not configured. Enable a provider (Twilio/MessageBird) in Supabase → Authentication → Providers → Phone to send SMS codes.\n\nIf you prefer, you can use an email code instead.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('close'),
+            child: const Text('Close'),
+          ),
+          if (canFallback)
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('email'),
+              child: const Text('Use Email Instead'),
+            ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    if (result == 'email' && canFallback) {
+      setState(() {
+        _forceEmailFallback = true; // Switch UI/logic to email mode
+      });
+      // Trigger an email OTP send immediately
+      await _sendOtp();
     }
   }
 
@@ -155,24 +216,38 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         }
         return;
       }
-
-      final email = _emailOrSessionEmail;
-      if (email == null || email.isEmpty) {
-        throw AuthException('Email is missing');
+      if (_useSms) {
+        final phone = _phoneFromWidget;
+        if (phone == null || phone.isEmpty) {
+          throw AuthException('Phone number is missing');
+        }
+        await supabase.auth.verifyOTP(
+          type: OtpType.sms,
+          phone: phone,
+          token: code,
+        );
+      } else {
+        final email = _emailOrSessionEmail;
+        if (email == null || email.isEmpty) {
+          throw AuthException('Email is missing');
+        }
+        await supabase.auth.verifyOTP(
+          type: OtpType.email,
+          email: email,
+          token: code,
+        );
       }
-      await supabase.auth.verifyOTP(
-        type: OtpType.email,
-        email: email,
-        token: code,
-      );
 
       // Ensure profile exists after successful verification (session created)
-      await ProfileService.ensureProfileExists(supabase, email: email);
+      await ProfileService.ensureProfileExists(
+        supabase,
+        email: _useSms ? null : _emailOrSessionEmail,
+      );
 
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const SignInScreen()),
+        MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
       );
     } on AuthException catch (e) {
       if (!mounted) return;
@@ -192,9 +267,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryTextColor = Color(0xFFCA5000); // All text except button
-
-    // No code inputs needed; verification occurs via email link
-
     return Scaffold(
       backgroundColor: const Color(0xFFFDF8F0),
       body: Padding(
@@ -205,7 +277,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
             // Verify your Email Address (bold, multi-line)
             Text(
-              "Verify your Email",
+              _useSms ? "Verify your Phone Number" : "Verify your Email",
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(
                 color: primaryTextColor,
@@ -217,7 +289,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
             // Verify message
             Text(
-              "We sent a verification code to your email.\nCheck it out and enter it below.",
+              _useSms
+                  ? "We sent a 6-digit code to your phone via SMS.\nEnter the code below to continue."
+                  : "We sent a verification link and a 6-digit code to your email.\nEnter the code below to continue.",
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(color: primaryTextColor),
             ),
@@ -230,7 +304,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'verify with 6-digit code',
+                'Or verify with 6-digit code',
                 style: GoogleFonts.nunito(
                   color: primaryTextColor,
                   fontWeight: FontWeight.bold,

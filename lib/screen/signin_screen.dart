@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'welcome_screen.dart';
 import '../data/profile_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -20,6 +23,8 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _isLoading = false;
 
   final supabase = Supabase.instance.client;
+  StreamSubscription<AuthState>? _authSub;
+  bool _googleOAuthPending = false;
 
   // Email validator - less restrictive
   String? _validateEmail(String? value) {
@@ -121,24 +126,16 @@ class _SignInScreenState extends State<SignInScreen> {
     setState(() => _isLoading = true);
 
     try {
+      _googleOAuthPending = true;
+      // Web: redirect back to current origin; Mobile: use deep link scheme
+      final redirect = kIsWeb ? Uri.base.origin : 'io.supabase.flutter://callback';
+      // Force external system browser for the auth flow to avoid embedded webviews
       await supabase.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'https://eyalgnlsdseuvmmtgefk.supabase.co/auth/v1/callback',
+        redirectTo: redirect,
+        authScreenLaunchMode: LaunchMode.externalApplication,
       );
-
-      // For Google OAuth, we need to wait a moment for the redirect to complete
-      await Future.delayed(const Duration(seconds: 3));
-
-      if (!mounted) return;
-      // Ensure profile exists
-      await _ensureProfileExists();
-
-      if (!mounted) return;
-      // Navigate to welcome screen
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const WelcomeScreen()),
-      );
+      // Navigation will be handled by onAuthStateChange listener in initState.
     } on AuthException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -154,6 +151,45 @@ class _SignInScreenState extends State<SignInScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen for auth state changes to complete OAuth flows reliably
+    _authSub = supabase.auth.onAuthStateChange.listen((data) async {
+      final event = data.event;
+      if (event == AuthChangeEvent.signedIn) {
+        // Ensure profile exists, then navigate
+        await _ensureProfileExists();
+        if (!mounted) return;
+        final user = supabase.auth.currentUser;
+        if (_googleOAuthPending) {
+          _googleOAuthPending = false;
+          Navigator.pushReplacementNamed(context, '/google_registration');
+          return;
+        }
+        final Map<String, dynamic>? meta = user?.appMetadata;
+        final provider = (meta != null ? meta['provider'] : '')?.toString();
+        if (provider == 'google') {
+          // After Google OAuth, go to GoogleRegistration screen
+          Navigator.pushReplacementNamed(context, '/google_registration');
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          );
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override

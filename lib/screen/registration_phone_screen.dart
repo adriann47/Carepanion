@@ -22,20 +22,37 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
 
   final supabase = Supabase.instance.client;
 
+  String? _toE164(String raw) {
+    // If already in E.164, pass through
+    if (raw.startsWith('+') && raw.length > 8) return raw;
+    // Strip non-digits
+    final d = raw.replaceAll(RegExp(r'\D'), '');
+    if (d.length == 11 && d.startsWith('0')) {
+      // Assume PH local 11-digit number starting with 0 -> +63
+      return '+63${d.substring(1)}';
+    }
+    // Fallback: return null to indicate invalid format
+    return null;
+  }
+
   void _validatePhoneAndProceed(BuildContext context) {
     String phone = _phoneController.text.trim();
-
     if (phone.isEmpty) {
       setState(() => _errorMessage = "Phone number is required");
-    } else if (!RegExp(r'^[0-9]{11}$').hasMatch(phone)) {
-      setState(() => _errorMessage = "Phone number must be exactly 11 digits");
-    } else {
-      setState(() => _errorMessage = null);
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const VerifyEmailScreen()),
-      );
+      return;
     }
+
+    final e164 = _toE164(phone);
+    if (e164 == null) {
+      setState(() => _errorMessage = "Enter a valid PH number (e.g., 09XXXXXXXXX)");
+      return;
+    }
+
+    setState(() => _errorMessage = null);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => VerifyEmailScreen(phone: e164)),
+    );
   }
 
   Future<void> _signInWithGoogle() async {

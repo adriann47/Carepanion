@@ -12,9 +12,11 @@ class TasksScreen extends StatefulWidget {
 }
 
 class _TasksScreen extends State<TasksScreen> {
+  // ignore: unused_field
   int _currentIndex = 0; // Home tab
   final List<bool> _taskDone = [true, false, false]; // initial checkboxes
 
+  // ignore: unused_element
   void _onTabTapped(int index) {
     setState(() => _currentIndex = index);
 
