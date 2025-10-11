@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'welcome_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -14,14 +15,16 @@ class _SignInScreenState extends State<SignInScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  // Email validator
+  bool _rememberMe = false;
+  bool _isLoading = false;
+
+  final supabase = Supabase.instance.client;
+
+  // Email validator - less restrictive
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) return "Email is required";
-
-    if (!value.endsWith("@gmail.com")) {
-      return "Email must be a @gmail.com address";
-    }
-
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value))
+      return "Please enter a valid email address";
     return null;
   }
 
@@ -29,20 +32,64 @@ class _SignInScreenState extends State<SignInScreen> {
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) return "Password is required";
     if (value.length < 6) return "Must be at least 6 characters";
-    if (!RegExp(r'[A-Z]').hasMatch(value)) return "Must contain 1 uppercase letter";
+    if (!RegExp(r'[A-Z]').hasMatch(value))
+      return "Must contain 1 uppercase letter";
     if (!RegExp(r'[0-9]').hasMatch(value)) return "Must contain 1 number";
-    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value)) {
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value))
       return "Must contain 1 special character";
-    }
     return null;
   }
 
-  void _submitForm() {
+  /// ✅ Email + Password Sign In
+  Future<void> _signInWithEmail() async {
     if (_formKey.currentState!.validate()) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+      setState(() => _isLoading = true);
+
+      try {
+        final response = await supabase.auth.signInWithPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+
+        if (response.user != null) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          );
+        }
+      } on AuthException catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      } catch (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("An unexpected error occurred")),
+        );
+      } finally {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  /// ✅ Google Sign In - Simple Supabase OAuth
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'https://eyalgnlsdseuvmmtgefk.supabase.co/auth/v1/callback',
       );
+    } on AuthException catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Google sign-in failed: $e")));
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -61,19 +108,22 @@ class _SignInScreenState extends State<SignInScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 30),
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Color(0xFFCA5000)),
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const WelcomeScreen(),
-                        ),
-                      );
-                    },
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Color(0xFFCA5000),
+                    ),
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const WelcomeScreen(),
+                              ),
+                            );
+                          },
                   ),
                 ),
-
-                // Title
                 Center(
                   child: Text(
                     "SIGN IN",
@@ -86,7 +136,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Email
+                // Email field
                 Text(
                   "Email",
                   style: GoogleFonts.nunito(
@@ -98,6 +148,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 TextFormField(
                   controller: _emailController,
                   validator: _validateEmail,
+                  enabled: !_isLoading,
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white,
@@ -105,14 +156,16 @@ class _SignInScreenState extends State<SignInScreen> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 12,
+                    ),
                   ),
                   style: GoogleFonts.nunito(color: const Color(0xFFCA5000)),
                 ),
                 const SizedBox(height: 25),
 
-                // Password
+                // Password field
                 Text(
                   "Password",
                   style: GoogleFonts.nunito(
@@ -125,6 +178,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   controller: _passwordController,
                   obscureText: true,
                   validator: _validatePassword,
+                  enabled: !_isLoading,
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white,
@@ -132,8 +186,10 @@ class _SignInScreenState extends State<SignInScreen> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 12,
+                    ),
                   ),
                   style: GoogleFonts.nunito(color: const Color(0xFFCA5000)),
                 ),
@@ -143,20 +199,33 @@ class _SignInScreenState extends State<SignInScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(children: [
-                      Checkbox(value: false, onChanged: (_) {}),
-                      Text(
-                        "Remember Me",
-                        style: GoogleFonts.nunito(color: const Color(0xFFCA5000)),
-                      ),
-                    ]),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _rememberMe,
+                          onChanged: _isLoading
+                              ? null
+                              : (value) {
+                                  setState(() => _rememberMe = value ?? false);
+                                },
+                        ),
+                        Text(
+                          "Remember Me",
+                          style: GoogleFonts.nunito(
+                            color: const Color(0xFFCA5000),
+                          ),
+                        ),
+                      ],
+                    ),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: _isLoading ? null : () {},
                       child: Text(
                         "Forgot password?",
-                        style: GoogleFonts.nunito(color: const Color(0xFFCA5000)),
+                        style: GoogleFonts.nunito(
+                          color: const Color(0xFFCA5000),
+                        ),
                       ),
-                    )
+                    ),
                   ],
                 ),
                 const SizedBox(height: 30),
@@ -171,20 +240,30 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                       minimumSize: const Size(200, 45),
                     ),
-                    onPressed: _submitForm,
-                    child: Text(
-                      "Log In",
-                      style: GoogleFonts.nunito(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
+                    onPressed: _isLoading ? null : _signInWithEmail,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            "Log In",
+                            style: GoogleFonts.nunito(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 30),
 
-                // Log In with
                 Center(
                   child: Text(
                     "Log In with",
@@ -193,13 +272,19 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Google logo
+                // Google logo as button
                 Center(
-                  child: Image.asset(
-                    'assets/google1.png',
-                    width: 40,
-                    height: 40,
-                    fit: BoxFit.cover,
+                  child: InkWell(
+                    onTap: _isLoading ? null : _signInWithGoogle,
+                    child: Opacity(
+                      opacity: _isLoading ? 0.5 : 1.0,
+                      child: Image.asset(
+                        'assets/google1.png',
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   ),
                 ),
 
