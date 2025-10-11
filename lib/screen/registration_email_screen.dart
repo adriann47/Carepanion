@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'registration_phone_screen.dart';
 import 'verify_email_screen.dart';
 import 'welcome_screen.dart';
-
+import 'signin_screen.dart';
 class RegistrationEmailScreen extends StatefulWidget {
   const RegistrationEmailScreen({super.key});
 
@@ -255,39 +255,53 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Already have account?
-                Center(
-                  child: Text(
-                    "Do you have an account already? Sign In",
-                    style: GoogleFonts.nunito(
-                      color: primaryTextColor,
-                      decoration: TextDecoration.underline,
-                      decorationColor: primaryTextColor,
-                      decorationThickness: 2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
+                // Already have an account?
+Center(
+  child: GestureDetector(
+    onTap: () {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const SignInScreen(),
+        ),
+      );
+    },
+    child: RichText(
+      text: TextSpan(
+        style: GoogleFonts.nunito(
+          color: primaryTextColor,
+          fontSize: 16,
+        ),
+        children: [
+          const TextSpan(text: "Do you have an account already? "),
+          TextSpan(
+            text: "Sign in",
+            style: GoogleFonts.nunito(
+              color: primaryTextColor,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.underline,
+              decorationColor: primaryTextColor,
+              decorationThickness: 2,
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+),
 
-                // Sign in with
-                Center(
-                  child: Text(
-                    "Sign in with",
-                    style: GoogleFonts.nunito(
-                      color: primaryTextColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
 
                 // Google logo
-                Center(
-                  child: Image.asset(
-                    'assets/google1.png',
-                    width: 40,
-                    height: 40,
-                  ),
-                ),
+                
+const SizedBox(height: 20),
+Center(
+  child: Image.asset(
+    'assets/google1.png',
+    width: 40,
+    height: 40,
+  ),
+),
+
               ],
             ),
           ),
