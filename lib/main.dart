@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+// Your screens
 import 'screen/welcome_screen.dart';
 import 'screen/signin_screen.dart';
 import 'screen/registration_email_screen.dart';
@@ -12,7 +15,16 @@ import 'Assisted Screen/notification.dart';
 import 'Assisted Screen/account.dart';
 import 'Assisted Screen/settings.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ Initialize Supabase with your project's URL and anon key
+  await Supabase.initialize(
+    url: 'https://eyalgnlsdseuvmmtgefk.supabase.co',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5YWxnbmxzZHNldXZtbXRnZWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5ODEwMjYsImV4cCI6MjA3NTU1NzAyNn0.IWCEqWYR-WaXzMlCCZkmmPHuP_KjHlSA4Zyhlfj8wNM',
+  );
+
   runApp(const CarePanionApp());
 }
 
