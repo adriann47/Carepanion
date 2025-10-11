@@ -6,7 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// - Guardians subscribe to an assisted user's task changes
 /// - Guardians subscribe to emergency alerts from one or more assisted users
 class RealtimeService {
-  RealtimeService({SupabaseClient? client}) : _client = client ?? Supabase.instance.client;
+  RealtimeService({SupabaseClient? client})
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
   final Map<String, RealtimeChannel> _channels = {};
