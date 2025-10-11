@@ -22,7 +22,6 @@ class TaskService {
   TaskService._();
 
   static final SupabaseClient _client = Supabase.instance.client;
-  static String? get _uid => _client.auth.currentUser?.id;
 
   static String _toDateString(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
 
@@ -72,18 +71,11 @@ class TaskService {
   /// Fetch tasks for a specific calendar date (local date match on `due_date`).
   static Future<List<Map<String, dynamic>>> getTasksForDate(DateTime date) async {
     final dateStr = _toDateString(date);
-    var builder = _client
+    final result = await _client
         .from('tasks')
         .select()
-        .eq('due_date', dateStr);
-
-    // If the user is authenticated, only fetch their tasks (helps with RLS and correctness)
-    final uid = _uid;
-    if (uid != null) {
-      builder = builder.eq('user_id', uid);
-    }
-
-    final result = await builder.order('start_at', ascending: true);
+        .eq('due_date', dateStr)
+        .order('start_at', ascending: true);
     return List<Map<String, dynamic>>.from(result);
   }
 
@@ -108,14 +100,11 @@ class TaskService {
     // We may need the existing due_date when only time changes
     DateTime? effectiveDate = dueDate;
     if (effectiveDate == null && (startTime != null || endTime != null)) {
-      // Fetch current row to get its due_date without using maybeSingle() to avoid 406
-      var builder = _client
+      final existingList = await _client
           .from('tasks')
           .select('due_date')
-          .eq('id', id);
-      final uid2 = _uid;
-      if (uid2 != null) builder = builder.eq('user_id', uid2);
-      final List existingList = await builder.limit(1);
+          .eq('id', id)
+          .limit(1);
       if (existingList.isNotEmpty) {
         final dueStr = existingList.first['due_date']?.toString();
         if (dueStr != null && dueStr.isNotEmpty) {
@@ -141,30 +130,13 @@ class TaskService {
     if (data.isEmpty) return; // nothing to update
 
     try {
-      // Use select() to ensure a row was actually updated (and surface RLS/permission issues)
-      var upd = _client.from('tasks').update(data).eq('id', id);
-      final uid = _uid;
-      if (uid != null) {
-        upd = upd.eq('user_id', uid);
-      }
-      final List updatedList = await upd.select('id');
-      if (updatedList.isEmpty) {
-        throw Exception('Task not updated. It may not exist or you may not have permission.');
-      }
+      await _client.from('tasks').update(data).eq('id', id);
     } catch (e) {
       final msg = e.toString().toLowerCase();
       if (msg.contains("'category'") || (msg.contains('category') && data.containsKey('category'))) {
         final fallback = Map<String, dynamic>.from(data);
         fallback.remove('category');
-        var upd = _client.from('tasks').update(fallback).eq('id', id);
-        final uid = _uid;
-        if (uid != null) {
-          upd = upd.eq('user_id', uid);
-        }
-        final List updatedList = await upd.select('id');
-        if (updatedList.isEmpty) {
-          throw Exception('Task not updated. It may not exist or you may not have permission.');
-        }
+        await _client.from('tasks').update(fallback).eq('id', id);
         return;
       }
       rethrow;
@@ -173,15 +145,6 @@ class TaskService {
 
   /// Delete a task by id.
   static Future<void> deleteTask(int id) async {
-    // Use select() to ensure a row was actually deleted (and surface RLS/permission issues)
-    var del = _client.from('tasks').delete().eq('id', id);
-    final uid = _uid;
-    if (uid != null) {
-      del = del.eq('user_id', uid);
-    }
-    final List deletedList = await del.select('id');
-    if (deletedList.isEmpty) {
-      throw Exception('Task not deleted. It may not exist or you may not have permission.');
-    }
+    await _client.from('tasks').delete().eq('id', id);
   }
 }
