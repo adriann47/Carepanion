@@ -138,32 +138,32 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                               ),
 
                               // Year dropdown (2015–2034)
-                              DropdownButton<int>(
-                                value: _focusedMonth.year,
-                                underline: const SizedBox.shrink(),
-                                items: List.generate(
-                                  2034 - 2015 + 1,
-                                  (i) {
-                                    int displayYear = 2015 + i;
-                                    return DropdownMenuItem<int>(
-                                      value: displayYear,
-                                      child: Text(
-                                        displayYear.toString(),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                onChanged: (int? newYear) {
-                                  if (newYear == null) return;
-                                  setState(() {
-                                    _focusedMonth = DateTime(newYear, month, 1);
-                                    _selectedDate = DateTime(newYear, month, 1);
-                                  });
-                                },
-                              ),
+                              // Year dropdown (2 years before and 2 years after current year)
+DropdownButton<int>(
+  value: _focusedMonth.year,
+  underline: const SizedBox.shrink(),
+  items: List.generate(5, (i) {
+    int currentYear = DateTime.now().year;
+    int displayYear = currentYear - 2 + i;
+    return DropdownMenuItem<int>(
+      value: displayYear,
+      child: Text(
+        displayYear.toString(),
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }),
+  onChanged: (int? newYear) {
+    if (newYear == null) return;
+    setState(() {
+      _focusedMonth = DateTime(newYear, _focusedMonth.month, 1);
+      _selectedDate = DateTime(newYear, _focusedMonth.month, 1);
+    });
+  },
+),
+
 
                             ],
                           ),

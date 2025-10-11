@@ -144,23 +144,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
                           /// --- YEAR DROPDOWN ---
                           DropdownButton<int>(
-                            value: year,
-                            underline: const SizedBox.shrink(),
-                            items: List.generate(
-                              20, // range: 10 years back + 10 years forward
-                              (i) {
-                                int y = DateTime.now().year - 10 + i;
-                                return DropdownMenuItem<int>(
-                                  value: y,
-                                  child: Text(
-                                    '$y',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
+                              value: year,
+                              underline: const SizedBox.shrink(),
+                              items: List.generate(
+                                5, // 2 years before + current year + 2 years after
+                                (i) {
+                                  int currentYear = DateTime.now().year;
+                                  int y = currentYear - 2 + i; // generates [currentYear-2 ... currentYear+2]
+                                  return DropdownMenuItem<int>(
+                                    value: y,
+                                    child: Text(
+                                      '$y',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
+                                  );
+                                },
+                              ),
+
                             onChanged: (int? newYear) {
                               if (newYear == null) return;
                               setState(() {
