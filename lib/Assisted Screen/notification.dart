@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 class NotificationPage extends StatefulWidget {
+  const NotificationPage({super.key});
+
   @override
   _NotificationPageState createState() => _NotificationPageState();
 }
@@ -139,7 +141,7 @@ class _NotificationPageState extends State<NotificationPage> {
             Switch(
               value: value,
               onChanged: onChanged,
-              activeColor: Colors.white,
+              activeThumbColor: Colors.white,
               activeTrackColor: activeColor,
               inactiveThumbColor: Colors.white,
               inactiveTrackColor: Colors.black54,

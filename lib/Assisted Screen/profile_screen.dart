@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'tasks_screen.dart';
-import 'calendar_screen.dart';
-import 'emergency_screen.dart';
 import 'aboutpage.dart';
 import 'legaldatapage.dart';
 import 'settings.dart';

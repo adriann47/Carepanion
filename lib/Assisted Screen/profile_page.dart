@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'tasks_screen.dart';
-import 'calendar_screen.dart';
-import 'emergency_screen.dart';
 import 'navbar_assisted.dart'; // ✅ Import your shared navbar
 
 class ProfilePage extends StatefulWidget {

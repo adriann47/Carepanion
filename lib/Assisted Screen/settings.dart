@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'account.dart';
 import 'notification.dart';
-import 'tasks_screen.dart';
-import 'calendar_screen.dart';
 import 'profile_screen.dart';
-import 'emergency_screen.dart';
 import '/screen/welcome_screen.dart';
 import 'navbar_assisted.dart'; // ✅ Import shared navbar
 

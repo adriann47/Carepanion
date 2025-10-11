@@ -5,7 +5,7 @@ import 'package:softeng/Regular%20Screen/tasks_screen_regular.dart'; // ✅ New 
 import '../Assisted Screen/guardian_input_screen.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
-  const RoleSelectionScreen({Key? key}) : super(key: key);
+  const RoleSelectionScreen({super.key});
 
   @override
   _RoleSelectionScreenState createState() => _RoleSelectionScreenState();

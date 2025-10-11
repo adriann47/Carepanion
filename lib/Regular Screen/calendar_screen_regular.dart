@@ -7,7 +7,7 @@ import '../Regular Screen/notification_screen.dart';
 import '../Regular Screen/add_task.dart';
 
 class CalendarScreenRegular extends StatefulWidget {
-  const CalendarScreenRegular({Key? key}) : super(key: key);
+  const CalendarScreenRegular({super.key});
 
   @override
   State<CalendarScreenRegular> createState() => _CalendarScreenRegularState();

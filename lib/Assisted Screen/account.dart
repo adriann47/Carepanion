@@ -320,7 +320,7 @@ class _AccountPageState extends State<AccountPage> {
                   ),
                   const SizedBox(height: 14),
 
-                  ...guardians.map((g) => _buildGuardianRow(g)).toList(),
+                  ...guardians.map((g) => _buildGuardianRow(g)),
 
                   GestureDetector(
                     onTap: _addGuardian,

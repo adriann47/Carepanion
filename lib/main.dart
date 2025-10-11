@@ -14,6 +14,7 @@ import 'Assisted Screen/profile_screen.dart';
 import 'Assisted Screen/notification.dart';
 import 'Assisted Screen/account.dart';
 import 'Assisted Screen/settings.dart';
+import 'data/profile_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,9 @@ Future<void> main() async {
     anonKey:
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5YWxnbmxzZHNldXZtbXRnZWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5ODEwMjYsImV4cCI6MjA3NTU1NzAyNn0.IWCEqWYR-WaXzMlCCZkmmPHuP_KjHlSA4Zyhlfj8wNM',
   );
+
+  // Pin profile table name to match your schema
+  ProfileService.setPreferredTable('profile');
 
   runApp(const CarePanionApp());
 }

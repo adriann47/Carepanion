@@ -3,7 +3,6 @@ import 'package:softeng/Regular%20Screen/notification_screen.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'profile_screen_regular.dart';
-import 'notification_regular.dart';
 import 'companion_list.dart';
 
 class AboutPage extends StatefulWidget {

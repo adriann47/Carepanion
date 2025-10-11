@@ -15,7 +15,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  int _currentIndex = 3;
+  final int _currentIndex = 3;
   File? _profileImage; // ✅ Store selected image
 
   final ImagePicker _picker = ImagePicker();

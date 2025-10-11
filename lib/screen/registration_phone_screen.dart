@@ -3,17 +3,23 @@ import 'package:google_fonts/google_fonts.dart';
 import 'registration_email_screen.dart';
 import 'verify_email_screen.dart'; // Import your verify email screen
 import 'welcome_screen.dart'; // Import your welcome screen
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/profile_service.dart';
 
 class RegistrationPhoneScreen extends StatefulWidget {
   const RegistrationPhoneScreen({super.key});
 
   @override
-  State<RegistrationPhoneScreen> createState() => _RegistrationPhoneScreenState();
+  State<RegistrationPhoneScreen> createState() =>
+      _RegistrationPhoneScreenState();
 }
 
 class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
   final TextEditingController _phoneController = TextEditingController();
   String? _errorMessage;
+  bool _isLoading = false;
+
+  final supabase = Supabase.instance.client;
 
   void _validatePhoneAndProceed(BuildContext context) {
     String phone = _phoneController.text.trim();
@@ -31,6 +37,42 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
         context,
         MaterialPageRoute(builder: (context) => const VerifyEmailScreen()),
       );
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      await supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'https://eyalgnlsdseuvmmtgefk.supabase.co/auth/v1/callback',
+      );
+
+      // Wait briefly for redirect/login to complete
+      await Future.delayed(const Duration(seconds: 3));
+
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        await ProfileService.ensureProfileExists(supabase, email: user.email);
+        if (!mounted) return;
+        // Navigate to welcome (or adjust to your desired post-OAuth screen)
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+        );
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Google sign-in failed: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -84,8 +126,8 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) =>
-                                const RegistrationEmailScreen()),
+                          builder: (context) => const RegistrationEmailScreen(),
+                        ),
                       );
                     },
                     child: Transform.translate(
@@ -152,8 +194,10 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                   fillColor: Colors.white,
                   counterText: "", // hides counter
                   errorText: _errorMessage, // shows error message
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 15,
+                    horizontal: 10,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -175,7 +219,8 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -193,7 +238,8 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -212,7 +258,8 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 30),
@@ -223,7 +270,8 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.pinkAccent,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30)),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
                     minimumSize: const Size(220, 50),
                   ),
                   onPressed: () => _validatePhoneAndProceed(context),
@@ -261,10 +309,16 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
               const SizedBox(height: 10),
 
               Center(
-                child: Image.asset(
-                  'assets/google1.png',
-                  width: 40,
-                  height: 40,
+                child: InkWell(
+                  onTap: _isLoading ? null : _signInWithGoogle,
+                  child: Opacity(
+                    opacity: _isLoading ? 0.5 : 1.0,
+                    child: Image.asset(
+                      'assets/google1.png',
+                      width: 40,
+                      height: 40,
+                    ),
+                  ),
                 ),
               ),
             ],

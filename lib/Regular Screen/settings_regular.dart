@@ -54,16 +54,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// --- REPORT BUG DIALOG ---
   void _showReportBugDialog(BuildContext context) {
-    final TextEditingController _controller = TextEditingController();
+    final TextEditingController controller = TextEditingController();
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return _buildCustomDialog(
           title: "REPORT A BUG",
-          textController: _controller,
+          textController: controller,
           hint: "ENTER CONCERN..",
           onSubmit: () {
-            print("Bug reported: ${_controller.text}");
+            print("Bug reported: ${controller.text}");
             Navigator.pop(context);
           },
         );
@@ -73,7 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// --- FEEDBACK DIALOG ---
   void _showFeedbackDialog(BuildContext context) {
-    final TextEditingController _controller = TextEditingController();
+    final TextEditingController controller = TextEditingController();
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -81,11 +81,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           builder: (context, setDialogState) {
             return _buildCustomDialog(
               title: "FEEDBACK",
-              textController: _controller,
+              textController: controller,
               hint: "ENTER FEEDBACK...",
               extraWidget: _buildStars(setDialogState),
               onSubmit: () {
-                print("Feedback: ${_controller.text}, Stars: $_selectedStars");
+                print("Feedback: ${controller.text}, Stars: $_selectedStars");
                 Navigator.pop(context);
               },
             );

@@ -6,7 +6,7 @@ import 'emergency_screen.dart';
 import 'navbar_assisted.dart'; // ✅ Import your custom navbar
 
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({Key? key}) : super(key: key);
+  const CalendarScreen({super.key});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();

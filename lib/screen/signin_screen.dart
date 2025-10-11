@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'welcome_screen.dart';
+import '../data/profile_service.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -23,8 +24,9 @@ class _SignInScreenState extends State<SignInScreen> {
   // Email validator - less restrictive
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) return "Email is required";
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value))
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
       return "Please enter a valid email address";
+    }
     return null;
   }
 
@@ -32,12 +34,44 @@ class _SignInScreenState extends State<SignInScreen> {
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) return "Password is required";
     if (value.length < 6) return "Must be at least 6 characters";
-    if (!RegExp(r'[A-Z]').hasMatch(value))
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
       return "Must contain 1 uppercase letter";
+    }
     if (!RegExp(r'[0-9]').hasMatch(value)) return "Must contain 1 number";
-    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value))
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value)) {
       return "Must contain 1 special character";
+    }
     return null;
+  }
+
+  /// ✅ Ensure profile exists for authenticated user
+  Future<void> _ensureProfileExists() async {
+    final user = supabase.auth.currentUser;
+    String? fullName;
+    final dynamic rawMeta = user?.userMetadata;
+    final Map<String, dynamic>? meta = rawMeta is Map<String, dynamic>
+        ? rawMeta
+        : null;
+    if (meta != null) {
+      final String? given = (meta['first_name'] ?? meta['given_name'])
+          ?.toString();
+      final String? family = (meta['last_name'] ?? meta['family_name'])
+          ?.toString();
+      final String? composite = (meta['full_name'] ?? meta['name'])?.toString();
+
+      final parts = <String>[
+        if (given != null && given.isNotEmpty) given,
+        if (family != null && family.isNotEmpty) family,
+      ];
+
+      fullName = parts.isNotEmpty ? parts.join(' ') : composite;
+    }
+
+    await ProfileService.ensureProfileExists(
+      supabase,
+      email: user?.email,
+      fullName: fullName,
+    );
   }
 
   /// ✅ Email + Password Sign In
@@ -51,27 +85,38 @@ class _SignInScreenState extends State<SignInScreen> {
           password: _passwordController.text.trim(),
         );
 
+        if (!mounted) return;
+
         if (response.user != null) {
+          // Ensure profile exists in database
+          await _ensureProfileExists();
+
+          if (!mounted) return;
+          // Navigate to welcome screen
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const WelcomeScreen()),
           );
         }
       } on AuthException catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(e.message)));
-      } catch (_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("An unexpected error occurred")),
-        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Sign-in failed: $e")));
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }
 
-  /// ✅ Google Sign In - Simple Supabase OAuth
+  /// ✅ Google Sign In
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
 
@@ -80,16 +125,34 @@ class _SignInScreenState extends State<SignInScreen> {
         OAuthProvider.google,
         redirectTo: 'https://eyalgnlsdseuvmmtgefk.supabase.co/auth/v1/callback',
       );
+
+      // For Google OAuth, we need to wait a moment for the redirect to complete
+      await Future.delayed(const Duration(seconds: 3));
+
+      if (!mounted) return;
+      // Ensure profile exists
+      await _ensureProfileExists();
+
+      if (!mounted) return;
+      // Navigate to welcome screen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+      );
     } on AuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Google sign-in failed: $e")));
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

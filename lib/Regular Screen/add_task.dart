@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 class AddTaskScreen extends StatefulWidget {
   final DateTime? selectedDate; // ✅ made optional
 
-  const AddTaskScreen({Key? key, this.selectedDate}) : super(key: key);
+  const AddTaskScreen({super.key, this.selectedDate});
 
   @override
   _AddTaskScreenState createState() => _AddTaskScreenState();
