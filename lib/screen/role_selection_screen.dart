@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:softeng/Assisted%20Screen/tasks_screen.dart'; // Assisted User screen
 import 'package:softeng/Regular%20Screen/tasks_screen_regular.dart'; // ✅ New Regular User screen
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/profile_service.dart';
 import '../Assisted Screen/guardian_input_screen.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
@@ -184,18 +185,28 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             ),
           ),
           onPressed: (regularUser || assistedUser)
-              ? () {
+              ? () async {
+                  final supabase = Supabase.instance.client;
+                  final role = assistedUser ? 'assisted' : 'regular';
+                  // Persist role selection to profile
+                  await ProfileService.ensureProfileExists(
+                    supabase,
+                    role: role,
+                  );
+
                   if (assistedUser) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const GuardianInputScreen()),
+                        builder: (context) => const GuardianInputScreen(),
+                      ),
                     );
                   } else if (regularUser) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const TasksScreenRegular()), // ✅ Regular User
+                        builder: (context) => const TasksScreenRegular(),
+                      ), // ✅ Regular User
                     );
                   }
                 }

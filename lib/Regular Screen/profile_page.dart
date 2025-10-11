@@ -78,14 +78,19 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: w * 0.05, vertical: h * 0.02),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: w * 0.05,
+                      vertical: h * 0.02,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         IconButton(
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.arrow_back, color: Color(0xFF3D3D3D)),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Color(0xFF3D3D3D),
+                          ),
                         ),
                         const SizedBox(height: 5),
                         Text(
@@ -121,10 +126,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   CircleAvatar(
                     radius: 60,
                     backgroundColor: const Color(0xFFF1D2B6),
-                    backgroundImage:
-                        _profileImage != null ? FileImage(_profileImage!) : null,
+                    backgroundImage: _profileImage != null
+                        ? FileImage(_profileImage!)
+                        : null,
                     child: _profileImage == null
-                        ? const Icon(Icons.person, size: 70, color: Colors.white)
+                        ? const Icon(
+                            Icons.person,
+                            size: 70,
+                            color: Colors.white,
+                          )
                         : null,
                   ),
                   Positioned(
@@ -169,8 +179,10 @@ class _ProfilePageState extends State<ProfilePage> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(25),
                         ),
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 55, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 55,
+                          vertical: 14,
+                        ),
                         elevation: 0,
                       ),
                       child: Text(
@@ -202,12 +214,21 @@ class _ProfilePageState extends State<ProfilePage> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Calendar',
-              isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications',
-              isSelected: _currentIndex == 3),
+          _navItem(
+            Icons.calendar_today,
+            'Calendar',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Alert',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -238,8 +259,10 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             filled: true,
             fillColor: Colors.white,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.black26),
@@ -263,8 +286,7 @@ class _ProfilePageState extends State<ProfilePage> {
         height: 55,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color:
-              isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
+          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
         ),
         child: Center(
           child: Icon(

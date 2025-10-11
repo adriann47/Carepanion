@@ -97,7 +97,7 @@ class _SignInScreenState extends State<SignInScreen> {
             context,
             MaterialPageRoute(builder: (context) => const WelcomeScreen()),
           );
-        }
+        } 
       } on AuthException catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(

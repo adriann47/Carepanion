@@ -70,6 +70,7 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
             'first_name': _firstNameController.text.trim(),
             'last_name': _lastNameController.text.trim(),
           },
+          emailRedirectTo: 'https://eyalgnlsdseuvmmtgefk.supabase.co',
         );
 
         if (authResponse.user != null) {
@@ -84,7 +85,6 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
               email: _emailController.text.trim(),
               fullName:
                   '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-              role: 'regular',
             );
           }
 
@@ -92,7 +92,10 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
           if (!mounted) return;
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const VerifyEmailScreen()),
+            MaterialPageRoute(
+              builder: (context) =>
+                  VerifyEmailScreen(email: _emailController.text.trim()),
+            ),
           );
         }
       } on AuthException catch (e) {

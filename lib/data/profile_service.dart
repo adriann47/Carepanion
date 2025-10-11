@@ -43,7 +43,7 @@ class ProfileService {
     SupabaseClient client, {
     String? email,
     String? fullName,
-    String role = 'regular',
+    String? role,
   }) async {
     final user = client.auth.currentUser;
     if (user == null) return;
@@ -52,7 +52,7 @@ class ProfileService {
       final payload = <String, dynamic>{'id': user.id};
       if (email != null) payload['email'] = email;
       if (fullName != null) payload['fullname'] = fullName;
-      if (role.isNotEmpty) payload['role'] = role;
+      if (role != null) payload['role'] = role;
       await client.from(table).upsert(payload);
     } catch (_) {
       // Swallow and let caller decide user-facing handling
