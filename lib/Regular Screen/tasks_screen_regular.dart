@@ -3,6 +3,8 @@ import 'profile_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'companion_list.dart';
 import 'notification_screen.dart'; // 👈 Import your notification screen
+import 'package:softeng/services/task_service.dart';
+import 'edit_task.dart';
 
 class TasksScreenRegular extends StatefulWidget {
   const TasksScreenRegular({super.key});
@@ -13,7 +15,6 @@ class TasksScreenRegular extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreenRegular> {
   int _currentIndex = 0;
-  final List<bool> _taskDone = [false, false, false, false];
 
   /// --- NAVIGATION HANDLER ---
   void _onTabTapped(int index) {
@@ -149,36 +150,42 @@ class _TasksScreenState extends State<TasksScreenRegular> {
 
               const SizedBox(height: 16),
 
-              /// --- TASK LIST ---
+              /// --- TASK LIST (Today from Supabase) ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    _taskTile(
-                      index: 0,
-                      title: "MEDICATION",
-                      time: "7:30 AM",
-                      note: "Drink Vitamins",
-                    ),
-                    _taskTile(
-                      index: 1,
-                      title: "GYM",
-                      time: "10:30 AM",
-                      note: "Chest Back",
-                    ),
-                    _taskTile(
-                      index: 2,
-                      title: "PROTEIN",
-                      time: "1:00 PM",
-                      note: "Drink Whey",
-                    ),
-                    _taskTile(
-                      index: 3,
-                      title: "STUDY",
-                      time: "4:00 PM",
-                      note: "SoftEng",
-                    ),
-                  ],
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: TaskService.getTasksForDate(DateTime.now()),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        child: Text('Error loading tasks: ${snapshot.error}'),
+                      );
+                    }
+                    final tasks = snapshot.data ?? [];
+                    if (tasks.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Text('No tasks for today'),
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        for (final t in tasks)
+                          _taskTileDynamic(
+                            task: t,
+                            onEdited: () => setState(() {}),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -210,12 +217,24 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   }
 
   /// --- TASK TILE ---
-  Widget _taskTile({
-    required int index,
-    required String title,
-    required String time,
-    required String note,
+  Widget _taskTileDynamic({
+    required Map<String, dynamic> task,
+    required VoidCallback onEdited,
   }) {
+    final title = (task['title'] ?? '').toString();
+    final note = (task['description'] ?? '').toString();
+    String time = '';
+    try {
+      String fmt(dynamic iso) {
+        if (iso == null) return '';
+        final dt = DateTime.parse(iso.toString()).toLocal();
+        return TimeOfDay(hour: dt.hour, minute: dt.minute).format(context);
+      }
+      final s = fmt(task['start_at']);
+      final e = fmt(task['end_at']);
+      time = s.isEmpty && e.isEmpty ? 'All day' : (s.isNotEmpty && e.isNotEmpty ? '$s - $e' : (s + e));
+    } catch (_) {}
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       child: Row(
@@ -253,12 +272,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                     children: [
                       Transform.scale(
                         scale: 1.2,
-                        child: Checkbox(
-                          value: _taskDone[index],
-                          onChanged: (val) {
-                            setState(() => _taskDone[index] = val ?? false);
-                          },
-                        ),
+                        child: const Icon(Icons.event_note),
                       ),
                       Text(
                         title,
@@ -268,11 +282,25 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                           decoration: TextDecoration.underline,
                         ),
                       ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 20),
+                        onPressed: () async {
+                          final changed = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditTaskScreen(task: task),
+                            ),
+                          );
+                          if (changed == true) onEdited();
+                        },
+                      )
                     ],
                   ),
                   const SizedBox(height: 6),
                   Text("Time: $time", style: const TextStyle(fontSize: 14)),
-                  Text("Note: $note", style: const TextStyle(fontSize: 14)),
+                  if (note.isNotEmpty)
+                    Text("Note: $note", style: const TextStyle(fontSize: 14)),
                 ],
               ),
             ),
