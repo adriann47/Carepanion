@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'registration_email_screen.dart';
 import 'verify_email_screen.dart'; // Import your verify email screen
 import 'welcome_screen.dart'; // Import your welcome screen
+import 'signin_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/profile_service.dart';
 
@@ -24,15 +25,12 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
   void _validatePhoneAndProceed(BuildContext context) {
     String phone = _phoneController.text.trim();
 
-    // Check if input is numeric and 11 digits
     if (phone.isEmpty) {
       setState(() => _errorMessage = "Phone number is required");
     } else if (!RegExp(r'^[0-9]{11}$').hasMatch(phone)) {
       setState(() => _errorMessage = "Phone number must be exactly 11 digits");
     } else {
       setState(() => _errorMessage = null);
-
-      // ✅ If valid, navigate to VerifyEmailScreen
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const VerifyEmailScreen()),
@@ -199,13 +197,14 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                     horizontal: 10,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10), // ✅ radius 10
+                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Other Fields (First Name, Last Name, Password)
+              // First Name
               Text(
                 "First Name",
                 style: GoogleFonts.nunito(
@@ -220,11 +219,13 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
               const SizedBox(height: 20),
 
+              // Last Name
               Text(
                 "Last Name",
                 style: GoogleFonts.nunito(
@@ -239,11 +240,13 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
               const SizedBox(height: 20),
 
+              // Password
               Text(
                 "Password",
                 style: GoogleFonts.nunito(
@@ -259,6 +262,29 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Confirm Password
+              Text(
+                "Confirm Password",
+                style: GoogleFonts.nunito(
+                  fontWeight: FontWeight.bold,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                obscureText: true,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
@@ -287,27 +313,45 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
               ),
               const SizedBox(height: 30),
 
+              // Already have an account?
               Center(
-                child: Text(
-                  "Do you have an account already? Sign In",
-                  style: GoogleFonts.nunito(
-                    color: primaryTextColor,
-                    decoration: TextDecoration.underline,
-                    decorationColor: primaryTextColor,
-                    decorationThickness: 2,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SignInScreen(),
+                      ),
+                    );
+                  },
+                  child: RichText(
+                    text: TextSpan(
+                      style: GoogleFonts.nunito(
+                        color: primaryTextColor,
+                        fontSize: 16,
+                      ),
+                      children: [
+                        const TextSpan(
+                          text: "Do you have an account already? ",
+                        ),
+                        TextSpan(
+                          text: "Sign in",
+                          style: GoogleFonts.nunito(
+                            color: primaryTextColor,
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.underline,
+                            decorationColor: primaryTextColor,
+                            decorationThickness: 2,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+
               const SizedBox(height: 20),
-
-              Center(
-                child: Text(
-                  "Sign in with",
-                  style: GoogleFonts.nunito(color: primaryTextColor),
-                ),
-              ),
-              const SizedBox(height: 10),
-
+              // Google sign-in button
               Center(
                 child: InkWell(
                   onTap: _isLoading ? null : _signInWithGoogle,

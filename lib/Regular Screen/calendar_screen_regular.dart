@@ -262,7 +262,11 @@ DropdownButton<int>(
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const AddTaskScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => AddTaskScreen(
+                      selectedDate: _selectedDate,
+                    ),
+                  ),
                 );
               },
               icon: const Icon(Icons.add, color: Colors.white),

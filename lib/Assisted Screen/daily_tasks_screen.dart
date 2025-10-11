@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:softeng/services/task_service.dart';
+import '../Regular Screen/edit_task.dart';
 
-class DailyTasksScreen extends StatelessWidget {
+class DailyTasksScreen extends StatefulWidget {
   final DateTime selectedDate;
 
   const DailyTasksScreen({super.key, required this.selectedDate});
 
   @override
+  State<DailyTasksScreen> createState() => _DailyTasksScreenState();
+}
+
+class _DailyTasksScreenState extends State<DailyTasksScreen> {
+  @override
   Widget build(BuildContext context) {
     String formattedDate =
-        "${_monthNames[selectedDate.month - 1].toUpperCase()} ${selectedDate.day}";
+        "${_monthNames[widget.selectedDate.month - 1].toUpperCase()} ${widget.selectedDate.day}";
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F3ED),
@@ -39,65 +47,58 @@ class DailyTasksScreen extends StatelessWidget {
 
             // --- Scrollable Task Sections ---
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _sectionTitle("TO DO"),
-                    _taskCard(
-                      "MEDICATION",
-                      "7:30 AM",
-                      "Drink Zykast",
-                      const Color(0xFFB3E5FC),
-                    ),
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: TaskService.getTasksForDate(widget.selectedDate),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                        child: Text('Error loading tasks: ${snapshot.error}'));
+                  }
+                  final tasks = snapshot.data ?? [];
+                  if (tasks.isEmpty) {
+                    return const Center(child: Text('No tasks for this day'));
+                  }
 
-                    const SizedBox(height: 16),
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: tasks.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final t = tasks[index];
+                      final String title = (t['title'] ?? '').toString();
+                      final String category = (t['category'] ?? 'OTHER').toString().toUpperCase();
+                      final String description = (t['description'] ?? '').toString();
+                      final String timeLabel = _formatTimeRange(t['start_at'], t['end_at']);
+                      final Color color = _categoryColor(category);
 
-                    _sectionTitle("DONE"),
-                    _taskCard(
-                      "MEDICATION",
-                      "7:00 AM",
-                      "Drink Glipten",
-                      const Color(0xFFB9F6CA),
-                    ),
-                    _taskCard(
-                      "WALK",
-                      "7:15 AM",
-                      "Walk for 5 mins",
-                      const Color(0xFFB9F6CA),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    _sectionTitle("SKIP"),
-                    _taskCard(
-                      "READ BOOK",
-                      "6:30 PM",
-                      "-",
-                      const Color(0xFFFFCCBC),
-                    ),
-                  ],
-                ),
+                      return InkWell(
+                        onTap: () async {
+                          final changed = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditTaskScreen(task: t),
+                            ),
+                          );
+                          if (changed == true) {
+                            setState(() {});
+                          }
+                        },
+                        child: _taskCard(
+                          category,
+                          timeLabel,
+                          title + (description.isNotEmpty ? " — $description" : ""),
+                          color,
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // --- Section Title ---
-  Widget _sectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-          letterSpacing: 1.2,
-          color: Colors.black87,
         ),
       ),
     );
@@ -141,6 +142,38 @@ class DailyTasksScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatTimeRange(dynamic startIso, dynamic endIso) {
+    String fmt(dynamic iso) {
+      if (iso == null) return '';
+      try {
+        final dt = DateTime.parse(iso.toString()).toLocal();
+        return DateFormat('h:mm a').format(dt);
+      } catch (_) {
+        return '';
+      }
+    }
+
+    final s = fmt(startIso);
+    final e = fmt(endIso);
+    if (s.isEmpty && e.isEmpty) return 'All day';
+    if (s.isNotEmpty && e.isEmpty) return s;
+    if (s.isEmpty && e.isNotEmpty) return e;
+    return '$s - $e';
+  }
+
+  Color _categoryColor(String category) {
+    switch (category.toUpperCase()) {
+      case 'MEDICATION':
+        return const Color(0xFFB3E5FC);
+      case 'EXERCISE':
+      case 'WALK':
+        return const Color(0xFFB9F6CA);
+      case 'OTHER':
+      default:
+        return const Color(0xFFFFCCBC);
+    }
   }
 
   static const List<String> _monthNames = [

@@ -3,6 +3,9 @@ import 'profile_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'companion_list.dart';
 import 'notification_screen.dart'; // 👈 Import your notification screen
+import 'edit_task.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 
 class TasksScreenRegular extends StatefulWidget {
   const TasksScreenRegular({super.key});
@@ -13,7 +16,6 @@ class TasksScreenRegular extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreenRegular> {
   int _currentIndex = 0;
-  final List<bool> _taskDone = [false, false, false, false];
 
   /// --- NAVIGATION HANDLER ---
   void _onTabTapped(int index) {
@@ -149,36 +151,11 @@ class _TasksScreenState extends State<TasksScreenRegular> {
 
               const SizedBox(height: 16),
 
-              /// --- TASK LIST ---
+              /// --- TASK LIST (Today from Supabase, realtime) ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    _taskTile(
-                      index: 0,
-                      title: "MEDICATION",
-                      time: "7:30 AM",
-                      note: "Drink Vitamins",
-                    ),
-                    _taskTile(
-                      index: 1,
-                      title: "GYM",
-                      time: "10:30 AM",
-                      note: "Chest Back",
-                    ),
-                    _taskTile(
-                      index: 2,
-                      title: "PROTEIN",
-                      time: "1:00 PM",
-                      note: "Drink Whey",
-                    ),
-                    _taskTile(
-                      index: 3,
-                      title: "STUDY",
-                      time: "4:00 PM",
-                      note: "SoftEng",
-                    ),
-                  ],
+                child: _TodayTasksStream(
+                  onEdited: () => setState(() {}),
                 ),
               ),
             ],
@@ -209,13 +186,144 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     );
   }
 
-  /// --- TASK TILE ---
-  Widget _taskTile({
-    required int index,
-    required String title,
-    required String time,
-    required String note,
-  }) {
+  /// --- NAV ITEM ---
+
+  /// --- NAV ITEM ---
+  static BottomNavigationBarItem _navItem(IconData icon, String label,
+      {required bool isSelected}) {
+    return BottomNavigationBarItem(
+      label: label,
+      icon: Container(
+        width: 55,
+        height: 55,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
+        ),
+        child: Center(
+          child: Icon(
+            icon,
+            size: 28,
+            color: isSelected ? Colors.pink : Colors.black87,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Realtime list of today's tasks using Supabase stream
+class _TodayTasksStream extends StatelessWidget {
+  const _TodayTasksStream({required this.onEdited});
+
+  final VoidCallback onEdited;
+
+  @override
+  Widget build(BuildContext context) {
+    final supabase = Supabase.instance.client;
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    final tasksStream = supabase
+        .from('tasks')
+        .stream(primaryKey: ['id'])
+        .eq('due_date', today);
+
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: tasksStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Text('Error loading tasks: ${snapshot.error}'),
+          );
+        }
+
+        var tasks = snapshot.data ?? const [];
+
+        // Sort by start_at ascending, nulls last
+        tasks = List.of(tasks);
+        tasks.sort((a, b) {
+          final sa = a['start_at']?.toString();
+          final sb = b['start_at']?.toString();
+          if (sa == null && sb == null) return 0;
+          if (sa == null) return 1;
+          if (sb == null) return -1;
+          return DateTime.parse(sa).compareTo(DateTime.parse(sb));
+        });
+
+        if (tasks.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Text('No tasks for today'),
+          );
+        }
+
+        return Column(
+          children: [
+            for (final t in tasks)
+              _TaskTile(task: t, onEdited: onEdited),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TaskTile extends StatelessWidget {
+  const _TaskTile({required this.task, required this.onEdited});
+
+  final Map<String, dynamic> task;
+  final VoidCallback onEdited;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = (task['title'] ?? '').toString();
+    final note = (task['description'] ?? '').toString();
+    String time = '';
+    // Normalize category and map to label/color
+    final rawCat = (task['category'] ?? 'other').toString().trim().toLowerCase();
+    final String cat = rawCat.isEmpty ? 'other' : rawCat;
+    late final Color catColor;
+    late final String catLabel;
+    switch (cat) {
+      case 'medication':
+      case 'medicine':
+      case 'meds':
+        catColor = Colors.deepPurple;
+        catLabel = 'Medication';
+        break;
+      case 'exercise':
+      case 'workout':
+      case 'fitness':
+        catColor = Colors.teal;
+        catLabel = 'Exercise';
+        break;
+      default:
+        catColor = Colors.grey;
+        catLabel = 'Other';
+    }
+    String fmt(dynamic iso) {
+      if (iso == null) return '';
+      try {
+        final dt = DateTime.parse(iso.toString()).toLocal();
+        return TimeOfDay(hour: dt.hour, minute: dt.minute).format(context);
+      } catch (_) {
+        return '';
+      }
+    }
+    final s = fmt(task['start_at']);
+    final e = fmt(task['end_at']);
+    time = s.isEmpty && e.isEmpty
+        ? 'All day'
+        : (s.isNotEmpty && e.isNotEmpty ? '$s - $e' : (s + e));
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       child: Row(
@@ -253,12 +361,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                     children: [
                       Transform.scale(
                         scale: 1.2,
-                        child: Checkbox(
-                          value: _taskDone[index],
-                          onChanged: (val) {
-                            setState(() => _taskDone[index] = val ?? false);
-                          },
-                        ),
+                        child: const Icon(Icons.event_note),
                       ),
                       Text(
                         title,
@@ -268,39 +371,47 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                           decoration: TextDecoration.underline,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: catColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: catColor.withOpacity(0.5)),
+                        ),
+                        child: Text(
+                          catLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: catColor,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 20),
+                        onPressed: () async {
+                          final changed = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditTaskScreen(task: task),
+                            ),
+                          );
+                          if (changed == true) onEdited();
+                        },
+                      )
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text("Time: $time", style: const TextStyle(fontSize: 14)),
-                  Text("Note: $note", style: const TextStyle(fontSize: 14)),
+                  Text('Time: $time', style: const TextStyle(fontSize: 14)),
+                  if (note.isNotEmpty)
+                    Text('Note: $note', style: const TextStyle(fontSize: 14)),
                 ],
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  /// --- NAV ITEM ---
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {required bool isSelected}) {
-    return BottomNavigationBarItem(
-      label: label,
-      icon: Container(
-        width: 55,
-        height: 55,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
-        ),
-        child: Center(
-          child: Icon(
-            icon,
-            size: 28,
-            color: isSelected ? Colors.pink : Colors.black87,
-          ),
-        ),
       ),
     );
   }

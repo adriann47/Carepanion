@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:softeng/services/task_service.dart';
 
-class AddTaskScreen extends StatefulWidget {
-  final DateTime? selectedDate; // ✅ made optional
-
-  const AddTaskScreen({super.key, this.selectedDate});
+class EditTaskScreen extends StatefulWidget {
+  final Map<String, dynamic> task;
+  const EditTaskScreen({super.key, required this.task});
 
   @override
-  State<AddTaskScreen> createState() => _AddTaskScreenState();
+  State<EditTaskScreen> createState() => _EditTaskScreenState();
 }
 
-class _AddTaskScreenState extends State<AddTaskScreen> {
+class _EditTaskScreenState extends State<EditTaskScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   DateTime? _selectedDate;
@@ -22,30 +21,49 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = widget.selectedDate ?? DateTime.now(); // ✅ Default date
+    final t = widget.task;
+    _titleController.text = (t['title'] ?? '').toString();
+    _descriptionController.text = (t['description'] ?? '').toString();
+
+    final due = t['due_date']?.toString();
+    if (due != null && due.isNotEmpty) {
+      try { _selectedDate = DateTime.parse(due); } catch (_) {}
+    }
+    final cat = t['category']?.toString();
+    if (cat != null && cat.isNotEmpty) _selectedCategory = cat;
+
+    TimeOfDay? parseTod(dynamic iso) {
+      if (iso == null) return null;
+      try {
+        final dt = DateTime.parse(iso.toString()).toLocal();
+        return TimeOfDay(hour: dt.hour, minute: dt.minute);
+      } catch (_) { return null; }
+    }
+    _startTime = parseTod(t['start_at']);
+    _endTime = parseTod(t['end_at']);
   }
 
   Future<void> _selectDate() async {
-  final DateTime initialDate = _selectedDate ?? DateTime.now();
+    final DateTime initialDate = _selectedDate ?? DateTime.now();
 
-  // Keep initial date within allowed range (2025–2027)
-  final DateTime safeInitialDate = initialDate.year < 2025
-      ? DateTime(2025)
-      : (initialDate.year > 2027 ? DateTime(2027) : initialDate);
+    // Keep initial date within allowed range (2025–2027) like Add Task
+    final DateTime safeInitialDate = initialDate.year < 2025
+        ? DateTime(2025)
+        : (initialDate.year > 2027 ? DateTime(2027) : initialDate);
 
-  final DateTime? picked = await showDatePicker(
-    context: context,
-    initialDate: safeInitialDate,
-    firstDate: DateTime(2025, 1, 1),
-    lastDate: DateTime(2027, 12, 31),
-    selectableDayPredicate: (DateTime day) {
-      // Only allow 2025–2027 dates
-      return day.year >= 2025 && day.year <= 2027;
-    },
-  );
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: safeInitialDate,
+      firstDate: DateTime(2025, 1, 1),
+      lastDate: DateTime(2027, 12, 31),
+      selectableDayPredicate: (DateTime day) {
+        return day.year >= 2025 && day.year <= 2027;
+      },
+    );
 
-  if (picked != null) setState(() => _selectedDate = picked);
-}
+    if (picked != null) setState(() => _selectedDate = picked);
+  }
+
   Future<void> _selectTime(bool isStart) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
@@ -63,6 +81,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   }
 
   Future<void> _saveTask() async {
+    final id = (widget.task['id'] as num).toInt();
     if ((_titleController.text).trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a title')),
@@ -77,12 +96,11 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     }
 
     try {
-      await TaskService.createTask(
+      await TaskService.updateTask(
+        id: id,
         title: _titleController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        dueDate: _selectedDate!,
+        description: _descriptionController.text.trim(),
+        dueDate: _selectedDate,
         startTime: _startTime,
         endTime: _endTime,
         category: _selectedCategory.isEmpty ? null : _selectedCategory,
@@ -90,14 +108,31 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Task saved successfully!')),
+          const SnackBar(content: Text('Task updated successfully!')),
         );
-        Navigator.pop(context, true); // return success
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save task: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteTask() async {
+    final id = (widget.task['id'] as num).toInt();
+    try {
+      await TaskService.deleteTask(id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task deleted')),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete: $e')),
       );
     }
   }
@@ -109,7 +144,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Top pink header
+            // Top pink header (copied from Add Task)
             Container(
               width: double.infinity,
               height: 320,
@@ -124,13 +159,23 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
-                    onPressed: () => Navigator.pop(context),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.black),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.black87),
+                        onPressed: _deleteTask,
+                        tooltip: 'Delete',
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    "TASK",
+                    "EDIT TASK",
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -267,7 +312,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               ),
             ),
 
-            const SizedBox(height: 40), // Adjusted spacing after removing navbar
+            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -410,3 +455,4 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     );
   }
 }
+

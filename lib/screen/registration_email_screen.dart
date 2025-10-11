@@ -5,6 +5,7 @@ import 'registration_phone_screen.dart';
 import 'verify_email_screen.dart';
 import 'welcome_screen.dart';
 import '../data/profile_service.dart';
+import 'signin_screen.dart';
 
 class RegistrationEmailScreen extends StatefulWidget {
   const RegistrationEmailScreen({super.key});
@@ -361,7 +362,7 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Already have account?
+                // Already have an account?
                 Center(
                   child: GestureDetector(
                     onTap: _isLoading
@@ -370,42 +371,38 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const WelcomeScreen(),
+                                builder: (context) => const SignInScreen(),
                               ),
                             );
                           },
-                    child: Text(
-                      "Do you have an account already? Sign In",
-                      style: GoogleFonts.nunito(
-                        color: primaryTextColor,
-                        decoration: TextDecoration.underline,
-                        decorationColor: primaryTextColor,
-                        decorationThickness: 2,
+                    child: RichText(
+                      text: TextSpan(
+                        style: GoogleFonts.nunito(
+                          color: primaryTextColor,
+                          fontSize: 16,
+                        ),
+                        children: [
+                          const TextSpan(
+                            text: "Do you have an account already? ",
+                          ),
+                          TextSpan(
+                            text: "Sign in",
+                            style: GoogleFonts.nunito(
+                              color: primaryTextColor,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                              decorationColor: primaryTextColor,
+                              decorationThickness: 2,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
 
-                // Or divider
-                Center(
-                  child: Text(
-                    "Or",
-                    style: GoogleFonts.nunito(color: primaryTextColor),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Sign in with
-                Center(
-                  child: Text(
-                    "Sign up with",
-                    style: GoogleFonts.nunito(color: primaryTextColor),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // Google logo as button
+                // Sign up with Google
                 Center(
                   child: InkWell(
                     onTap: _isLoading ? null : _signInWithGoogle,
