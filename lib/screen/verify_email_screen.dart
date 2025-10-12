@@ -9,7 +9,8 @@ import '../data/profile_service.dart';
 class VerifyEmailScreen extends StatefulWidget {
   final String? email; // email used for registration; enables resend/OTP
   final String? phone; // phone in E.164 format (+63...), enables SMS OTP
-  const VerifyEmailScreen({super.key, this.email, this.phone});
+  final String? fullName; // optional, used to prefill profile after OTP
+  const VerifyEmailScreen({super.key, this.email, this.phone, this.fullName});
 
   @override
   State<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
@@ -39,8 +40,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     if (sessEmail != null && sessEmail.isNotEmpty) return sessEmail;
     return null;
   }
+
   String? get _phoneFromWidget => widget.phone?.trim();
-  bool get _useSms => !_forceEmailFallback && (_phoneFromWidget != null && _phoneFromWidget!.isNotEmpty);
+  bool get _useSms =>
+      !_forceEmailFallback &&
+      (_phoneFromWidget != null && _phoneFromWidget!.isNotEmpty);
 
   @override
   void dispose() {
@@ -59,7 +63,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     super.initState();
     // Auto-send OTP on first build when email is available and we're using real email OTP
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!_devLocalOtp && !_autoSent && (_emailOrSessionEmail != null || _useSms)) {
+      if (!_devLocalOtp &&
+          !_autoSent &&
+          (_emailOrSessionEmail != null || _useSms)) {
         _autoSent = true;
         await _sendOtp();
       }
@@ -108,9 +114,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         _fillOtpControllersWith(six);
         if (!mounted) return;
         _startCooldown();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('DEV: Your code is $six')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('DEV: Your code is $six')));
       } finally {
         if (mounted) setState(() => _isSending = false);
       }
@@ -139,7 +145,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       if (!mounted) return;
       _startCooldown();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_useSms ? 'OTP sent via SMS.' : 'OTP sent to your email.')),
+        SnackBar(
+          content: Text(
+            _useSms ? 'OTP sent via SMS.' : 'OTP sent to your email.',
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -148,7 +158,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       if (_useSms && msg.toLowerCase().contains('phone_provider_disabled')) {
         await _handleSmsProviderDisabled();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to send OTP: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to send OTP: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -210,9 +222,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
             MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invalid code.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Invalid code.')));
         }
         return;
       }
@@ -242,6 +254,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       await ProfileService.ensureProfileExists(
         supabase,
         email: _useSms ? null : _emailOrSessionEmail,
+        fullName: widget.fullName,
       );
 
       if (!mounted) return;

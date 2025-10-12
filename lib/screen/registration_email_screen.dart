@@ -15,6 +15,90 @@ class RegistrationEmailScreen extends StatefulWidget {
       _RegistrationEmailScreenState();
 }
 
+class _PasswordChecklist extends StatelessWidget {
+  final bool lenOk;
+  final bool upperOk;
+  final bool digitOk;
+  final bool specialOk;
+
+  const _PasswordChecklist({
+    required this.lenOk,
+    required this.upperOk,
+    required this.digitOk,
+    required this.specialOk,
+  });
+
+  Widget _row(String text, bool ok) {
+    return Row(
+      children: [
+        Icon(
+          ok ? Icons.check_circle : Icons.cancel,
+          size: 16,
+          color: ok ? Colors.green : Colors.redAccent,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              color: const Color(0xFFDA6319),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _row('At least 6 characters', lenOk),
+        const SizedBox(height: 4),
+        _row('Contains 1 uppercase letter', upperOk),
+        const SizedBox(height: 4),
+        _row('Contains 1 digit', digitOk),
+        const SizedBox(height: 4),
+        _row('Contains 1 special character', specialOk),
+      ],
+    );
+  }
+}
+
+class _RuleIndicatorRow extends StatelessWidget {
+  final bool ok;
+  final String text;
+
+  const _RuleIndicatorRow({required this.ok, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          ok ? Icons.check_circle : Icons.cancel,
+          size: 16,
+          color: ok ? Colors.green : Colors.redAccent,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              color: const Color(0xFFDA6319),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
@@ -26,6 +110,38 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
 
   bool _isLoading = false; // Add loading state
   final supabase = Supabase.instance.client;
+
+  // Live password rule indicators
+  bool _ruleLen = false;
+  bool _ruleUpper = false;
+  bool _ruleDigit = false;
+  bool _ruleSpecial = false;
+
+  // Password visibility toggles
+  bool _passwordObscured = true;
+  bool _confirmPasswordObscured = true;
+
+  // Email validity indicator
+  bool _emailValid = false;
+
+  void _updateEmailValidity(String value) {
+    final v = value.trim().toLowerCase();
+    // Simple rule: must be a @gmail.com address with something before @
+    final atIndex = v.indexOf('@');
+    final hasLocal = atIndex > 0; // at least 1 char before '@'
+    setState(() {
+      _emailValid = v.endsWith('@gmail.com') && hasLocal;
+    });
+  }
+
+  void _updatePasswordRules(String value) {
+    setState(() {
+      _ruleLen = value.length >= 6;
+      _ruleUpper = RegExp(r'[A-Z]').hasMatch(value);
+      _ruleDigit = RegExp(r'[0-9]').hasMatch(value);
+      _ruleSpecial = RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value);
+    });
+  }
 
   // Email validator
   String? _validateEmail(String? value) {
@@ -256,7 +372,13 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
                   controller: _emailController,
                   validator: _validateEmail,
                   enabled: !_isLoading,
+                  onChanged: _updateEmailValidity,
                   decoration: _inputDecoration(),
+                ),
+                const SizedBox(height: 8),
+                _RuleIndicatorRow(
+                  ok: _emailValid,
+                  text: 'Valid @gmail.com email',
                 ),
                 const SizedBox(height: 20),
 
@@ -303,10 +425,35 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
+                  obscureText: _passwordObscured,
                   validator: _validatePassword,
                   enabled: !_isLoading,
-                  decoration: _inputDecoration(),
+                  onChanged: _updatePasswordRules,
+                  decoration: _inputDecoration(
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _passwordObscured
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: const Color(0xFFDA6319),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _passwordObscured = !_passwordObscured;
+                        });
+                      },
+                      tooltip: _passwordObscured
+                          ? 'Show password'
+                          : 'Hide password',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _PasswordChecklist(
+                  lenOk: _ruleLen,
+                  upperOk: _ruleUpper,
+                  digitOk: _ruleDigit,
+                  specialOk: _ruleSpecial,
                 ),
                 const SizedBox(height: 20),
 
@@ -321,10 +468,27 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _confirmPasswordController,
-                  obscureText: true,
+                  obscureText: _confirmPasswordObscured,
                   validator: _validateConfirmPassword,
                   enabled: !_isLoading,
-                  decoration: _inputDecoration(),
+                  decoration: _inputDecoration(
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _confirmPasswordObscured
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: const Color(0xFFDA6319),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _confirmPasswordObscured = !_confirmPasswordObscured;
+                        });
+                      },
+                      tooltip: _confirmPasswordObscured
+                          ? 'Show password'
+                          : 'Hide password',
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 30),
 
@@ -424,7 +588,7 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
     );
   }
 
-  InputDecoration _inputDecoration() {
+  InputDecoration _inputDecoration({Widget? suffixIcon}) {
     return InputDecoration(
       filled: true,
       fillColor: Colors.white,
@@ -441,6 +605,7 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Colors.white),
       ),
+      suffixIcon: suffixIcon,
     );
   }
 }

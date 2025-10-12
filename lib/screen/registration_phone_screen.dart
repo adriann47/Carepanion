@@ -17,10 +17,34 @@ class RegistrationPhoneScreen extends StatefulWidget {
 
 class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   String? _errorMessage;
   bool _isLoading = false;
 
   final supabase = Supabase.instance.client;
+
+  // Password visibility toggles
+  bool _passwordObscured = true;
+  bool _confirmPasswordObscured = true;
+
+  // Live password rule indicators
+  bool _ruleLen = false;
+  bool _ruleUpper = false;
+  bool _ruleDigit = false;
+  bool _ruleSpecial = false;
+
+  void _updatePasswordRules(String value) {
+    setState(() {
+      _ruleLen = value.length >= 6;
+      _ruleUpper = RegExp(r'[A-Z]').hasMatch(value);
+      _ruleDigit = RegExp(r'[0-9]').hasMatch(value);
+      _ruleSpecial = RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value);
+    });
+  }
 
   String? _toE164(String raw) {
     // If already in E.164, pass through
@@ -37,6 +61,9 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
 
   void _validatePhoneAndProceed(BuildContext context) {
     String phone = _phoneController.text.trim();
+    final fullName =
+        '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+            .trim();
     if (phone.isEmpty) {
       setState(() => _errorMessage = "Phone number is required");
       return;
@@ -44,14 +71,21 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
 
     final e164 = _toE164(phone);
     if (e164 == null) {
-      setState(() => _errorMessage = "Enter a valid PH number (e.g., 09XXXXXXXXX)");
+      setState(
+        () => _errorMessage = "Enter a valid PH number (e.g., 09XXXXXXXXX)",
+      );
       return;
     }
 
     setState(() => _errorMessage = null);
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => VerifyEmailScreen(phone: e164)),
+      MaterialPageRoute(
+        builder: (context) => VerifyEmailScreen(
+          phone: e164,
+          fullName: fullName.isEmpty ? null : fullName,
+        ),
+      ),
     );
   }
 
@@ -89,6 +123,16 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -231,6 +275,7 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
               ),
               const SizedBox(height: 8),
               TextField(
+                controller: _firstNameController,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white,
@@ -252,6 +297,7 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
               ),
               const SizedBox(height: 8),
               TextField(
+                controller: _lastNameController,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white,
@@ -273,7 +319,9 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
               ),
               const SizedBox(height: 8),
               TextField(
-                obscureText: true,
+                controller: _passwordController,
+                obscureText: _passwordObscured,
+                onChanged: _updatePasswordRules,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white,
@@ -281,7 +329,30 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _passwordObscured
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: const Color(0xFFDA6319),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _passwordObscured = !_passwordObscured;
+                      });
+                    },
+                    tooltip: _passwordObscured
+                        ? 'Show password'
+                        : 'Hide password',
+                  ),
                 ),
+              ),
+              const SizedBox(height: 8),
+              _PasswordChecklist(
+                lenOk: _ruleLen,
+                upperOk: _ruleUpper,
+                digitOk: _ruleDigit,
+                specialOk: _ruleSpecial,
               ),
               const SizedBox(height: 20),
 
@@ -295,13 +366,30 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
               ),
               const SizedBox(height: 8),
               TextField(
-                obscureText: true,
+                controller: _confirmPasswordController,
+                obscureText: _confirmPasswordObscured,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
+                  ),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _confirmPasswordObscured
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: const Color(0xFFDA6319),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _confirmPasswordObscured = !_confirmPasswordObscured;
+                      });
+                    },
+                    tooltip: _confirmPasswordObscured
+                        ? 'Show password'
+                        : 'Hide password',
                   ),
                 ),
               ),
@@ -386,6 +474,59 @@ class _RegistrationPhoneScreenState extends State<RegistrationPhoneScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PasswordChecklist extends StatelessWidget {
+  final bool lenOk;
+  final bool upperOk;
+  final bool digitOk;
+  final bool specialOk;
+
+  const _PasswordChecklist({
+    required this.lenOk,
+    required this.upperOk,
+    required this.digitOk,
+    required this.specialOk,
+  });
+
+  Widget _row(String text, bool ok) {
+    return Row(
+      children: [
+        Icon(
+          ok ? Icons.check_circle : Icons.cancel,
+          size: 16,
+          color: ok ? Colors.green : Colors.redAccent,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              color: const Color(0xFFDA6319),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _row('At least 6 characters', lenOk),
+        const SizedBox(height: 4),
+        _row('Contains 1 uppercase letter', upperOk),
+        const SizedBox(height: 4),
+        _row('Contains 1 digit', digitOk),
+        const SizedBox(height: 4),
+        _row('Contains 1 special character', specialOk),
+      ],
     );
   }
 }
