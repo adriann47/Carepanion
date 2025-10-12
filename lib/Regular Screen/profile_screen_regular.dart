@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:softeng/data/profile_service.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'aboutpage_regular.dart';
@@ -17,6 +19,25 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   int _currentIndex = 4; // Profile tab selected
+  String? _avatarUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final data = await ProfileService.fetchProfile(Supabase.instance.client);
+      if (!mounted) return;
+      setState(() {
+        _avatarUrl = data?['avatar_url'] as String?;
+      });
+    } catch (_) {
+      // ignore
+    }
+  }
 
   void _onTabTapped(int index) {
     if (index == _currentIndex) return;
@@ -66,7 +87,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               CircleAvatar(
                 radius: 40,
                 backgroundColor: Colors.brown[200],
-                child: const Icon(Icons.person, size: 50, color: Colors.white),
+                backgroundImage:
+                    _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                child: _avatarUrl == null
+                    ? const Icon(Icons.person, size: 50, color: Colors.white)
+                    : null,
               ),
               const SizedBox(height: 10),
               const Text(

@@ -6,6 +6,7 @@ import 'notification_screen.dart'; // 👈 Import your notification screen
 import 'edit_task.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:softeng/data/profile_service.dart';
 
 class TasksScreenRegular extends StatefulWidget {
 const TasksScreenRegular({super.key});
@@ -16,6 +17,23 @@ State<TasksScreenRegular> createState() => _TasksScreenState();
 
 class _TasksScreenState extends State<TasksScreenRegular> {
 int _currentIndex = 0;
+String? _avatarUrl;
+
+@override
+void initState() {
+  super.initState();
+  _loadProfile();
+}
+
+Future<void> _loadProfile() async {
+  try {
+    final data = await ProfileService.fetchProfile(Supabase.instance.client);
+    if (!mounted) return;
+    setState(() {
+      _avatarUrl = data?['avatar_url'] as String?;
+    });
+  } catch (_) {}
+}
 
 /// --- NAVIGATION HANDLER ---
  void _onTabTapped(int index) {
@@ -66,10 +84,13 @@ borderRadius: BorderRadius.circular(16),
 ),
 child: Row(
 children: [
-const CircleAvatar(
-radius: 30,
-backgroundColor: Colors.white,
-child: Icon(Icons.person, size: 40, color: Colors.black87),
+CircleAvatar(
+  radius: 30,
+  backgroundColor: Colors.white,
+  backgroundImage: _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+  child: _avatarUrl == null
+      ? const Icon(Icons.person, size: 40, color: Colors.black87)
+      : null,
 ),
 const SizedBox(width: 16),
 Expanded(

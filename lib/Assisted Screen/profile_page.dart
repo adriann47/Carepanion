@@ -1,5 +1,9 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:softeng/data/profile_service.dart';
 import 'navbar_assisted.dart'; // ✅ Import your shared navbar
 
 class ProfilePage extends StatefulWidget {
@@ -10,6 +14,77 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  final ImagePicker _picker = ImagePicker();
+  String? _avatarUrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final data = await ProfileService.fetchProfile(Supabase.instance.client);
+      if (!mounted) return;
+      setState(() {
+        _avatarUrl = data?['avatar_url'] as String?;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+    await _uploadAndSaveAvatar(image);
+  }
+
+  Future<void> _uploadAndSaveAvatar(XFile image) async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to update avatar.')),
+      );
+      return;
+    }
+
+    try {
+      if (mounted) setState(() => _saving = true);
+
+      final Uint8List bytes = await image.readAsBytes();
+      final String ext = image.path.split('.').last.toLowerCase();
+
+      final result = await ProfileService.uploadAvatar(
+        client,
+        bytes: bytes,
+        fileExt: ext,
+        userId: user.id,
+      );
+
+      await ProfileService.updateAvatarUrl(
+        client,
+        userId: user.id,
+        avatarUrl: result.publicUrl,
+      );
+
+      final withBuster = '${result.publicUrl}?v=${DateTime.now().millisecondsSinceEpoch}';
+      if (!mounted) return;
+      setState(() => _avatarUrl = withBuster);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile picture updated.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update avatar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -69,10 +144,47 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 18),
-              CircleAvatar(
-                radius: 60,
-                backgroundColor: const Color(0xFFF1D2B6),
-                child: const Icon(Icons.person, size: 70, color: Colors.white),
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  CircleAvatar(
+                    radius: 60,
+                    backgroundColor: const Color(0xFFF1D2B6),
+                    backgroundImage:
+                        _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                    child: _avatarUrl == null
+                        ? const Icon(Icons.person, size: 70, color: Colors.white)
+                        : null,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 4,
+                    child: GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Colors.pinkAccent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: _saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.edit,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 30),
               Padding(

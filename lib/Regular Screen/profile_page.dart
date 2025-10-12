@@ -1,7 +1,10 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:softeng/data/profile_service.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'companion_list.dart';
@@ -16,15 +19,93 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final int _currentIndex = 3;
   File? _profileImage; // ✅ Store selected image
+  String? _avatarUrl; // ✅ Remote avatar from Supabase
+  bool _saving = false;
 
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final client = Supabase.instance.client;
+    try {
+      final data = await ProfileService.fetchProfile(client);
+      if (!mounted) return;
+      setState(() {
+        _avatarUrl = (data?['avatar_url'] as String?)?.trim().isEmpty == true
+            ? null
+            : data?['avatar_url'] as String?;
+      });
+    } catch (_) {
+      // Silently ignore; UI will show placeholder
+    }
+  }
 
   Future<void> _pickImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
+      if (mounted) {
+        setState(() {
+          _profileImage = File(image.path);
+        });
+      }
+
+      // Also upload to Supabase and persist URL
+      await _uploadAndSaveAvatar(image);
+    }
+  }
+
+  Future<void> _uploadAndSaveAvatar(XFile image) async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to update avatar.')),
+      );
+      return;
+    }
+
+    try {
+      if (mounted) setState(() => _saving = true);
+
+      // Read bytes and derive extension
+      final Uint8List bytes = await image.readAsBytes();
+      final String ext = image.path.split('.').last.toLowerCase();
+
+      final result = await ProfileService.uploadAvatar(
+        client,
+        bytes: bytes,
+        fileExt: ext,
+        userId: user.id,
+      );
+
+      await ProfileService.updateAvatarUrl(
+        client,
+        userId: user.id,
+        avatarUrl: result.publicUrl,
+      );
+
+      // Bust caches by appending a version param
+      final withBuster = '${result.publicUrl}?v=${DateTime.now().millisecondsSinceEpoch}';
+      if (!mounted) return;
       setState(() {
-        _profileImage = File(image.path);
+        _avatarUrl = withBuster;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile picture updated.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update avatar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -127,13 +208,15 @@ class _ProfilePageState extends State<ProfilePage> {
                     backgroundColor: const Color(0xFFF1D2B6),
                     backgroundImage: _profileImage != null
                         ? FileImage(_profileImage!)
-                        : null,
+                        : (_avatarUrl != null ? NetworkImage(_avatarUrl!) : null) as ImageProvider<Object>?,
                     child: _profileImage == null
-                        ? const Icon(
-                            Icons.person,
-                            size: 70,
-                            color: Colors.white,
-                          )
+                        ? (_avatarUrl == null
+                            ? const Icon(
+                                Icons.person,
+                                size: 70,
+                                color: Colors.white,
+                              )
+                            : null)
                         : null,
                   ),
                   Positioned(
@@ -147,11 +230,20 @@ class _ProfilePageState extends State<ProfilePage> {
                           color: Colors.pinkAccent,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          Icons.edit,
-                          color: Colors.white,
-                          size: 18,
-                        ),
+                        child: _saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.edit,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                       ),
                     ),
                   ),

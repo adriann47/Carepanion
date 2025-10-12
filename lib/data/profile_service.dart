@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Centralized profile persistence that auto-detects the correct table name.
@@ -74,4 +76,74 @@ class ProfileService {
     if (role != null) payload['role'] = role;
     await client.from(table).upsert(payload);
   }
+
+  /// Fetch the profile row for the supplied [id] or the current auth user.
+  static Future<Map<String, dynamic>?> fetchProfile(
+    SupabaseClient client, {
+    String? userId,
+  }) async {
+    final id = userId ?? client.auth.currentUser?.id;
+    if (id == null) return null;
+    final table = await _resolveTable(client);
+    return client.from(table).select().eq('id', id).maybeSingle();
+  }
+
+  /// Persists the supplied [avatarUrl] against the profile row.
+  static Future<void> updateAvatarUrl(
+    SupabaseClient client, {
+    required String userId,
+    required String avatarUrl,
+  }) async {
+    final table = await _resolveTable(client);
+    await client.from(table).update({'avatar_url': avatarUrl}).eq('id', userId);
+  }
+
+  /// Upload raw image [bytes] to the `avatars` storage bucket and return paths.
+  static Future<AvatarUploadResult> uploadAvatar(
+    SupabaseClient client, {
+    required Uint8List bytes,
+    required String fileExt,
+    required String userId,
+  }) async {
+    final storage = client.storage.from('avatars');
+    final safeExt = fileExt.toLowerCase();
+    final path = '$userId/avatar.$safeExt';
+    await storage.uploadBinary(
+      path,
+      bytes,
+      fileOptions: FileOptions(
+        cacheControl: '3600',
+        upsert: true,
+        contentType: _resolveMimeType(safeExt),
+      ),
+    );
+    final publicUrl = storage.getPublicUrl(path);
+    return AvatarUploadResult(path: path, publicUrl: publicUrl);
+  }
+
+  static String _resolveMimeType(String ext) {
+    switch (ext.replaceAll('.', '')) {
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'heic':
+      case 'heif':
+        return 'image/heic';
+      case 'bmp':
+        return 'image/bmp';
+      default:
+        return 'image/jpeg';
+    }
+  }
+}
+
+/// Result payload returned after uploading an avatar image.
+class AvatarUploadResult {
+  AvatarUploadResult({required this.path, required this.publicUrl});
+
+  final String path;
+  final String publicUrl;
 }

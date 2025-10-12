@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:softeng/data/profile_service.dart';
 import 'profile_screen.dart';
 import 'emergency_screen.dart';
 import 'calendar_screen.dart';
@@ -15,6 +17,23 @@ class _TasksScreen extends State<TasksScreen> {
   // ignore: unused_field
   int _currentIndex = 0; // Home tab
   final List<bool> _taskDone = [true, false, false]; // initial checkboxes
+  String? _avatarUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final data = await ProfileService.fetchProfile(Supabase.instance.client);
+      if (!mounted) return;
+      setState(() {
+        _avatarUrl = data?['avatar_url'] as String?;
+      });
+    } catch (_) {}
+  }
 
   // ignore: unused_element
   void _onTabTapped(int index) {
@@ -59,10 +78,14 @@ class _TasksScreen extends State<TasksScreen> {
                 ),
                 child: Row(
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 40,
                       backgroundColor: Colors.brown,
-                      child: Icon(Icons.person, size: 45, color: Colors.white),
+                      backgroundImage:
+                          _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                      child: _avatarUrl == null
+                          ? const Icon(Icons.person, size: 45, color: Colors.white)
+                          : null,
                     ),
                     const SizedBox(width: 20),
                     Expanded(
