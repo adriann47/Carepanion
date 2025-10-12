@@ -22,6 +22,7 @@ class TaskService {
   TaskService._();
 
   static final SupabaseClient _client = Supabase.instance.client;
+  static String? get _uid => _client.auth.currentUser?.id;
 
   static String _toDateString(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
 
@@ -30,7 +31,7 @@ class TaskService {
     return DateTime(date.year, date.month, date.day, tod.hour, tod.minute);
   }
 
-  /// Creates a task row in Supabase.
+/// Creates a task row in Supabase.
   static Future<void> createTask({
     required String title,
     String? description,
@@ -58,7 +59,7 @@ class TaskService {
     } catch (e) {
       final msg = e.toString().toLowerCase();
       // Fallback if 'category' column doesn't exist in DB
-      if (msg.contains("'category'") || msg.contains('category') && data.containsKey('category')) {
+      if (msg.contains("'category'") || (msg.contains('category') && data.containsKey('category'))) {
         final fallback = Map<String, dynamic>.from(data);
         fallback.remove('category');
         await _client.from('tasks').insert(fallback);
@@ -68,18 +69,24 @@ class TaskService {
     }
   }
 
-  /// Fetch tasks for a specific calendar date (local date match on `due_date`).
+/// Fetch tasks for a specific calendar date (local date match on `due_date`).
   static Future<List<Map<String, dynamic>>> getTasksForDate(DateTime date) async {
     final dateStr = _toDateString(date);
-    final result = await _client
+    var builder = _client
         .from('tasks')
         .select()
-        .eq('due_date', dateStr)
-        .order('start_at', ascending: true);
+        .eq('due_date', dateStr);
+
+    final uid = _uid;
+    if (uid != null) {
+      builder = builder.eq('user_id', uid);
+    }
+
+    final result = await builder.order('start_at', ascending: true);
     return List<Map<String, dynamic>>.from(result);
   }
 
-  /// Update an existing task.
+/// Update an existing task.
   static Future<void> updateTask({
     required int id,
     String? title,
@@ -100,15 +107,19 @@ class TaskService {
     // We may need the existing due_date when only time changes
     DateTime? effectiveDate = dueDate;
     if (effectiveDate == null && (startTime != null || endTime != null)) {
-      final existingList = await _client
+      var builder = _client
           .from('tasks')
           .select('due_date')
-          .eq('id', id)
-          .limit(1);
+          .eq('id', id);
+      final uid2 = _uid;
+      if (uid2 != null) builder = builder.eq('user_id', uid2);
+      final List existingList = await builder.limit(1);
       if (existingList.isNotEmpty) {
         final dueStr = existingList.first['due_date']?.toString();
         if (dueStr != null && dueStr.isNotEmpty) {
-          try { effectiveDate = DateTime.parse(dueStr); } catch (_) {}
+          try {
+            effectiveDate = DateTime.parse(dueStr);
+          } catch (_) {}
         }
       }
     }
@@ -130,21 +141,45 @@ class TaskService {
     if (data.isEmpty) return; // nothing to update
 
     try {
-      await _client.from('tasks').update(data).eq('id', id);
+      var upd = _client.from('tasks').update(data).eq('id', id);
+      final uid = _uid;
+      if (uid != null) {
+        upd = upd.eq('user_id', uid);
+      }
+      final List updatedList = await upd.select('id');
+      if (updatedList.isEmpty) {
+        throw Exception('Task not updated. It may not exist or you may not have permission.');
+      }
     } catch (e) {
       final msg = e.toString().toLowerCase();
       if (msg.contains("'category'") || (msg.contains('category') && data.containsKey('category'))) {
         final fallback = Map<String, dynamic>.from(data);
         fallback.remove('category');
-        await _client.from('tasks').update(fallback).eq('id', id);
+        var upd = _client.from('tasks').update(fallback).eq('id', id);
+        final uid = _uid;
+        if (uid != null) {
+          upd = upd.eq('user_id', uid);
+        }
+        final List updatedList = await upd.select('id');
+        if (updatedList.isEmpty) {
+          throw Exception('Task not updated. It may not exist or you may not have permission.');
+        }
         return;
       }
       rethrow;
     }
   }
 
-  /// Delete a task by id.
+/// Delete a task by id.
   static Future<void> deleteTask(int id) async {
-    await _client.from('tasks').delete().eq('id', id);
+    var del = _client.from('tasks').delete().eq('id', id);
+    final uid = _uid;
+    if (uid != null) {
+      del = del.eq('user_id', uid);
+    }
+    final List deletedList = await del.select('id');
+    if (deletedList.isEmpty) {
+      throw Exception('Task not deleted. It may not exist or you may not have permission.');
+    }
   }
 }

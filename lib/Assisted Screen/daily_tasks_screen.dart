@@ -69,9 +69,12 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
                     itemBuilder: (context, index) {
                       final t = tasks[index];
                       final String title = (t['title'] ?? '').toString();
-                      final String category = (t['category'] ?? 'OTHER').toString().toUpperCase();
-                      final String description = (t['description'] ?? '').toString();
-                      final String timeLabel = _formatTimeRange(t['start_at'], t['end_at']);
+                      final String category =
+                          (t['category'] ?? 'OTHER').toString().toUpperCase();
+                      final String description =
+                          (t['description'] ?? '').toString();
+                      final String timeLabel =
+                          _formatTimeRange(t['start_at'], t['end_at']);
                       final Color color = _categoryColor(category);
 
                       return InkWell(
@@ -87,9 +90,10 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
                           }
                         },
                         child: _taskCard(
-                          category,
+                          title,
                           timeLabel,
-                          title + (description.isNotEmpty ? " — $description" : ""),
+                          category,
+                          description,
                           color,
                         ),
                       );
@@ -104,15 +108,16 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
     );
   }
 
-  // --- Task Card (Full Width) ---
+  // --- Updated Task Card Layout ---
   Widget _taskCard(
-    String task,
+    String title,
     String time,
+    String category,
     String note,
     Color backgroundColor,
   ) {
     return Container(
-      width: double.infinity, // ✅ Full width of the screen
+      width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -122,23 +127,35 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // --- Title (larger font) ---
           Text(
-            task,
+            title,
             style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Colors.black54, // ✅ gray
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
+
+          // --- Time ---
           Text(
             "Time: $time",
-            style: const TextStyle(fontSize: 13, color: Colors.black54),
+            style: const TextStyle(fontSize: 14, color: Colors.black87),
           ),
+
+          // --- Category ---
           Text(
-            "Note: $note",
-            style: const TextStyle(fontSize: 13, color: Colors.black54),
+            "Category: $category",
+            style: const TextStyle(fontSize: 14, color: Colors.black87),
           ),
+
+          // --- Note ---
+          if (note.isNotEmpty)
+            Text(
+              "Note: $note",
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+            ),
         ],
       ),
     );
