@@ -123,12 +123,18 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   Future<void> _deleteTask() async {
     final id = (widget.task['id'] as num).toInt();
     try {
-      await TaskService.deleteTask(id);
+      final ok = await TaskService.deleteTask(id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Task deleted')),
-      );
-      Navigator.pop(context, true);
+      if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Task deleted')),
+        );
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not delete this task (no permission or it no longer exists).')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

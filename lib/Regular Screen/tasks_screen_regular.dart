@@ -223,10 +223,10 @@ class _TodayTasksStream extends StatelessWidget {
     final supabase = Supabase.instance.client;
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-    final tasksStream = supabase
-        .from('tasks')
-        .stream(primaryKey: ['id'])
-        .eq('due_date', today);
+  // Important: Do not filter by due_date on the server for realtime.
+  // Delete events may not include non-PK columns for filtering unless REPLICA IDENTITY FULL is set.
+  // Stream all rows and filter client-side to ensure deletes are reflected immediately.
+  final tasksStream = supabase.from('tasks').stream(primaryKey: ['id']);
 
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: tasksStream,
@@ -245,7 +245,10 @@ class _TodayTasksStream extends StatelessWidget {
           );
         }
 
-        var tasks = snapshot.data ?? const [];
+    // Filter today's tasks client-side
+    var tasks = (snapshot.data ?? const [])
+      .where((row) => (row['due_date']?.toString() ?? '') == today)
+      .toList();
 
         // Sort by start_at ascending, nulls last
         tasks = List.of(tasks);

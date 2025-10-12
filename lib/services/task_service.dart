@@ -144,7 +144,23 @@ class TaskService {
   }
 
   /// Delete a task by id.
-  static Future<void> deleteTask(int id) async {
-    await _client.from('tasks').delete().eq('id', id);
+  static Future<bool> deleteTask(int id) async {
+    try {
+      // Ask PostgREST to return the deleted row; null means nothing deleted (likely RLS)
+      final res = await _client
+          .from('tasks')
+          .delete()
+          .eq('id', id)
+          .select('id')
+          .maybeSingle();
+      return res != null;
+    } on PostgrestException catch (e) {
+      // Surface clearer message for common RLS/permission issues
+      final msg = e.message.toLowerCase();
+      if (msg.contains('permission denied') || msg.contains('policy')) {
+        throw Exception('Delete blocked by security policy. Please sign in as the owner of the task or adjust RLS policies.');
+      }
+      rethrow;
+    }
   }
 }
