@@ -137,10 +137,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         if (email == null || email.isEmpty) {
           throw AuthException('Email is missing');
         }
-        // IMPORTANT: For signup confirmation, resend a SIGNUP OTP (not a login OTP)
-        await supabase.auth.resend(
-          type: OtpType.signup,
+        await supabase.auth.signInWithOtp(
           email: email,
+          emailRedirectTo: 'https://eyalgnlsdseuvmmtgefk.supabase.co',
         );
       }
       if (!mounted) return;
@@ -244,9 +243,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         if (email == null || email.isEmpty) {
           throw AuthException('Email is missing');
         }
-        // IMPORTANT: Use SIGNUP type so Supabase marks email_confirmed_at
         await supabase.auth.verifyOTP(
-          type: OtpType.signup,
+          type: OtpType.email,
           email: email,
           token: code,
         );

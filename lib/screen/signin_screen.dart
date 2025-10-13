@@ -164,6 +164,27 @@ class _SignInScreenState extends State<SignInScreen> {
           return;
         }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+          // Navigate to welcome screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          );
+        } 
+      } on AuthException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Sign-in failed: $e")));
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
   }
@@ -224,6 +245,10 @@ class _SignInScreenState extends State<SignInScreen> {
         } else {
           // For email/password sign-ins, do not navigate here.
           // Navigation is handled inside _signInWithEmail() on success.
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          );
         }
       }
     });
