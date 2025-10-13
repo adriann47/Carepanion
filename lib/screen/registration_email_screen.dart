@@ -196,13 +196,23 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
               supabase.auth.currentSession != null ||
               authResponse.session != null;
           if (hasSession) {
-            await ProfileService.upsertProfile(
-              supabase,
-              id: authResponse.user!.id,
-              email: _emailController.text.trim(),
-              fullName:
-                  '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-            );
+            try {
+              await ProfileService.upsertProfile(
+                supabase,
+                id: authResponse.user!.id,
+                email: _emailController.text.trim(),
+                fullName:
+                    '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+              );
+            } on PostgrestException catch (e) {
+              // If profile RLS blocks insert (code 42501), ignore and continue registration
+              final code = (e.code ?? '').toUpperCase();
+              final msg = e.message.toLowerCase();
+              final isRls = code == '42501' || msg.contains('row-level security');
+              if (!isRls) rethrow;
+            } catch (_) {
+              // Swallow any profile write error so registration can proceed
+            }
           }
 
           // 3. Navigate to verify email screen
