@@ -7,6 +7,7 @@ import 'welcome_screen.dart';
 import '../data/profile_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
 
@@ -26,67 +27,6 @@ class _SignInScreenState extends State<SignInScreen> {
   StreamSubscription<AuthState>? _authSub;
   bool _googleOAuthPending = false;
 
-  Future<void> _sendPasswordReset() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter your email first')),
-      );
-      return;
-    }
-    try {
-      final redirect = kIsWeb ? Uri.base.origin : 'io.supabase.flutter://callback';
-      await supabase.auth.resetPasswordForEmail(email, redirectTo: redirect);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password reset email sent. Check your inbox.')),
-      );
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send reset email: $e')),
-      );
-    }
-  }
-
-  Future<String?> _promptNewPassword() async {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Set new password'),
-          content: TextField(
-            controller: controller,
-            obscureText: true,
-            decoration: const InputDecoration(hintText: 'New password'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(null),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final v = controller.text.trim();
-                if (v.length < 6) return; // simple guard
-                Navigator.of(ctx).pop(v);
-              },
-              child: const Text('Update'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   // Email validator - less restrictive
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) return "Email is required";
@@ -96,10 +36,17 @@ class _SignInScreenState extends State<SignInScreen> {
     return null;
   }
 
-  // Password validator (sign-in): keep it light to avoid blocking valid passwords
+  // Password validator
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) return "Password is required";
     if (value.length < 6) return "Must be at least 6 characters";
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+      return "Must contain 1 uppercase letter";
+    }
+    if (!RegExp(r'[0-9]').hasMatch(value)) return "Must contain 1 number";
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value)) {
+      return "Must contain 1 special character";
+    }
     return null;
   }
 
@@ -133,8 +80,6 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  
-
   /// ✅ Email + Password Sign In
   Future<void> _signInWithEmail() async {
     if (_formKey.currentState!.validate()) {
@@ -161,7 +106,7 @@ class _SignInScreenState extends State<SignInScreen> {
             if (r == 'assisted' || r == 'assistee') {
               Navigator.pushReplacementNamed(context, '/tasks'); // Assisted tasks
             } else if (r == 'regular' || r == 'caregiver') {
-              Navigator.pushReplacementNamed(context, '/tasks_regular');
+                 Navigator.pushReplacementNamed(context, '/tasks_regular');
             } else {
               // Unknown role → let user pick
               Navigator.pushReplacementNamed(context, '/role_selection');
@@ -170,10 +115,10 @@ class _SignInScreenState extends State<SignInScreen> {
             // No profile/role yet → let user pick
             Navigator.pushReplacementNamed(context, '/role_selection');
           }
-        }
+        } 
       } on AuthException catch (e) {
         if (!mounted) return;
-        final msg = (e.message).toLowerCase();
+       final msg = (e.message).toLowerCase();
         // If the email is unconfirmed, guide the user to verification screen.
         if (msg.contains('confirm')) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -219,17 +164,8 @@ class _SignInScreenState extends State<SignInScreen> {
           return;
         }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Sign-in failed: $e")));
-      } finally {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-      }
     }
+  }
   }
 
   /// ✅ Google Sign In
@@ -270,27 +206,6 @@ class _SignInScreenState extends State<SignInScreen> {
     // Listen for auth state changes to complete OAuth flows reliably
     _authSub = supabase.auth.onAuthStateChange.listen((data) async {
       final event = data.event;
-      if (event == AuthChangeEvent.passwordRecovery) {
-        // Coming back from email reset link; ask for a new password
-        final newPass = await _promptNewPassword();
-        if (newPass != null) {
-          try {
-            await supabase.auth.updateUser(UserAttributes(password: newPass));
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Password updated. You can sign in now.')),
-              );
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to update password: $e')),
-              );
-            }
-          }
-        }
-        return;
-      }
       if (event == AuthChangeEvent.signedIn) {
         // Ensure profile exists, then navigate
         await _ensureProfileExists();
@@ -307,8 +222,10 @@ class _SignInScreenState extends State<SignInScreen> {
           // After Google OAuth, go to GoogleRegistration screen
           Navigator.pushReplacementNamed(context, '/google_registration');
         } else {
-          // For email/password sign-ins, do not navigate here.
-          // Navigation is handled inside _signInWithEmail() only on success.
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          );
         }
       }
     });
@@ -447,7 +364,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       ],
                     ),
                     TextButton(
-                      onPressed: _isLoading ? null : _sendPasswordReset,
+                      onPressed: _isLoading ? null : () {},
                       child: Text(
                         "Forgot password?",
                         style: GoogleFonts.nunito(
