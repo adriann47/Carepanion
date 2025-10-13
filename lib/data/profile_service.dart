@@ -49,12 +49,24 @@ class ProfileService {
   }) async {
     final user = client.auth.currentUser;
     if (user == null) return;
+    // If role not provided, try to read it from user metadata set during signup
+    String? effectiveRole = role;
+    try {
+      final raw = user.userMetadata;
+      if (effectiveRole == null && raw is Map<String, dynamic>) {
+        final dynamic metaRole = raw['role'];
+        if (metaRole != null) {
+          final sr = metaRole.toString().trim();
+          if (sr.isNotEmpty) effectiveRole = sr;
+        }
+      }
+    } catch (_) {}
     final table = await _resolveTable(client);
     try {
       final payload = <String, dynamic>{'id': user.id};
       if (email != null) payload['email'] = email;
       if (fullName != null) payload['fullname'] = fullName;
-      if (role != null) payload['role'] = role;
+      if (effectiveRole != null) payload['role'] = effectiveRole;
       await client.from(table).upsert(payload);
     } catch (_) {
       // Swallow and let caller decide user-facing handling
@@ -78,7 +90,7 @@ class ProfileService {
     if (birthday != null) payload['birthday'] = birthday;
     await client.from(table).upsert(payload);
   }
-
+  
   /// Fetch the profile row for the supplied [id] or the current auth user.
   static Future<Map<String, dynamic>?> fetchProfile(
     SupabaseClient client, {

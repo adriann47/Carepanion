@@ -7,6 +7,7 @@ import 'welcome_screen.dart';
 import '../data/profile_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
 
@@ -97,6 +98,72 @@ class _SignInScreenState extends State<SignInScreen> {
           await _ensureProfileExists();
 
           if (!mounted) return;
+          // Fetch role and route accordingly
+          final role = await ProfileService.getCurrentUserRole(supabase);
+          if (!mounted) return;
+          if (role != null) {
+            final r = role.toLowerCase();
+            if (r == 'assisted' || r == 'assistee') {
+              Navigator.pushReplacementNamed(context, '/tasks'); // Assisted tasks
+            } else if (r == 'regular' || r == 'caregiver') {
+                 Navigator.pushReplacementNamed(context, '/tasks_regular');
+            } else {
+              // Unknown role → let user pick
+              Navigator.pushReplacementNamed(context, '/role_selection');
+            }
+          } else {
+            // No profile/role yet → let user pick
+            Navigator.pushReplacementNamed(context, '/role_selection');
+          }
+        } 
+      } on AuthException catch (e) {
+        if (!mounted) return;
+       final msg = (e.message).toLowerCase();
+        // If the email is unconfirmed, guide the user to verification screen.
+        if (msg.contains('confirm')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please verify your email first. We\'ll resend the code.')),
+          );
+          // Optionally resend a signup OTP
+          try {
+            final email = _emailController.text.trim();
+            if (email.isNotEmpty) {
+              await supabase.auth.resend(type: OtpType.signup, email: email);
+            }
+          } catch (_) {}
+          // Navigate to verify screen with the email
+          Navigator.pushReplacementNamed(context, '/verify_email');
+          return;
+        }
+        // Handle invalid credentials with a quick reset option
+        if (msg.contains('invalid login credentials')) {
+          final email = _emailController.text.trim();
+          final snack = SnackBar(
+            content: const Text('Invalid email or password. You can reset your password.'),
+            action: SnackBarAction(
+              label: 'Reset now',
+              onPressed: () async {
+                if (email.isEmpty) return;
+                try {
+                  final redirect = kIsWeb ? Uri.base.origin : 'io.supabase.flutter://callback';
+                  await supabase.auth.resetPasswordForEmail(email, redirectTo: redirect);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Password reset email sent. Check your inbox.')),
+                  );
+                } catch (err) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to send reset email: $err')),
+                  );
+                }
+              },
+            ),
+          );
+          ScaffoldMessenger.of(context).showSnackBar(snack);
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
           // Navigate to welcome screen
           Navigator.pushReplacement(
             context,
@@ -119,6 +186,7 @@ class _SignInScreenState extends State<SignInScreen> {
         }
       }
     }
+  }
   }
 
   /// ✅ Google Sign In
@@ -175,6 +243,8 @@ class _SignInScreenState extends State<SignInScreen> {
           // After Google OAuth, go to GoogleRegistration screen
           Navigator.pushReplacementNamed(context, '/google_registration');
         } else {
+          // For email/password sign-ins, do not navigate here.
+          // Navigation is handled inside _signInWithEmail() on success.
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const WelcomeScreen()),
