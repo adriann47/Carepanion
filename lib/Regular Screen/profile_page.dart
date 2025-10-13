@@ -18,11 +18,23 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final int _currentIndex = 3;
-  File? _profileImage; // ✅ Store selected image
-  String? _avatarUrl; // ✅ Remote avatar from Supabase
+  File? _profileImage;
+  String? _avatarUrl;
   bool _saving = false;
 
   final ImagePicker _picker = ImagePicker();
+
+  // Edit state
+  bool _isEditingName = false;
+  bool _isEditingBirthday = false;
+
+  // Controllers
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _birthdayController = TextEditingController();
+
+  // We’ll store an ISO (YYYY-MM-DD) version here for saving to DB
+  String? _birthdayIso;
 
   @override
   void initState() {
@@ -30,18 +42,42 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadProfile();
   }
 
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _birthdayController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadProfile() async {
     final client = Supabase.instance.client;
     try {
       final data = await ProfileService.fetchProfile(client);
       if (!mounted) return;
+
+      // Populate
+      _nameController.text = (data?['fullname'] as String?) ?? '';
+      _emailController.text = (data?['email'] as String?) ?? '';
+
+      final rawBirthday = (data?['birthday'] as String?) ?? '';
+      final parsed = _tryParseIsoDate(rawBirthday);
+      if (parsed != null) {
+        _birthdayIso = _toIso(parsed);
+        _birthdayController.text = _toReadable(parsed);
+      } else {
+        // if not a valid iso date, leave as is (or empty)
+        _birthdayIso = null;
+        _birthdayController.text = '';
+      }
+
       setState(() {
         _avatarUrl = (data?['avatar_url'] as String?)?.trim().isEmpty == true
             ? null
             : data?['avatar_url'] as String?;
       });
     } catch (_) {
-      // Silently ignore; UI will show placeholder
+      // ignore silently
     }
   }
 
@@ -53,8 +89,6 @@ class _ProfilePageState extends State<ProfilePage> {
           _profileImage = File(image.path);
         });
       }
-
-      // Also upload to Supabase and persist URL
       await _uploadAndSaveAvatar(image);
     }
   }
@@ -72,8 +106,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
     try {
       if (mounted) setState(() => _saving = true);
-
-      // Read bytes and derive extension
       final Uint8List bytes = await image.readAsBytes();
       final String ext = image.path.split('.').last.toLowerCase();
 
@@ -90,8 +122,8 @@ class _ProfilePageState extends State<ProfilePage> {
         avatarUrl: result.publicUrl,
       );
 
-      // Bust caches by appending a version param
-      final withBuster = '${result.publicUrl}?v=${DateTime.now().millisecondsSinceEpoch}';
+      final withBuster =
+          '${result.publicUrl}?v=${DateTime.now().millisecondsSinceEpoch}';
       if (!mounted) return;
       setState(() {
         _avatarUrl = withBuster;
@@ -128,8 +160,62 @@ class _ProfilePageState extends State<ProfilePage> {
     } else if (index == 3) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const ProfilePage()), // Fixed
+        MaterialPageRoute(builder: (context) => const ProfilePage()),
       );
+    }
+  }
+
+  // ---- Birthday helpers ----
+  static DateTime? _tryParseIsoDate(String? s) {
+    if (s == null || s.trim().isEmpty) return null;
+    try {
+      // Accepts YYYY-MM-DD (recommended), or full ISO strings
+      return DateTime.parse(s);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _toIso(DateTime d) {
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y-$m-$day';
+  }
+
+  static const _months = [
+    '', // 1-based
+    'January','February','March','April','May','June',
+    'July','August','September','October','November','December'
+  ];
+
+  static String _toReadable(DateTime d) {
+    return '${_months[d.month]} ${d.day}, ${d.year}';
+  }
+
+  Future<void> _pickBirthday() async {
+    // Decide initial date for the picker
+    DateTime initial = DateTime(1970, 1, 1);
+    final parsed = _tryParseIsoDate(_birthdayIso ?? _birthdayController.text);
+    if (parsed != null) initial = parsed;
+
+    // Bounds: 1900..today
+    final today = DateTime.now();
+    final first = DateTime(1900, 1, 1);
+    final last = DateTime(today.year, today.month, today.day);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(first) || initial.isAfter(last) ? DateTime(1970,1,1) : initial,
+      firstDate: first,
+      lastDate: last,
+      helpText: 'Select Birthday',
+    );
+
+    if (picked != null) {
+      _birthdayIso = _toIso(picked);
+      _birthdayController.text = _toReadable(picked);
+      setState(() {}); // refresh styles if needed
     }
   }
 
@@ -145,7 +231,7 @@ class _ProfilePageState extends State<ProfilePage> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // 🔹 Pink Header
+              // Header
               Container(
                 width: double.infinity,
                 height: h * 0.18,
@@ -199,7 +285,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 18),
 
-              // 🖼️ Editable Profile Picture
+              // Profile Picture
               Stack(
                 alignment: Alignment.bottomRight,
                 children: [
@@ -208,7 +294,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     backgroundColor: const Color(0xFFF1D2B6),
                     backgroundImage: _profileImage != null
                         ? FileImage(_profileImage!)
-                        : (_avatarUrl != null ? NetworkImage(_avatarUrl!) : null) as ImageProvider<Object>?,
+                        : (_avatarUrl != null ? NetworkImage(_avatarUrl!) : null)
+                            as ImageProvider<Object>?,
                     child: _profileImage == null
                         ? (_avatarUrl == null
                             ? const Icon(
@@ -236,7 +323,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
                               )
                             : const Icon(
@@ -252,19 +340,80 @@ class _ProfilePageState extends State<ProfilePage> {
 
               const SizedBox(height: 30),
 
-              // 📝 Profile Form Fields
+              // Fields
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Column(
                   children: [
-                    _buildTextField('NAME', 'SHAWN URIEL CABUTIHAN'),
+                    _buildEditableTextField(
+                      label: 'NAME',
+                      controller: _nameController,
+                      isEditing: _isEditingName,
+                      onEditToggle: () {
+                        setState(() => _isEditingName = !_isEditingName);
+                      },
+                    ),
                     const SizedBox(height: 15),
-                    _buildTextField('EMAIL', 'SHAWNURIEL@GMAIL.COM'),
+                    _buildReadOnlyField(
+                      label: 'EMAIL',
+                      controller: _emailController,
+                    ),
                     const SizedBox(height: 15),
-                    _buildTextField('BIRTHDAY', 'JUNE 1, 1956'),
+
+                    // 🎂 Birthday: uses a date picker
+                    _buildBirthdayField(
+                      label: 'BIRTHDAY',
+                      controller: _birthdayController,
+                      isEditing: _isEditingBirthday,
+                      onEditToggle: () {
+                        setState(() => _isEditingBirthday = !_isEditingBirthday);
+                        // optional: open picker immediately when entering edit mode
+                        // if (_isEditingBirthday) _pickBirthday();
+                      },
+                      onPickDate: _pickBirthday,
+                    ),
+
                     const SizedBox(height: 30),
+
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () async {
+                        final client = Supabase.instance.client;
+                        final user = client.auth.currentUser;
+                        if (user == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('You must be signed in.')),
+                          );
+                          return;
+                        }
+                        try {
+                          await ProfileService.upsertProfile(
+                            client,
+                            id: user.id,
+                            fullName: _nameController.text.trim().isEmpty
+                                ? null
+                                : _nameController.text.trim(),
+                            // Keep email in sync if you store it in profile
+                            email: _emailController.text.trim().isEmpty
+                                ? null
+                                : _emailController.text.trim(),
+                            // Save ISO string (YYYY-MM-DD). Works for text *and* date columns.
+                            birthday: _birthdayIso,
+                          );
+                          if (!mounted) return;
+                          setState(() {
+                            _isEditingName = false;
+                            _isEditingBirthday = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Changes saved')),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to save: $e')),
+                          );
+                        }
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFF7A9AC),
                         shape: RoundedRectangleBorder(
@@ -293,7 +442,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ),
 
-      // 🔹 Bottom Navigation Bar
+      // Bottom Navigation Bar
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
@@ -305,29 +454,22 @@ class _ProfilePageState extends State<ProfilePage> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(
-            Icons.calendar_today,
-            'Calendar',
-            isSelected: _currentIndex == 1,
-          ),
-          _navItem(
-            Icons.family_restroom,
-            'Alert',
-            isSelected: _currentIndex == 2,
-          ),
-          _navItem(
-            Icons.notifications,
-            'Notifications',
-            isSelected: _currentIndex == 3,
-          ),
+          _navItem(Icons.calendar_today, 'Calendar', isSelected: _currentIndex == 1),
+          _navItem(Icons.family_restroom, 'Alert', isSelected: _currentIndex == 2),
+          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
     );
   }
 
-  // 🧱 Text Field Builder
-  Widget _buildTextField(String label, String hint) {
+  // ----- Field builders -----
+
+  // Read-only field (email) — white like others
+  Widget _buildReadOnlyField({
+    required String label,
+    required TextEditingController controller,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -341,13 +483,14 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         const SizedBox(height: 6),
         TextField(
+          controller: controller,
+          readOnly: true,
+          style: GoogleFonts.nunito(
+            color: Colors.black87,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
           decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.nunito(
-              color: Colors.black87,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
             filled: true,
             fillColor: Colors.white,
             contentPadding: const EdgeInsets.symmetric(
@@ -364,7 +507,120 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  /// 🧭 Helper for nav bar icon styling
+  // Name (editable text with gray edit icon inside)
+  Widget _buildEditableTextField({
+    required String label,
+    required TextEditingController controller,
+    required bool isEditing,
+    required VoidCallback onEditToggle,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.nunito(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          readOnly: !isEditing,
+          style: GoogleFonts.nunito(
+            color: isEditing ? Colors.grey[600] : Colors.black87,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.black26),
+            ),
+            suffixIcon: IconButton(
+              onPressed: onEditToggle,
+              icon: Icon(Icons.edit, color: Colors.grey[600], size: 20),
+              tooltip: isEditing ? 'Stop editing' : 'Edit',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Birthday (calendar picker)
+Widget _buildBirthdayField({
+  required String label,
+  required TextEditingController controller,
+  required bool isEditing,
+  required VoidCallback onEditToggle,
+  required VoidCallback onPickDate,
+}) {
+  void _openPickerNow() {
+    // ensure the UI shows “editing” gray state immediately
+    if (!isEditing) onEditToggle();
+    onPickDate();
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: GoogleFonts.nunito(
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+          color: Colors.black54,
+        ),
+      ),
+      const SizedBox(height: 6),
+      GestureDetector(
+        // ✅ open calendar on first tap (no edit-gating)
+        onTap: _openPickerNow,
+        child: AbsorbPointer(
+          absorbing: true, // keep keyboard from appearing
+          child: TextField(
+            controller: controller,
+            readOnly: true, // always read-only; we pick via calendar
+            style: GoogleFonts.nunito(
+              color: isEditing ? Colors.grey[600] : Colors.black87, // gray while “editing”
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.black26),
+              ),
+              // ✅ icon also opens calendar immediately
+              suffixIcon: IconButton(
+                onPressed: _openPickerNow,
+                icon: Icon(Icons.calendar_today, color: Colors.grey[600], size: 20),
+                tooltip: 'Pick date',
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+  // nav helper
   static BottomNavigationBarItem _navItem(
     IconData icon,
     String label, {

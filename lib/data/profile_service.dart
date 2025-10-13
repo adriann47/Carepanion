@@ -68,12 +68,14 @@ class ProfileService {
     String? email,
     String? fullName,
     String? role,
+    String? birthday,
   }) async {
     final table = await _resolveTable(client);
     final payload = <String, dynamic>{'id': id};
     if (email != null) payload['email'] = email;
     if (fullName != null) payload['fullname'] = fullName;
     if (role != null) payload['role'] = role;
+    if (birthday != null) payload['birthday'] = birthday;
     await client.from(table).upsert(payload);
   }
 
