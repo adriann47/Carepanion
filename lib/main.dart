@@ -17,7 +17,6 @@ import 'Assisted Screen/notification.dart';
 import 'Assisted Screen/account.dart';
 import 'Assisted Screen/settings.dart';
 import 'data/profile_service.dart';
-import 'Regular Screen/tasks_screen_regular.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,10 +47,9 @@ void _setupGlobalAuthListener() {
   _authSub = supa.auth.onAuthStateChange.listen((data) async {
     if (data.event == AuthChangeEvent.signedIn) {
       final user = supa.auth.currentUser;
-      final provider = (user?.appMetadata != null
-              ? user!.appMetadata['provider']
-              : '')
-          ?.toString();
+      final provider =
+          (user?.appMetadata != null ? user!.appMetadata['provider'] : '')
+              ?.toString();
       // If signed in via Google, take the user to GoogleRegistration
       if (provider == 'google') {
         _navKey.currentState?.pushNamedAndRemoveUntil(
@@ -79,12 +77,11 @@ class CarePanionApp extends StatelessWidget {
         "/signin": (context) => const SignInScreen(),
         "/register_email": (context) => const RegistrationEmailScreen(),
         "/register_phone": (context) => const RegistrationPhoneScreen(),
-    "/verify_email": (context) => const VerifyEmailScreen(),
-    "/google_registration": (context) => GoogleRegistration(),
+        "/verify_email": (context) => const VerifyEmailScreen(),
+        "/google_registration": (context) => GoogleRegistration(),
         "/role_selection": (context) => const RoleSelectionScreen(),
         "/guardian_input": (context) => const GuardianInputScreen(),
         "/tasks": (context) => const TasksScreen(),
-        "/tasks_regular": (context) => const TasksScreenRegular(),
         "/profile": (context) => const ProfileScreen(),
         "/settings": (context) => const SettingsScreen(),
         "/notifications": (context) => NotificationPage(),

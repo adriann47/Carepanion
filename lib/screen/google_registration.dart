@@ -22,7 +22,9 @@ class _GoogleRegistrationState extends State<GoogleRegistration> {
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) return "Password is required";
     if (value.length < 6) return "Must be at least 6 characters";
-    if (!RegExp(r'[A-Z]').hasMatch(value)) return "Must contain 1 uppercase letter";
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+      return "Must contain 1 uppercase letter";
+    }
     if (!RegExp(r'[0-9]').hasMatch(value)) return "Must contain 1 number";
     if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value)) {
       return "Must contain 1 special character";
@@ -41,9 +43,7 @@ class _GoogleRegistrationState extends State<GoogleRegistration> {
     if (_formKey.currentState!.validate()) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const VerifyEmailScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const VerifyEmailScreen()),
       );
     }
   }
@@ -196,9 +196,7 @@ class _GoogleRegistrationState extends State<GoogleRegistration> {
                 Center(
                   child: Text(
                     "Sign in with",
-                    style: GoogleFonts.nunito(
-                      color: primaryTextColor,
-                    ),
+                    style: GoogleFonts.nunito(color: primaryTextColor),
                   ),
                 ),
                 const SizedBox(height: 10),

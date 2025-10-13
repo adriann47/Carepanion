@@ -19,11 +19,7 @@ class WelcomeScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Image.asset(
-                        "assets/logo.jpg",
-                        width: 120,
-                        height: 120,
-                      ),
+                      Image.asset("assets/logo.jpg", width: 120, height: 120),
                       const SizedBox(width: 20),
                       Transform.translate(
                         offset: const Offset(-40, 0),
