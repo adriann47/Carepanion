@@ -170,6 +170,15 @@ class TaskService {
     }
   }
 
+  /// Convenience: set only the status field for a task by id.
+  static Future<void> setTaskStatus({required int id, required String status}) async {
+    await updateTask(id: id, status: status);
+  }
+
+  static Future<void> markDone(int id) => setTaskStatus(id: id, status: 'done');
+  static Future<void> markSkip(int id) => setTaskStatus(id: id, status: 'skip');
+  static Future<void> markTodo(int id) => setTaskStatus(id: id, status: 'todo');
+
 /// Delete a task by id.
   static Future<void> deleteTask(int id) async {
     var del = _client.from('tasks').delete().eq('id', id);
@@ -180,6 +189,23 @@ class TaskService {
     final List deletedList = await del.select('id');
     if (deletedList.isEmpty) {
       throw Exception('Task not deleted. It may not exist or you may not have permission.');
+    }
+  }
+
+  /// Mark past-due 'todo' tasks as 'skip' for the current user.
+  /// This is a convenience clean-up to maintain accurate buckets.
+  static Future<void> autoSkipPastDueTodos() async {
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      await _client
+          .from('tasks')
+          .update({'status': 'skip'})
+          .lt('due_date', _toDateString(DateTime.now()))
+          .eq('status', 'todo')
+          .eq('user_id', uid);
+    } catch (_) {
+      // ignore silently; non-blocking hygiene step
     }
   }
 }
