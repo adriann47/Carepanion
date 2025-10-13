@@ -60,6 +60,43 @@ class ProfileService {
     }
   }
 
+  /// Link the current user (assisted) to a guardian by their `public_id`.
+  /// Returns true on success, false if guardian not found.
+  static Future<bool> linkGuardianByPublicId(
+    SupabaseClient client, {
+    required String guardianPublicId,
+  }) async {
+    // Find guardian row by public_id
+    try {
+      final table = await _resolveTable(client);
+      final guardian = await client.from(table).select('id').eq('public_id', guardianPublicId).maybeSingle();
+      if (guardian == null) return false;
+      final guardianId = guardian['id'] as String;
+      final user = client.auth.currentUser;
+      if (user == null) return false;
+      await client.from(table).update({'guardian_id': guardianId}).eq('id', user.id);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Given a guardian's user id, return a list of assisted users (their profile rows)
+  /// who have this guardian linked. Returns empty list if none or on error.
+  static Future<List<Map<String, dynamic>>> fetchAssistedsForGuardian(
+    SupabaseClient client, {
+    required String guardianUserId,
+  }) async {
+    try {
+      final table = await _resolveTable(client);
+      final res = await client.from(table).select().eq('guardian_id', guardianUserId);
+      // Supabase returns a List of maps on success; cast accordingly.
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Upsert a profile row with the provided fields.
   static Future<void> upsertProfile(
     SupabaseClient client, {

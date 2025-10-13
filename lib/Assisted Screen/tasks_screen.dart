@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:softeng/data/profile_service.dart';
+import 'package:softeng/services/task_service.dart';
 import 'profile_screen.dart';
 import 'emergency_screen.dart';
 import 'calendar_screen.dart';
@@ -16,13 +17,15 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreen extends State<TasksScreen> {
   // ignore: unused_field
   int _currentIndex = 0; // Home tab
-  final List<bool> _taskDone = [true, false, false]; // initial checkboxes
+  final List<bool> _taskDone = []; // tracked per loaded task
   String? _avatarUrl;
+  List<Map<String, dynamic>> _tasks = [];
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadTodayTasks();
   }
 
   Future<void> _loadProfile() async {
@@ -33,6 +36,21 @@ class _TasksScreen extends State<TasksScreen> {
         _avatarUrl = data?['avatar_url'] as String?;
       });
     } catch (_) {}
+  }
+
+  Future<void> _loadTodayTasks() async {
+    try {
+      final today = DateTime.now();
+      final tasks = await TaskService.getTasksForDate(today);
+      if (!mounted) return;
+      setState(() {
+        _tasks = tasks;
+        _taskDone.clear();
+        _taskDone.addAll(_tasks.map((t) => (t['status']?.toString() == 'done')));
+      });
+    } catch (e) {
+      // ignore errors silently for now
+    }
   }
 
   // ignore: unused_element
@@ -142,32 +160,40 @@ class _TasksScreen extends State<TasksScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
-                  children: [
-                    _taskTile(
-                      index: 0,
-                      color: const Color(0xFFFFD6D6),
-                      title: "MEDICATION",
-                      time: "7:00 AM",
-                      note: "Drink Glipten",
-                      guardian: "Neriah Villapana",
-                    ),
-                    _taskTile(
-                      index: 1,
-                      color: const Color(0xFFFFE699),
-                      title: "WALK",
-                      time: "7:15 AM",
-                      note: "Walk for 5 mins",
-                      guardian: "Neriah Villapana",
-                    ),
-                    _taskTile(
-                      index: 2,
-                      color: const Color(0xFFFFD6D6),
-                      title: "MEDICATION",
-                      time: "7:30 AM",
-                      note: "Drink Zykast",
-                      guardian: "Neriah Villapana",
-                    ),
-                  ],
+                  children: _tasks.isEmpty
+                      ? [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Text(
+                              'No tasks for today',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          )
+                        ]
+                      : List.generate(_tasks.length, (i) {
+                          final t = _tasks[i];
+                          final title = (t['title'] ?? '') as String;
+                          final note = (t['description'] ?? '') as String;
+                          final startAt = t['start_at']?.toString();
+                          String timeStr = '';
+                          if (startAt != null) {
+                            try {
+                              final dt = DateTime.parse(startAt).toLocal();
+                              timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                            } catch (_) {}
+                          }
+                          final guardian = (t['guardian_name'] ?? '') as String? ?? '';
+                          final color = i % 2 == 0 ? const Color(0xFFFFD6D6) : const Color(0xFFFFE699);
+                          return _taskTile(
+                            index: i,
+                            color: color,
+                            title: title,
+                            time: timeStr,
+                            note: note,
+                            guardian: guardian,
+                            taskId: t['id'] as int?,
+                          );
+                        }),
                 ),
               ),
             ],
@@ -189,6 +215,7 @@ class _TasksScreen extends State<TasksScreen> {
     required String time,
     required String note,
     required String guardian,
+    int? taskId,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 25),
@@ -231,9 +258,26 @@ class _TasksScreen extends State<TasksScreen> {
                       Transform.scale(
                         scale: 1.6,
                         child: Checkbox(
-                          value: _taskDone[index],
-                          onChanged: (val) {
-                            setState(() => _taskDone[index] = val ?? false);
+                          value: index < _taskDone.length ? _taskDone[index] : false,
+                          onChanged: (val) async {
+                            final newVal = val ?? false;
+                            if (index < _taskDone.length) {
+                              setState(() => _taskDone[index] = newVal);
+                            }
+                            if (taskId != null) {
+                              try {
+                                if (newVal) {
+                                  await TaskService.markDone(taskId);
+                                } else {
+                                  await TaskService.markTodo(taskId);
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to update task status')),
+                                );
+                              }
+                              await _loadTodayTasks();
+                            }
                           },
                         ),
                       ),

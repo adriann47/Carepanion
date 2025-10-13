@@ -7,7 +7,8 @@ import '../Regular Screen/notification_screen.dart';
 import '../Regular Screen/add_task.dart';
 
 class CalendarScreenRegular extends StatefulWidget {
-  const CalendarScreenRegular({super.key});
+  final String? forUserId; // optional: view calendar for specific user
+  const CalendarScreenRegular({super.key, this.forUserId});
 
   @override
   State<CalendarScreenRegular> createState() => _CalendarScreenRegularState();
@@ -205,8 +206,7 @@ DropdownButton<int>(
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) =>
-                                          DailyTasksScreen(selectedDate: date),
+                                      builder: (context) => DailyTasksScreen(selectedDate: date, forUserId: widget.forUserId),
                                     ),
                                   );
                                 },
@@ -265,6 +265,7 @@ DropdownButton<int>(
                   MaterialPageRoute(
                     builder: (context) => AddTaskScreen(
                       selectedDate: _selectedDate,
+                      forUserId: widget.forUserId,
                     ),
                   ),
                 );

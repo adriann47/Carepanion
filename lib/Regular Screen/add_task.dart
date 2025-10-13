@@ -4,8 +4,9 @@ import 'package:softeng/services/task_service.dart';
 
 class AddTaskScreen extends StatefulWidget {
   final DateTime? selectedDate; // ✅ made optional
+  final String? forUserId; // optional target user id (guardian creating for assisted)
 
-  const AddTaskScreen({super.key, this.selectedDate});
+  const AddTaskScreen({super.key, this.selectedDate, this.forUserId});
 
   @override
   State<AddTaskScreen> createState() => _AddTaskScreenState();
@@ -86,6 +87,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         startTime: _startTime,
         endTime: _endTime,
         category: _selectedCategory.isEmpty ? null : _selectedCategory,
+        forUserId: widget.forUserId,
       );
 
       if (mounted) {

@@ -39,6 +39,7 @@ class TaskService {
     TimeOfDay? startTime,
     TimeOfDay? endTime,
     String? category,
+    String? forUserId,
   }) async {
     final startAt = _combineDateAndTime(dueDate, startTime)?.toUtc();
     final endAt = _combineDateAndTime(dueDate, endTime)?.toUtc();
@@ -51,7 +52,7 @@ class TaskService {
       'start_at': startAt?.toIso8601String(),
       'end_at': endAt?.toIso8601String(),
       'status': 'todo',
-      'user_id': _client.auth.currentUser?.id,
+      'user_id': forUserId ?? _client.auth.currentUser?.id,
     }..removeWhere((key, value) => value == null);
 
     try {
@@ -70,7 +71,7 @@ class TaskService {
   }
 
 /// Fetch tasks for a specific calendar date (local date match on `due_date`).
-  static Future<List<Map<String, dynamic>>> getTasksForDate(DateTime date) async {
+  static Future<List<Map<String, dynamic>>> getTasksForDate(DateTime date, {String? forUserId}) async {
     final dateStr = _toDateString(date);
     var builder = _client
         .from('tasks')
@@ -78,7 +79,9 @@ class TaskService {
         .eq('due_date', dateStr);
 
     final uid = _uid;
-    if (uid != null) {
+    if (forUserId != null) {
+      builder = builder.eq('user_id', forUserId);
+    } else if (uid != null) {
       builder = builder.eq('user_id', uid);
     }
 
@@ -96,6 +99,7 @@ class TaskService {
     TimeOfDay? endTime,
     String? category,
     String? status,
+    String? forUserId,
   }) async {
     final Map<String, dynamic> data = {};
     if (title != null) data['title'] = title;
@@ -111,7 +115,7 @@ class TaskService {
           .from('tasks')
           .select('due_date')
           .eq('id', id);
-      final uid2 = _uid;
+      final uid2 = forUserId ?? _uid;
       if (uid2 != null) builder = builder.eq('user_id', uid2);
       final List existingList = await builder.limit(1);
       if (existingList.isNotEmpty) {
@@ -142,7 +146,7 @@ class TaskService {
 
     try {
       var upd = _client.from('tasks').update(data).eq('id', id);
-      final uid = _uid;
+      final uid = forUserId ?? _uid;
       if (uid != null) {
         upd = upd.eq('user_id', uid);
       }
@@ -156,7 +160,7 @@ class TaskService {
         final fallback = Map<String, dynamic>.from(data);
         fallback.remove('category');
         var upd = _client.from('tasks').update(fallback).eq('id', id);
-        final uid = _uid;
+        final uid = forUserId ?? _uid;
         if (uid != null) {
           upd = upd.eq('user_id', uid);
         }
@@ -171,19 +175,19 @@ class TaskService {
   }
 
   /// Convenience: set only the status field for a task by id.
-  static Future<void> setTaskStatus({required int id, required String status}) async {
-    await updateTask(id: id, status: status);
+  static Future<void> setTaskStatus({required int id, required String status, String? forUserId}) async {
+    await updateTask(id: id, status: status, forUserId: forUserId);
   }
 
-  static Future<void> markDone(int id) => setTaskStatus(id: id, status: 'done');
-  static Future<void> markSkip(int id) => setTaskStatus(id: id, status: 'skip');
-  static Future<void> markTodo(int id) => setTaskStatus(id: id, status: 'todo');
+  static Future<void> markDone(int id, {String? forUserId}) => setTaskStatus(id: id, status: 'done', forUserId: forUserId);
+  static Future<void> markSkip(int id, {String? forUserId}) => setTaskStatus(id: id, status: 'skip', forUserId: forUserId);
+  static Future<void> markTodo(int id, {String? forUserId}) => setTaskStatus(id: id, status: 'todo', forUserId: forUserId);
 
 /// Delete a task by id. Returns true if a row was deleted, false otherwise.
-  static Future<bool> deleteTask(int id) async {
+  static Future<bool> deleteTask(int id, {String? forUserId}) async {
     try {
       var del = _client.from('tasks').delete().eq('id', id);
-      final uid = _uid;
+      final uid = forUserId ?? _uid;
       if (uid != null) {
         del = del.eq('user_id', uid);
       }

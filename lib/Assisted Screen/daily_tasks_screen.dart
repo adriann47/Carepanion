@@ -6,8 +6,9 @@ import '../Regular Screen/edit_task.dart';
 
 class DailyTasksScreen extends StatefulWidget {
   final DateTime selectedDate;
+  final String? forUserId; // optional: show tasks for this user id
 
-  const DailyTasksScreen({super.key, required this.selectedDate});
+  const DailyTasksScreen({super.key, required this.selectedDate, this.forUserId});
 
   @override
   State<DailyTasksScreen> createState() => _DailyTasksScreenState();
@@ -74,7 +75,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
             // --- BODY (scrollable sections) ---
             Expanded(
               child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: TaskService.getTasksForDate(widget.selectedDate),
+                future: TaskService.getTasksForDate(widget.selectedDate, forUserId: widget.forUserId),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -219,7 +220,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
   void _openEdit(Map<String, dynamic> t) async {
     final changed = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => EditTaskScreen(task: t)),
+      MaterialPageRoute(builder: (_) => EditTaskScreen(task: t, forUserId: widget.forUserId ?? t['user_id'] as String?)),
     );
     if (changed == true) setState(() {});
   }

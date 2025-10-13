@@ -4,7 +4,8 @@ import 'package:softeng/services/task_service.dart';
 
 class EditTaskScreen extends StatefulWidget {
   final Map<String, dynamic> task;
-  const EditTaskScreen({super.key, required this.task});
+  final String? forUserId;
+  const EditTaskScreen({super.key, required this.task, this.forUserId});
 
   @override
   State<EditTaskScreen> createState() => _EditTaskScreenState();
@@ -118,6 +119,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
         startTime: _startTime,
         endTime: _endTime,
         category: _selectedCategory.isEmpty ? null : _selectedCategory,
+        forUserId: widget.forUserId ?? widget.task['user_id'] as String?,
       );
 
       if (!mounted) return;
@@ -151,7 +153,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     if (confirm != true) return;
 
     try {
-      final ok = await TaskService.deleteTask(id);
+  final ok = await TaskService.deleteTask(id, forUserId: widget.forUserId ?? widget.task['user_id'] as String?);
       if (!mounted) return;
       if (ok) {
         ScaffoldMessenger.of(context).showSnackBar(

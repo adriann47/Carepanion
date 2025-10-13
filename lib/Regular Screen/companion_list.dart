@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/profile_service.dart';
 import 'companion_detail.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
@@ -13,6 +15,34 @@ class CompanionListScreen extends StatefulWidget {
 
 class _CompanionListScreenState extends State<CompanionListScreen> {
   int _currentIndex = 2; // Companions tab selected
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _assisteds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAssisteds();
+  }
+
+  Future<void> _loadAssisteds() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final supabase = Supabase.instance.client;
+      final guardianId = supabase.auth.currentUser?.id;
+      if (guardianId != null) {
+        final rows = await ProfileService.fetchAssistedsForGuardian(supabase, guardianUserId: guardianId);
+        setState(() => _assisteds = rows);
+      } else {
+        setState(() => _assisteds = []);
+      }
+    } catch (_) {
+      setState(() => _assisteds = []);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   void _onTabTapped(int index) {
     setState(() => _currentIndex = index);
@@ -69,109 +99,75 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 👩 Companion 1
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CompanionDetailScreen(
-                        name: "NERIAH VILLAPANA",
-                        imagePath: "assets/neriah.png",
-                      ),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: double.infinity,
-                  height: 110,
-                  margin:
-                      const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.lightBlue[100],
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: const [
-                      SizedBox(width: 10),
-                      CircleAvatar(
-                        radius: 36,
-                        backgroundImage: AssetImage("assets/neriah.png"),
-                      ),
-                      SizedBox(width: 30),
-                      Text(
-                        "NERIAH VILLAPANA",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              if (_isLoading) const CircularProgressIndicator(),
+              if (!_isLoading && _assisteds.isEmpty)
+                const Text('No companions found.'),
 
-              // 👨 Companion 2
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CompanionDetailScreen(
-                        name: "ALDRICH SABANDO",
-                        imagePath: "assets/aldrich.png",
-                      ),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: double.infinity,
-                  height: 110,
-                  margin:
-                      const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.lightBlue[100],
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: const [
-                      SizedBox(width: 10),
-                      CircleAvatar(
-                        radius: 36,
-                        backgroundImage: AssetImage("assets/aldrich.png"),
-                      ),
-                      SizedBox(width: 30),
-                      Text(
-                        "ALDRICH SABANDO",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+              if (!_isLoading && _assisteds.isNotEmpty)
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _assisteds.length,
+                    itemBuilder: (context, idx) {
+                      final p = _assisteds[idx];
+                      final fullname = (p['fullname'] ?? p['full_name'] ?? p['name'])?.toString() ?? 'No name';
+                      final avatar = (p['avatar_url'] as String?)?.isNotEmpty == true
+                          ? p['avatar_url'] as String
+                          : 'assets/logo.jpg';
+
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CompanionDetailScreen(
+                                name: fullname,
+                                imagePathOrUrl: avatar,
+                                assistedId: p['id'] as String?,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          height: 110,
+                          margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.lightBlue[100],
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const SizedBox(width: 10),
+                              CircleAvatar(
+                                radius: 36,
+                                backgroundImage: avatar.startsWith('http')
+                                    ? NetworkImage(avatar) as ImageProvider
+                                    : AssetImage(avatar),
+                              ),
+                              const SizedBox(width: 30),
+                              Text(
+                                fullname,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
-              ),
             ],
           ),
         ),

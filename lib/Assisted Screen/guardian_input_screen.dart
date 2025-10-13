@@ -28,27 +28,23 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter guardian ID')));
       return;
     }
+    // Validate 8-digit numeric public id
+    final idReg = RegExp(r'^\d{8}\$');
+    if (!idReg.hasMatch(val)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid 8-digit guardian ID')));
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       final supabase = Supabase.instance.client;
-      // Lookup guardian by public_id
-      final guardian = await supabase.from('profile').select('id').eq('public_id', val).maybeSingle();
-      if (guardian == null) {
+      // Use ProfileService helper to link guardian by public id
+      final ok = await ProfileService.linkGuardianByPublicId(supabase, guardianPublicId: val);
+      if (!ok) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian not found')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian not found or failed to link')));
         return;
       }
-      final guardianId = guardian['id'] as String;
-      // Save guardian_id into current user's profile
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not signed in')));
-        return;
-      }
-      await ProfileService.upsertProfile(supabase, id: user.id, fullName: null, email: null, role: null);
-      // write guardian_id specifically
-      await supabase.from('profile').update({'guardian_id': guardianId}).eq('id', user.id);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian linked successfully')));
