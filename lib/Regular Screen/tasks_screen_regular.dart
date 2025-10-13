@@ -19,7 +19,11 @@ class TasksScreenRegular extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreenRegular> {
   int _currentIndex = 0;
+
   String? _avatarUrl;
+  String? _userId;
+  String? _fullName;
+  String? _email;
 
   @override
   void initState() {
@@ -29,10 +33,27 @@ class _TasksScreenState extends State<TasksScreenRegular> {
 
   Future<void> _loadProfile() async {
     try {
-      final data = await ProfileService.fetchProfile(Supabase.instance.client);
+      final client = Supabase.instance.client;
+      final authUser = client.auth.currentUser;
+
+      final data = await ProfileService.fetchProfile(client);
       if (!mounted) return;
-      setState(() => _avatarUrl = data?['avatar_url'] as String?);
-    } catch (_) {}
+
+      setState(() {
+        _userId = authUser?.id ?? '—';
+        _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
+        _fullName = (data?['fullname'] as String?)?.trim().isEmpty == true
+            ? '—'
+            : (data?['fullname'] as String?) ?? '—';
+
+        final raw = data?['avatar_url'] as String?;
+        _avatarUrl = (raw == null || raw.trim().isEmpty)
+            ? null
+            : '$raw?v=${DateTime.now().millisecondsSinceEpoch}';
+      });
+    } catch (_) {
+      // ignore silently
+    }
   }
 
   void _onTabTapped(int index) {
@@ -66,52 +87,12 @@ class _TasksScreenState extends State<TasksScreenRegular> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- USER CARD ---
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFA94D),
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.orange.withOpacity(0.18),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.white,
-                      backgroundImage: _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
-                      child: _avatarUrl == null
-                          ? const Icon(Icons.person, size: 40, color: Colors.black87)
-                          : null,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("USER ID: SHAWN CABUTIHAN",
-                              style: GoogleFonts.nunito(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF2D2D2D),
-                              )),
-                          const SizedBox(height: 6),
-                          Text("EMAIL: URIEL.SHAWN@GMAIL.COM",
-                              style: GoogleFonts.nunito(fontSize: 12, color: Colors.black87)),
-                          Text("NUMBER: 09541234567",
-                              style: GoogleFonts.nunito(fontSize: 12, color: Colors.black87)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              // --- USER CARD (updated) ---
+              _UserHeaderCard(
+                avatarUrl: _avatarUrl,
+                userId: _userId ?? '—',
+                fullName: _fullName ?? '—',
+                email: _email ?? '—',
               ),
 
               const SizedBox(height: 18),
@@ -216,6 +197,102 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   }
 }
 
+// ===================== User Header Card =====================
+
+class _UserHeaderCard extends StatelessWidget {
+  const _UserHeaderCard({
+    required this.avatarUrl,
+    required this.userId,
+    required this.fullName,
+    required this.email,
+  });
+
+  final String? avatarUrl;
+  final String userId;
+  final String fullName;
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFC58F), Color(0xFFFFA94D)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFA94D).withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Avatar
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.white,
+            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
+            child: avatarUrl == null
+                ? const Icon(Icons.person, size: 40, color: Colors.black87)
+                : null,
+          ),
+          const SizedBox(width: 16),
+
+          // Details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _kv('USER ID', userId),
+                const SizedBox(height: 6),
+                _kv('NAME', fullName),
+                const SizedBox(height: 6),
+                _kv('EMAIL', email),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Label–value line with improved typography
+  Widget _kv(String label, String value) {
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: GoogleFonts.nunito(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+              color: const Color(0xFF2D2D2D),
+            ),
+          ),
+          TextSpan(
+            text: value,
+            style: GoogleFonts.nunito(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF1D1D1D),
+            ),
+          ),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
 // ===================== Today stream =====================
 
 class _TodayTasksStream extends StatelessWidget {
@@ -273,7 +350,7 @@ class _TodayTasksStream extends StatelessWidget {
           children: [
             for (final t in tasks)
               _TaskTile(
-                key: ValueKey(t['id']), // 👈 ensures correct state per task
+                key: ValueKey(t['id']),
                 task: t,
                 onEdited: onEdited,
               ),
@@ -299,13 +376,12 @@ class _TaskTile extends StatefulWidget {
 class _TaskTileState extends State<_TaskTile> {
   late bool _done;
 
-  // derive done from task (status or flags)
   bool _deriveDone(Map<String, dynamic> t) {
     final status = (t['status'] ?? '').toString().toLowerCase();
     if (status == 'done') return true;
     final raw = t['is_done'] ?? t['done'] ?? false;
     return raw is bool ? raw : (raw.toString() == 'true' || raw.toString() == '1');
-  }
+    }
 
   @override
   void initState() {
@@ -313,7 +389,6 @@ class _TaskTileState extends State<_TaskTile> {
     _done = _deriveDone(widget.task);
   }
 
-  // when stream sends updated task, sync local checkbox
   @override
   void didUpdateWidget(covariant _TaskTile oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -326,13 +401,11 @@ class _TaskTileState extends State<_TaskTile> {
   Future<void> _toggleDone(bool value) async {
     final id = widget.task['id'];
     final prev = _done;
-    setState(() => _done = value); // optimistic UI
+    setState(() => _done = value);
 
     try {
-      // canonical status column
       await TaskService.setTaskStatus(id: id, status: value ? 'done' : 'todo');
 
-      // best-effort legacy flags
       final supabase = Supabase.instance.client;
       try {
         await supabase.from('tasks').update({'is_done': value}).eq('id', id);
@@ -342,12 +415,10 @@ class _TaskTileState extends State<_TaskTile> {
         } catch (_) {}
       }
 
-      // also update local map (so if user navigates immediately, UI still shows correct state)
       widget.task['status'] = value ? 'done' : 'todo';
       widget.task['is_done'] = value;
       widget.task['done'] = value;
     } catch (e) {
-      // revert on failure
       if (mounted) setState(() => _done = prev);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update task: $e')),
@@ -360,7 +431,6 @@ class _TaskTileState extends State<_TaskTile> {
     final title = (widget.task['title'] ?? '').toString();
     final note = (widget.task['description'] ?? '').toString();
 
-    // Category pill
     final rawCat = (widget.task['category'] ?? 'other').toString().trim().toLowerCase();
     final cat = rawCat.isEmpty ? 'other' : rawCat;
     late final Color catColor;
@@ -397,7 +467,6 @@ class _TaskTileState extends State<_TaskTile> {
     final e = fmt(widget.task['end_at']);
     final time = s.isEmpty && e.isEmpty ? 'All day' : (s.isNotEmpty && e.isNotEmpty ? '$s - $e' : (s + e));
 
-    // Visuals: keep “done” styling (subtle fade) and allow toggle
     final double opacity = _done ? 0.55 : 1.0;
 
     return Container(
@@ -406,7 +475,6 @@ class _TaskTileState extends State<_TaskTile> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // timeline
             Column(
               children: [
                 Container(
@@ -423,15 +491,12 @@ class _TaskTileState extends State<_TaskTile> {
             ),
             const SizedBox(width: 12),
 
-            // card
             Expanded(
               child: Opacity(
                 opacity: opacity,
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                   decoration: BoxDecoration(
-                    // keep blue gradient for default; you can also switch to green when done if you want:
-                    // colors: _done ? [Color(0xFFCFF8C8), Color(0xFFB6F0AD)] : [Color(0xFFD8F1FF), Color(0xFFBEE6FF)],
                     gradient: const LinearGradient(
                       colors: [Color(0xFFD8F1FF), Color(0xFFBEE6FF)],
                       begin: Alignment.topLeft,
@@ -449,7 +514,6 @@ class _TaskTileState extends State<_TaskTile> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // title row
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
@@ -465,7 +529,6 @@ class _TaskTileState extends State<_TaskTile> {
                           ),
                           const SizedBox(width: 8),
 
-                          // Title + Category together
                           Expanded(
                             child: Wrap(
                               direction: Axis.horizontal,
@@ -505,7 +568,6 @@ class _TaskTileState extends State<_TaskTile> {
                             ),
                           ),
 
-                          // edit
                           IconButton(
                             icon: const Icon(Icons.edit, size: 18, color: Color(0xFF36495A)),
                             padding: EdgeInsets.zero,
@@ -522,10 +584,7 @@ class _TaskTileState extends State<_TaskTile> {
                       ),
                       const SizedBox(height: 8),
 
-                      // TIME
                       _infoLine(label: 'TIME', value: time),
-
-                      // NOTE
                       if ((note).isNotEmpty) _infoLine(label: 'NOTE', value: note),
                     ],
                   ),

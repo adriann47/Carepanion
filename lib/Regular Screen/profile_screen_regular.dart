@@ -20,6 +20,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   int _currentIndex = 4; // Profile tab selected
   String? _avatarUrl;
+  String? _fullName; // ✅ pulled from public.profile.fullname
 
   @override
   void initState() {
@@ -29,10 +30,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      final data = await ProfileService.fetchProfile(Supabase.instance.client);
+      final client = Supabase.instance.client;
+      final authUser = client.auth.currentUser;
+
+      final data = await ProfileService.fetchProfile(client);
       if (!mounted) return;
+
+      // fullname from profile table; fallback to email local-part for a friendly default
+      final fullname = (data?['fullname'] as String?)?.trim();
+      final friendlyFromEmail = () {
+        final email = authUser?.email ?? '';
+        if (email.contains('@')) {
+          final local = email.split('@').first;
+          // Capitalize each word-ish (split by . or _)
+          final parts = local.split(RegExp(r'[._\s]+')).where((s) => s.isNotEmpty);
+          return parts.map((p) => p[0].toUpperCase() + p.substring(1)).join(' ');
+        }
+        return email;
+      }();
+
       setState(() {
-        _avatarUrl = data?['avatar_url'] as String?;
+        _fullName = (fullname != null && fullname.isNotEmpty) ? fullname : friendlyFromEmail;
+        final raw = data?['avatar_url'] as String?;
+        _avatarUrl = (raw == null || raw.trim().isEmpty)
+            ? null
+            : '$raw?v=${DateTime.now().millisecondsSinceEpoch}';
       });
     } catch (_) {
       // ignore
@@ -55,8 +77,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         MaterialPageRoute(builder: (context) => const CalendarScreenRegular()),
       );
     } else if (index == 2) {
-      // Alert or Family section
-      // Add your alert or companion list screen here if available
+      // Add your alert/companion list here if needed
     } else if (index == 3) {
       Navigator.pushReplacement(
         context,
@@ -69,13 +90,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final nameText = (_fullName == null || _fullName!.trim().isEmpty) ? '—' : _fullName!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F4EF),
       appBar: AppBar(
         backgroundColor: const Color(0xFFF8F4EF),
         elevation: 0,
         centerTitle: true,
-        automaticallyImplyLeading: false, // ✅ Removes the back button
+        automaticallyImplyLeading: false,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -87,26 +110,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
               CircleAvatar(
                 radius: 40,
                 backgroundColor: Colors.brown[200],
-                backgroundImage:
-                    _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                backgroundImage: _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
                 child: _avatarUrl == null
                     ? const Icon(Icons.person, size: 50, color: Colors.white)
                     : null,
               ),
               const SizedBox(height: 10),
-              const Text(
-                'SHAWN URIEL\nCABUTIHAN',
+
+              // ✅ Name from registration/profile (dynamic)
+              Text(
+                nameText,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 20,
-                  letterSpacing: 1,
+                  letterSpacing: 0.5,
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // --- GUARDIAN CARD ---
+              // --- GUARDIAN CARD (unchanged sample) ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 25),
                 padding: const EdgeInsets.all(12),
@@ -158,42 +184,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 25),
 
               // --- MENU BUTTONS ---
-              _menuButton(Icons.person, 'PROFILE', const Color(0xFFB2EBF2),
-                  onTap: () {
-                Navigator.push(
+              _menuButton(Icons.person, 'PROFILE', const Color(0xFFB2EBF2), onTap: () async {
+                // Open profile editor; when you return, refresh name/avatar.
+                await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ProfilePage()),
                 );
+                if (mounted) _loadProfile(); // ✅ refresh on return
               }),
-              _menuButton(Icons.settings, 'SETTINGS', const Color(0xFFF8BBD0),
-                  onTap: () {
+              _menuButton(Icons.settings, 'SETTINGS', const Color(0xFFF8BBD0), onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (context) => const SettingsScreen()),
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
                 );
               }),
-              _menuButton(Icons.info, 'ABOUT', const Color(0xFFFFE0B2),
-                  onTap: () {
+              _menuButton(Icons.info, 'ABOUT', const Color(0xFFFFE0B2), onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const AboutPage()),
                 );
               }),
-              _menuButton(Icons.help_outline, 'HELP & SUPPORT',
-                  const Color(0xFFB3E5FC), onTap: () {
+              _menuButton(Icons.help_outline, 'HELP & SUPPORT', const Color(0xFFB3E5FC), onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (context) => const HelpSupportPage()),
+                  MaterialPageRoute(builder: (context) => const HelpSupportPage()),
                 );
               }),
-              _menuButton(Icons.policy, 'LEGAL & DATA', const Color(0xFFF8BBD0),
-                  onTap: () {
+              _menuButton(Icons.policy, 'LEGAL & DATA', const Color(0xFFF8BBD0), onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (context) => const LegalDataPage()),
+                  MaterialPageRoute(builder: (context) => const LegalDataPage()),
                 );
               }),
             ],
@@ -213,12 +233,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Calendar',
-              isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications',
-              isSelected: _currentIndex == 3),
+          _navItem(Icons.calendar_today, 'Calendar', isSelected: _currentIndex == 1),
+          _navItem(Icons.family_restroom, 'Alert', isSelected: _currentIndex == 2),
+          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -226,8 +243,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // --- MENU BUTTON ---
-  static Widget _menuButton(IconData icon, String text, Color color,
-      {VoidCallback? onTap}) {
+  static Widget _menuButton(IconData icon, String text, Color color, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -244,8 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Expanded(
               child: Text(
                 text,
-                style:
-                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
             const Icon(Icons.arrow_forward_ios, size: 16),
@@ -268,8 +283,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         height: 55,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color:
-              isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
+          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
         ),
         child: Center(
           child: Icon(

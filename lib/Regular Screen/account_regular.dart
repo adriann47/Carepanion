@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -9,7 +10,7 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
-  String email = "URIEL.SHAWN@GMAIL.COM";
+  String? email; // ← from Supabase Auth
   String mobile = "09541234567";
   List<String> guardians = [];
 
@@ -17,7 +18,20 @@ class _AccountPageState extends State<AccountPage> {
   final TextEditingController _newPass = TextEditingController();
   final TextEditingController _confirmPass = TextEditingController();
 
-  // Edit Field Dialog
+  @override
+  void initState() {
+    super.initState();
+    _loadAuthEmail();
+  }
+
+  void _loadAuthEmail() {
+    final user = Supabase.instance.client.auth.currentUser;
+    setState(() {
+      email = user?.email ?? '—';
+    });
+  }
+
+  // Edit Field Dialog (used for mobile and guardians)
   void _editField(String title, String currentValue, Function(String) onSave) {
     final controller = TextEditingController(text: currentValue);
 
@@ -87,7 +101,48 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
-  // Editable Row (Email, Mobile)
+  // Read-only Row (for Email)
+  Widget _buildReadOnlyRow(String label, String value) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFB3E5FC),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Editable Row (Mobile)
   Widget _buildEditableRow(String label, String value, VoidCallback onEdit) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -161,36 +216,44 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   Widget _buildGuardianRow(String guardian) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(
-      color: const Color(0xFFB3E5FC),
-      borderRadius: BorderRadius.circular(28),
-    ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          guardian,
-          style: GoogleFonts.nunito(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFB3E5FC),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            guardian,
+            style: GoogleFonts.nunito(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
           ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.delete, color: Colors.redAccent),
-          onPressed: () {
-            setState(() {
-              guardians.remove(guardian);
-            });
-          },
-        ),
-      ],
-    ),
-  );
-}
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.redAccent),
+            onPressed: () {
+              setState(() {
+                guardians.remove(guardian);
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _currentPass.dispose();
+    _newPass.dispose();
+    _confirmPass.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -245,11 +308,10 @@ class _AccountPageState extends State<AccountPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildEditableRow("Email", email, () {
-                    _editField("Email", email, (val) {
-                      setState(() => email = val);
-                    });
-                  }),
+                  // EMAIL: read-only from Supabase Auth
+                  _buildReadOnlyRow("Email", email ?? '—'),
+
+                  // MOBILE: editable
                   _buildEditableRow("Mobile Number", mobile, () {
                     _editField("Mobile Number", mobile, (val) {
                       setState(() => mobile = val);
@@ -276,9 +338,11 @@ class _AccountPageState extends State<AccountPage> {
 
                   Center(
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        // TODO: implement password change flow with Supabase auth if desired
+                      },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0x99B3E5FC), // also lighter
+                        backgroundColor: const Color(0x99B3E5FC),
                         padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
@@ -297,13 +361,7 @@ class _AccountPageState extends State<AccountPage> {
 
                   SizedBox(height: h * 0.03),
 
-                  // 🔹 Divider line between sections
-                  const Divider(
-                    color: Colors.black26,
-                    thickness: 1,
-                    indent: 10,
-                    endIndent: 10,
-                  ),
+                  const Divider(color: Colors.black26, thickness: 1, indent: 10, endIndent: 10),
 
                   SizedBox(height: h * 0.02),
 
