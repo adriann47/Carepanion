@@ -24,11 +24,23 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   String? _userId;
   String? _fullName;
   String? _email;
+  RealtimeChannel? _profileChannel;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _subscribeProfileChanges();
+  }
+
+  String _friendlyFromEmail(String email) {
+    if (email.contains('@')) {
+      final local = email.split('@').first;
+      final parts = local.split(RegExp(r'[._\s]+')).where((s) => s.isNotEmpty);
+      if (parts.isEmpty) return email;
+      return parts.map((p) => p[0].toUpperCase() + p.substring(1)).join(' ');
+    }
+    return email;
   }
 
   Future<void> _loadProfile() async {
@@ -40,16 +52,20 @@ class _TasksScreenState extends State<TasksScreenRegular> {
       if (!mounted) return;
 
       setState(() {
-    // Prefer a short public_id (8-digit) stored in profile for display.
-    final publicId = data?['public_id'] as String?;
-    _userId = (publicId != null && publicId.trim().isNotEmpty)
-      ? publicId
-      : (authUser?.id ?? '—');
+        // Prefer a short public_id (8-digit) stored in profile for display.
+        final publicId = data?['public_id'] as String?;
+        _userId = (publicId != null && publicId.trim().isNotEmpty)
+            ? publicId
+            : (authUser?.id ?? '—');
 
-    _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
-    _fullName = (data?['fullname'] as String?)?.trim().isEmpty == true
-      ? '—'
-      : (data?['fullname'] as String?) ?? '—';
+        _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
+
+        final name = (data?['fullname'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) {
+          _fullName = name;
+        } else {
+          _fullName = _friendlyFromEmail(_email ?? '—');
+        }
 
         final raw = data?['avatar_url'] as String?;
         _avatarUrl = (raw == null || raw.trim().isEmpty)
@@ -61,17 +77,68 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     }
   }
 
+  void _subscribeProfileChanges() {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return;
+    _profileChannel = client
+        .channel('public:profile')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'profile',
+          callback: (payload) {
+            final row = payload.newRecord;
+            if (row['id'] != user.id) return;
+            if (!mounted) return;
+            setState(() {
+              final name = (row['fullname'] as String?)?.trim();
+              if (name != null && name.isNotEmpty) {
+                _fullName = name;
+              } else if ((_email ?? '').isNotEmpty) {
+                _fullName = _friendlyFromEmail(_email!);
+              }
+              final em = (row['email'] as String?)?.trim();
+              if (em != null && em.isNotEmpty) _email = em;
+              final url = (row['avatar_url'] as String?)?.trim();
+              if (url != null && url.isNotEmpty) {
+                _avatarUrl = '$url?v=${DateTime.now().millisecondsSinceEpoch}';
+              }
+            });
+          },
+        )
+        .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _profileChannel?.unsubscribe();
+    super.dispose();
+  }
+
   void _onTabTapped(int index) {
     setState(() => _currentIndex = index);
 
     if (index == 1) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const CalendarScreenRegular()));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CalendarScreenRegular()),
+      );
     } else if (index == 2) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanionListScreen()));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CompanionListScreen()),
+      );
     } else if (index == 3) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen()));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const NotificationScreen()),
+      );
     } else if (index == 4) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+      );
     }
   }
 
@@ -105,7 +172,10 @@ class _TasksScreenState extends State<TasksScreenRegular> {
               // --- STREAK CARD ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   border: Border.all(color: Colors.orange.shade200),
@@ -120,22 +190,31 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.emoji_events, color: Colors.orange, size: 30),
+                    const Icon(
+                      Icons.emoji_events,
+                      color: Colors.orange,
+                      size: 30,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("3 DAYS STREAK!",
-                              style: GoogleFonts.nunito(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14,
-                                color: const Color(0xFF2D2D2D),
-                              )),
+                          Text(
+                            "3 DAYS STREAK!",
+                            style: GoogleFonts.nunito(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: const Color(0xFF2D2D2D),
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             "Thanks for showing up today! Consistency is the key to forming strong habits.",
-                            style: GoogleFonts.nunito(fontSize: 12, color: const Color(0xFF4A4A4A)),
+                            style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              color: const Color(0xFF4A4A4A),
+                            ),
                           ),
                         ],
                       ),
@@ -175,16 +254,32 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Companion', isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
+          _navItem(
+            Icons.calendar_today,
+            'Menu',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Companion',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
     );
   }
 
-  static BottomNavigationBarItem _navItem(IconData icon, String label, {required bool isSelected}) {
+  static BottomNavigationBarItem _navItem(
+    IconData icon,
+    String label, {
+    required bool isSelected,
+  }) {
     return BottomNavigationBarItem(
       label: label,
       icon: Container(
@@ -195,7 +290,11 @@ class _TasksScreenState extends State<TasksScreenRegular> {
           color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
         ),
         child: Center(
-          child: Icon(icon, size: 28, color: isSelected ? Colors.pink : Colors.black87),
+          child: Icon(
+            icon,
+            size: 28,
+            color: isSelected ? Colors.pink : Colors.black87,
+          ),
         ),
       ),
     );
@@ -243,7 +342,9 @@ class _UserHeaderCard extends StatelessWidget {
           CircleAvatar(
             radius: 30,
             backgroundColor: Colors.white,
-            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
+            backgroundImage: avatarUrl != null
+                ? NetworkImage(avatarUrl!)
+                : null,
             child: avatarUrl == null
                 ? const Icon(Icons.person, size: 40, color: Colors.black87)
                 : null,
@@ -320,7 +421,8 @@ class _TodayTasksStream extends StatelessWidget {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: stream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 40),
             child: Center(child: CircularProgressIndicator()),
@@ -333,10 +435,10 @@ class _TodayTasksStream extends StatelessWidget {
           );
         }
 
-    // Filter today's tasks client-side
-    var tasks = (snapshot.data ?? const [])
-      .where((row) => (row['due_date']?.toString() ?? '') == today)
-      .toList();
+        // Filter today's tasks client-side
+        var tasks = (snapshot.data ?? const [])
+            .where((row) => (row['due_date']?.toString() ?? '') == today)
+            .toList();
 
         // Sort by start_at ascending
         tasks.sort((a, b) {
@@ -351,19 +453,20 @@ class _TodayTasksStream extends StatelessWidget {
         if (tasks.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Text('No tasks for today',
-                style: GoogleFonts.nunito(fontSize: 14, color: const Color(0xFF4A4A4A))),
+            child: Text(
+              'No tasks for today',
+              style: GoogleFonts.nunito(
+                fontSize: 14,
+                color: const Color(0xFF4A4A4A),
+              ),
+            ),
           );
         }
 
         return Column(
           children: [
             for (final t in tasks)
-              _TaskTile(
-                key: ValueKey(t['id']),
-                task: t,
-                onEdited: onEdited,
-              ),
+              _TaskTile(key: ValueKey(t['id']), task: t, onEdited: onEdited),
           ],
         );
       },
@@ -390,8 +493,10 @@ class _TaskTileState extends State<_TaskTile> {
     final status = (t['status'] ?? '').toString().toLowerCase();
     if (status == 'done') return true;
     final raw = t['is_done'] ?? t['done'] ?? false;
-    return raw is bool ? raw : (raw.toString() == 'true' || raw.toString() == '1');
-    }
+    return raw is bool
+        ? raw
+        : (raw.toString() == 'true' || raw.toString() == '1');
+  }
 
   @override
   void initState() {
@@ -430,9 +535,9 @@ class _TaskTileState extends State<_TaskTile> {
       widget.task['done'] = value;
     } catch (e) {
       if (mounted) setState(() => _done = prev);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update task: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update task: $e')));
     }
   }
 
@@ -441,7 +546,10 @@ class _TaskTileState extends State<_TaskTile> {
     final title = (widget.task['title'] ?? '').toString();
     final note = (widget.task['description'] ?? '').toString();
 
-    final rawCat = (widget.task['category'] ?? 'other').toString().trim().toLowerCase();
+    final rawCat = (widget.task['category'] ?? 'other')
+        .toString()
+        .trim()
+        .toLowerCase();
     final cat = rawCat.isEmpty ? 'other' : rawCat;
     late final Color catColor;
     late final String catLabel;
@@ -475,7 +583,9 @@ class _TaskTileState extends State<_TaskTile> {
 
     final s = fmt(widget.task['start_at']);
     final e = fmt(widget.task['end_at']);
-    final time = s.isEmpty && e.isEmpty ? 'All day' : (s.isNotEmpty && e.isNotEmpty ? '$s - $e' : (s + e));
+    final time = s.isEmpty && e.isEmpty
+        ? 'All day'
+        : (s.isNotEmpty && e.isNotEmpty ? '$s - $e' : (s + e));
 
     final double opacity = _done ? 0.55 : 1.0;
 
@@ -496,7 +606,9 @@ class _TaskTileState extends State<_TaskTile> {
                     border: Border.all(color: Colors.white, width: 2),
                   ),
                 ),
-                Expanded(child: Container(width: 2, color: Colors.grey.shade300)),
+                Expanded(
+                  child: Container(width: 2, color: Colors.grey.shade300),
+                ),
               ],
             ),
             const SizedBox(width: 12),
@@ -532,9 +644,15 @@ class _TaskTileState extends State<_TaskTile> {
                             child: Checkbox(
                               value: _done,
                               onChanged: (v) => _toggleDone(v ?? false),
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: const VisualDensity(
+                                horizontal: -4,
+                                vertical: -4,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -558,11 +676,16 @@ class _TaskTileState extends State<_TaskTile> {
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: catColor.withOpacity(0.12),
                                     borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(color: catColor.withOpacity(0.45)),
+                                    border: Border.all(
+                                      color: catColor.withOpacity(0.45),
+                                    ),
                                   ),
                                   child: Text(
                                     catLabel,
@@ -579,13 +702,20 @@ class _TaskTileState extends State<_TaskTile> {
                           ),
 
                           IconButton(
-                            icon: const Icon(Icons.edit, size: 18, color: Color(0xFF36495A)),
+                            icon: const Icon(
+                              Icons.edit,
+                              size: 18,
+                              color: Color(0xFF36495A),
+                            ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: () async {
                               final changed = await Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => EditTaskScreen(task: widget.task)),
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      EditTaskScreen(task: widget.task),
+                                ),
                               );
                               if (changed == true) widget.onEdited();
                             },
@@ -595,7 +725,8 @@ class _TaskTileState extends State<_TaskTile> {
                       const SizedBox(height: 8),
 
                       _infoLine(label: 'TIME', value: time),
-                      if ((note).isNotEmpty) _infoLine(label: 'NOTE', value: note),
+                      if ((note).isNotEmpty)
+                        _infoLine(label: 'NOTE', value: note),
                     ],
                   ),
                 ),

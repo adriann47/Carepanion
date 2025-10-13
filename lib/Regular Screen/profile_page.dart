@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,7 +10,7 @@ import 'package:softeng/data/profile_service.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'companion_list.dart';
-import 'notification_regular.dart';
+// import 'notification_regular.dart'; // unused
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -23,6 +24,7 @@ class _ProfilePageState extends State<ProfilePage> {
   File? _profileImage;
   String? _avatarUrl;
   bool _saving = false;
+  Timer? _nameSaveDebounce;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -46,10 +48,28 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   void dispose() {
+    _nameSaveDebounce?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _birthdayController.dispose();
     super.dispose();
+  }
+
+  void _onNameChanged(String value) {
+    _nameSaveDebounce?.cancel();
+    _nameSaveDebounce = Timer(const Duration(milliseconds: 500), () async {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) return;
+      final fullName = value.trim();
+      try {
+        await ProfileService.upsertProfile(
+          client,
+          id: user.id,
+          fullName: fullName.isEmpty ? null : fullName,
+        );
+      } catch (_) {}
+    });
   }
 
   Future<void> _loadProfile() async {
@@ -101,7 +121,9 @@ class _ProfilePageState extends State<ProfilePage> {
     if (user == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be signed in to update avatar.')),
+        const SnackBar(
+          content: Text('You must be signed in to update avatar.'),
+        ),
       );
       return;
     }
@@ -130,14 +152,14 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() {
         _avatarUrl = withBuster;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile picture updated.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile picture updated.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update avatar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update avatar: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -187,8 +209,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   static const _months = [
     '', // 1-based
-    'January','February','March','April','May','June',
-    'July','August','September','October','November','December'
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
   static String _toReadable(DateTime d) {
@@ -208,7 +230,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final picked = await showDatePicker(
       context: context,
-      initialDate: initial.isBefore(first) || initial.isAfter(last) ? DateTime(1970,1,1) : initial,
+      initialDate: initial.isBefore(first) || initial.isAfter(last)
+          ? DateTime(1970, 1, 1)
+          : initial,
       firstDate: first,
       lastDate: last,
       helpText: 'Select Birthday',
@@ -296,16 +320,18 @@ class _ProfilePageState extends State<ProfilePage> {
                     backgroundColor: const Color(0xFFF1D2B6),
                     backgroundImage: _profileImage != null
                         ? FileImage(_profileImage!)
-                        : (_avatarUrl != null ? NetworkImage(_avatarUrl!) : null)
-                            as ImageProvider<Object>?,
+                        : (_avatarUrl != null
+                                  ? NetworkImage(_avatarUrl!)
+                                  : null)
+                              as ImageProvider<Object>?,
                     child: _profileImage == null
                         ? (_avatarUrl == null
-                            ? const Icon(
-                                Icons.person,
-                                size: 70,
-                                color: Colors.white,
-                              )
-                            : null)
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 70,
+                                  color: Colors.white,
+                                )
+                              : null)
                         : null,
                   ),
                   Positioned(
@@ -325,8 +351,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : const Icon(
@@ -354,6 +381,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       onEditToggle: () {
                         setState(() => _isEditingName = !_isEditingName);
                       },
+                      onChanged: _onNameChanged,
                     ),
                     const SizedBox(height: 15),
                     _buildReadOnlyField(
@@ -368,7 +396,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       controller: _birthdayController,
                       isEditing: _isEditingBirthday,
                       onEditToggle: () {
-                        setState(() => _isEditingBirthday = !_isEditingBirthday);
+                        setState(
+                          () => _isEditingBirthday = !_isEditingBirthday,
+                        );
                         // optional: open picker immediately when entering edit mode
                         // if (_isEditingBirthday) _pickBirthday();
                       },
@@ -383,7 +413,9 @@ class _ProfilePageState extends State<ProfilePage> {
                         final user = client.auth.currentUser;
                         if (user == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('You must be signed in.')),
+                            const SnackBar(
+                              content: Text('You must be signed in.'),
+                            ),
                           );
                           return;
                         }
@@ -456,9 +488,21 @@ class _ProfilePageState extends State<ProfilePage> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Calendar', isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Alert', isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
+          _navItem(
+            Icons.calendar_today,
+            'Calendar',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Alert',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -515,6 +559,7 @@ class _ProfilePageState extends State<ProfilePage> {
     required TextEditingController controller,
     required bool isEditing,
     required VoidCallback onEditToggle,
+    void Function(String)? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -531,6 +576,7 @@ class _ProfilePageState extends State<ProfilePage> {
         TextField(
           controller: controller,
           readOnly: !isEditing,
+          onChanged: onChanged,
           style: GoogleFonts.nunito(
             color: isEditing ? Colors.grey[600] : Colors.black87,
             fontSize: 14,
@@ -559,68 +605,74 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // Birthday (calendar picker)
-Widget _buildBirthdayField({
-  required String label,
-  required TextEditingController controller,
-  required bool isEditing,
-  required VoidCallback onEditToggle,
-  required VoidCallback onPickDate,
-}) {
-  void _openPickerNow() {
-    // ensure the UI shows “editing” gray state immediately
-    if (!isEditing) onEditToggle();
-    onPickDate();
-  }
+  Widget _buildBirthdayField({
+    required String label,
+    required TextEditingController controller,
+    required bool isEditing,
+    required VoidCallback onEditToggle,
+    required VoidCallback onPickDate,
+  }) {
+    void _openPickerNow() {
+      // ensure the UI shows “editing” gray state immediately
+      if (!isEditing) onEditToggle();
+      onPickDate();
+    }
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        label,
-        style: GoogleFonts.nunito(
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-          color: Colors.black54,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.nunito(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: Colors.black54,
+          ),
         ),
-      ),
-      const SizedBox(height: 6),
-      GestureDetector(
-        // ✅ open calendar on first tap (no edit-gating)
-        onTap: _openPickerNow,
-        child: AbsorbPointer(
-          absorbing: true, // keep keyboard from appearing
-          child: TextField(
-            controller: controller,
-            readOnly: true, // always read-only; we pick via calendar
-            style: GoogleFonts.nunito(
-              color: isEditing ? Colors.grey[600] : Colors.black87, // gray while “editing”
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
+        const SizedBox(height: 6),
+        GestureDetector(
+          // ✅ open calendar on first tap (no edit-gating)
+          onTap: _openPickerNow,
+          child: AbsorbPointer(
+            absorbing: true, // keep keyboard from appearing
+            child: TextField(
+              controller: controller,
+              readOnly: true, // always read-only; we pick via calendar
+              style: GoogleFonts.nunito(
+                color: isEditing
+                    ? Colors.grey[600]
+                    : Colors.black87, // gray while “editing”
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.black26),
-              ),
-              // ✅ icon also opens calendar immediately
-              suffixIcon: IconButton(
-                onPressed: _openPickerNow,
-                icon: Icon(Icons.calendar_today, color: Colors.grey[600], size: 20),
-                tooltip: 'Pick date',
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.black26),
+                ),
+                // ✅ icon also opens calendar immediately
+                suffixIcon: IconButton(
+                  onPressed: _openPickerNow,
+                  icon: Icon(
+                    Icons.calendar_today,
+                    color: Colors.grey[600],
+                    size: 20,
+                  ),
+                  tooltip: 'Pick date',
+                ),
               ),
             ),
           ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   // nav helper
   static BottomNavigationBarItem _navItem(
