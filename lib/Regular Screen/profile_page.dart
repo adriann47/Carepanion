@@ -17,7 +17,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final int _currentIndex = 3;
+  final int _currentIndex = 4;
   File? _profileImage;
   String? _avatarUrl;
   bool _saving = false;
