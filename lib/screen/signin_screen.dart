@@ -222,10 +222,8 @@ class _SignInScreenState extends State<SignInScreen> {
           // After Google OAuth, go to GoogleRegistration screen
           Navigator.pushReplacementNamed(context, '/google_registration');
         } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
-          );
+          // For email/password sign-ins, do not navigate here.
+          // Navigation is handled inside _signInWithEmail() on success.
         }
       }
     });

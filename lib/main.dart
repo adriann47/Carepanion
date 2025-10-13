@@ -18,7 +18,6 @@ import 'Assisted Screen/account.dart';
 import 'Assisted Screen/settings.dart';
 import 'data/profile_service.dart';
 import 'Regular Screen/tasks_screen_regular.dart';
-import 'Regular Screen/tasks_screen_regular.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

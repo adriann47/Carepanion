@@ -22,6 +22,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   void initState() {
     super.initState();
     final t = widget.task;
+
     _titleController.text = (t['title'] ?? '').toString();
     _descriptionController.text = (t['description'] ?? '').toString();
 
@@ -31,6 +32,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
         _selectedDate = DateTime.parse(due);
       } catch (_) {}
     }
+
     final cat = t['category']?.toString();
     if (cat != null && cat.isNotEmpty) _selectedCategory = cat;
 
@@ -48,10 +50,17 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     _endTime = parseTod(t['end_at']);
   }
 
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
   Future<void> _selectDate() async {
     final DateTime initialDate = _selectedDate ?? DateTime.now();
 
-    // Keep initial date within allowed range (2025–2027) like Add Task
+    // Keep initial date within allowed range (2025–2027) to mirror Add Task
     final DateTime safeInitialDate = initialDate.year < 2025
         ? DateTime(2025)
         : (initialDate.year > 2027 ? DateTime(2027) : initialDate);
@@ -61,9 +70,8 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
       initialDate: safeInitialDate,
       firstDate: DateTime(2025, 1, 1),
       lastDate: DateTime(2027, 12, 31),
-      selectableDayPredicate: (DateTime day) {
-        return day.year >= 2025 && day.year <= 2027;
-      },
+      selectableDayPredicate: (DateTime day) =>
+          day.year >= 2025 && day.year <= 2027,
     );
 
     if (picked != null) setState(() => _selectedDate = picked);
@@ -72,7 +80,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   Future<void> _selectTime(bool isStart) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: (isStart ? _startTime : _endTime) ?? TimeOfDay.now(),
     );
     if (picked != null) {
       setState(() {
@@ -87,7 +95,8 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
 
   Future<void> _saveTask() async {
     final id = (widget.task['id'] as num).toInt();
-    if ((_titleController.text).trim().isEmpty) {
+
+    if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a title')),
       );
@@ -111,12 +120,11 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
         category: _selectedCategory.isEmpty ? null : _selectedCategory,
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Task updated successfully!')),
-        );
-        Navigator.pop(context, true);
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task updated successfully!')),
+      );
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -127,18 +135,32 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
 
   Future<void> _deleteTask() async {
     final id = (widget.task['id'] as num).toInt();
+
+    // Optional confirm dialog (remove if you don’t want it)
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete task?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
     try {
-      final dynamic svc = TaskService;
-      final dynamic ok = await svc.deleteTask(id);
+      final ok = await TaskService.deleteTask(id);
       if (!mounted) return;
-      if (ok == true) {
+      if (ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Task deleted')),
         );
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not delete this task (no permission or it no longer exists).')),
+          const SnackBar(content: Text('Task not deleted. It may not exist or you may not have permission.')),
         );
       }
     } catch (e) {
@@ -156,7 +178,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Top pink header (copied from Add Task)
+            // Header
             Container(
               width: double.infinity,
               height: 320,
@@ -195,19 +217,15 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                     ),
                   ),
                   const SizedBox(height: 25),
-                  // Title input
                   _buildInputField(
                     label: "TITLE",
                     controller: _titleController,
                     icon: Icons.edit,
                   ),
                   const SizedBox(height: 20),
-                  // Date picker
                   Row(
                     children: [
-                      Expanded(
-                        child: _buildDateField(),
-                      ),
+                      Expanded(child: _buildDateField()),
                     ],
                   ),
                 ],
@@ -216,7 +234,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
 
             const SizedBox(height: 35),
 
-            // Start and End Time
+            // Start / End Time
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30),
               child: Row(
@@ -262,7 +280,6 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                 children: [
                   const Text(
                     "CATEGORY",
-                    textAlign: TextAlign.left,
                     style: TextStyle(
                       color: Colors.grey,
                       fontSize: 13,
@@ -301,7 +318,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
 
             const SizedBox(height: 40),
 
-            // Save Button
+            // Save button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30),
               child: ElevatedButton(
