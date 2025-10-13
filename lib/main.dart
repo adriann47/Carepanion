@@ -17,6 +17,7 @@ import 'Assisted Screen/notification.dart';
 import 'Assisted Screen/account.dart';
 import 'Assisted Screen/settings.dart';
 import 'data/profile_service.dart';
+import 'Regular Screen/tasks_screen_regular.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,6 +84,7 @@ class CarePanionApp extends StatelessWidget {
         "/role_selection": (context) => const RoleSelectionScreen(),
         "/guardian_input": (context) => const GuardianInputScreen(),
         "/tasks": (context) => const TasksScreen(),
+        "/tasks_regular": (context) => const TasksScreenRegular(),
         "/profile": (context) => const ProfileScreen(),
         "/settings": (context) => const SettingsScreen(),
         "/notifications": (context) => NotificationPage(),
