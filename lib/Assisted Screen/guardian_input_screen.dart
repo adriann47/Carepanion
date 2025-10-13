@@ -28,13 +28,7 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter guardian ID')));
       return;
     }
-    // Validate 8-digit numeric public id
-    final idReg = RegExp(r'^\d{8}\$');
-    if (!idReg.hasMatch(val)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid 8-digit guardian ID')));
-      return;
-    }
+    // Let the backend (profile table lookup) determine validity of the provided id.
     setState(() => _isLoading = true);
     try {
       final supabase = Supabase.instance.client;
