@@ -140,28 +140,6 @@ class ProfileService {
         return 'image/jpeg';
     }
   }
-
-  /// Fetch the current user's role string from the profile table.
-  /// Returns null if no row or no role.
-  static Future<String?> getCurrentUserRole(SupabaseClient client) async {
-    final user = client.auth.currentUser;
-    if (user == null) return null;
-    final table = await _resolveTable(client);
-    try {
-      final data = await client
-          .from(table)
-          .select('role')
-          .eq('id', user.id)
-          .maybeSingle();
-      if (data == null) return null;
-      final dynamic r = data['role'];
-      if (r == null) return null;
-      final s = r.toString().trim();
-      return s.isEmpty ? null : s;
-    } catch (_) {
-      return null;
-    }
-  }
 }
 
 /// Result payload returned after uploading an avatar image.
