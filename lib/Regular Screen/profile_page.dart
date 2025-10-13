@@ -3,11 +3,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:softeng/Regular%20Screen/notification_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:softeng/data/profile_service.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'companion_list.dart';
+import 'notification_regular.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -160,7 +162,7 @@ class _ProfilePageState extends State<ProfilePage> {
     } else if (index == 3) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const ProfilePage()),
+        MaterialPageRoute(builder: (context) => const NotificationScreen()),
       );
     }
   }
