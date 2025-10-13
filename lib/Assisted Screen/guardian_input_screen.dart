@@ -1,9 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/profile_service.dart';
 import 'tasks_screen.dart'; // import your tasks screen
 
-class GuardianInputScreen extends StatelessWidget {
+class GuardianInputScreen extends StatefulWidget {
   const GuardianInputScreen({super.key});
+
+  @override
+  State<GuardianInputScreen> createState() => _GuardianInputScreenState();
+}
+
+class _GuardianInputScreenState extends State<GuardianInputScreen> {
+  final TextEditingController _guardianController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _guardianController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitGuardian() async {
+    final val = _guardianController.text.trim();
+    if (val.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter guardian ID')));
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      final supabase = Supabase.instance.client;
+      // Lookup guardian by public_id
+      final guardian = await supabase.from('profile').select('id').eq('public_id', val).maybeSingle();
+      if (guardian == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian not found')));
+        return;
+      }
+      final guardianId = guardian['id'] as String;
+      // Save guardian_id into current user's profile
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not signed in')));
+        return;
+      }
+      await ProfileService.upsertProfile(supabase, id: user.id, fullName: null, email: null, role: null);
+      // write guardian_id specifically
+      await supabase.from('profile').update({'guardian_id': guardianId}).eq('id', user.id);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian linked successfully')));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TasksScreen()));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to link guardian: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +122,7 @@ class GuardianInputScreen extends StatelessWidget {
 
             // Guardian ID TextField with white outline
             TextField(
+              controller: _guardianController,
               decoration: InputDecoration(
                 hintText: "ENTER GUARDIAN ID...",
                 hintStyle: const TextStyle(
@@ -99,21 +156,16 @@ class GuardianInputScreen extends StatelessWidget {
                 ),
                 minimumSize: const Size(200, 40),
               ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TasksScreen(),
-                  ),
-                );
-              },
-              child: const Text(
-                "Submit",
-                style: TextStyle(
-                  color: Colors.white, // make text white
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              onPressed: _isLoading ? null : _submitGuardian,
+              child: _isLoading
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text(
+                      "Submit",
+                      style: TextStyle(
+                        color: Colors.white, // make text white
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ],
         ),

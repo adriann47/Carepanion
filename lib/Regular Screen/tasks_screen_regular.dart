@@ -40,11 +40,16 @@ class _TasksScreenState extends State<TasksScreenRegular> {
       if (!mounted) return;
 
       setState(() {
-        _userId = authUser?.id ?? '—';
-        _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
-        _fullName = (data?['fullname'] as String?)?.trim().isEmpty == true
-            ? '—'
-            : (data?['fullname'] as String?) ?? '—';
+    // Prefer a short public_id (8-digit) stored in profile for display.
+    final publicId = data?['public_id'] as String?;
+    _userId = (publicId != null && publicId.trim().isNotEmpty)
+      ? publicId
+      : (authUser?.id ?? '—');
+
+    _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
+    _fullName = (data?['fullname'] as String?)?.trim().isEmpty == true
+      ? '—'
+      : (data?['fullname'] as String?) ?? '—';
 
         final raw = data?['avatar_url'] as String?;
         _avatarUrl = (raw == null || raw.trim().isEmpty)

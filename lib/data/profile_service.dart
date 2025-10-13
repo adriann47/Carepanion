@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Centralized profile persistence that auto-detects the correct table name.
@@ -67,10 +69,52 @@ class ProfileService {
       if (email != null) payload['email'] = email;
       if (fullName != null) payload['fullname'] = fullName;
       if (effectiveRole != null) payload['role'] = effectiveRole;
+
+      // If this is a regular user, ensure they have a short public_id (8 digits)
+      if (effectiveRole != null && effectiveRole.toLowerCase() == 'regular') {
+        // Check existing row for public_id
+        try {
+          final existing = await client.from(table).select('public_id').eq('id', user.id).maybeSingle();
+          final existingId = existing == null ? null : (existing['public_id'] as dynamic);
+          if (existingId == null) {
+            // generate unique 8-digit numeric id
+            final pub = await _generateUniquePublicId(client, table);
+            if (pub != null) payload['public_id'] = pub;
+          }
+        } catch (_) {
+          // ignore and continue; the upsert below will still run
+        }
+      }
+
       await client.from(table).upsert(payload);
-    } catch (_) {
-      // Swallow and let caller decide user-facing handling
+    } catch (e) {
+      // During development, surface DB errors so we can debug why the upsert failed.
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('ProfileService.ensureProfileExists error: $e');
+      }
+      // Swallow in production to preserve existing behaviour
     }
+  }
+
+  /// Generate a unique 8-digit numeric public_id not already present in the
+  /// profile table. Returns null if generation failed (after attempts).
+  static Future<String?> _generateUniquePublicId(SupabaseClient client, String table) async {
+    final rng = Random.secure();
+    const attempts = 6;
+    for (var i = 0; i < attempts; i++) {
+      final value = (rng.nextInt(90000000) + 10000000).toString(); // 8 digits, first digit non-zero
+      try {
+        final found = await client.from(table).select('id').eq('public_id', value).maybeSingle();
+        if (found == null) {
+          return value;
+        }
+      } catch (_) {
+        // if query fails, try again
+        continue;
+      }
+    }
+    return null;
   }
 
   /// Upsert a profile row with the provided fields.
