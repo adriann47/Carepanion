@@ -9,6 +9,8 @@ import 'settings_regular.dart';
 import 'help_regular.dart';
 import 'notification_screen.dart';
 import 'profile_page.dart'; // ✅ Added ProfilePage import
+import 'companion_list.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -77,7 +79,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         MaterialPageRoute(builder: (context) => const CalendarScreenRegular()),
       );
     } else if (index == 2) {
-      // Add your alert/companion list here if needed
+      Navigator.pushReplacement(
+        context,
+         MaterialPageRoute(builder: (context) => const CompanionListScreen()),
+      );
     } else if (index == 3) {
       Navigator.pushReplacement(
         context,

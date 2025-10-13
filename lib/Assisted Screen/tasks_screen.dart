@@ -19,23 +19,86 @@ class _TasksScreen extends State<TasksScreen> {
   int _currentIndex = 0; // Home tab
   final List<bool> _taskDone = []; // tracked per loaded task
   String? _avatarUrl;
+  String? _fullName;
+  String? _email;
   List<Map<String, dynamic>> _tasks = [];
+  RealtimeChannel? _profileChannel;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
     _loadTodayTasks();
+    _subscribeProfileChanges();
   }
 
   Future<void> _loadProfile() async {
     try {
-      final data = await ProfileService.fetchProfile(Supabase.instance.client);
+      final client = Supabase.instance.client;
+      final authUser = client.auth.currentUser;
+      final data = await ProfileService.fetchProfile(client);
       if (!mounted) return;
       setState(() {
-        _avatarUrl = data?['avatar_url'] as String?;
+        final rawUrl = data?['avatar_url'] as String?;
+        _avatarUrl = (rawUrl == null || rawUrl.trim().isEmpty)
+            ? null
+            : '$rawUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+
+        final name = (data?['fullname'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) {
+          _fullName = name;
+        } else {
+          final email = authUser?.email ?? (data?['email'] as String?) ?? '';
+          _fullName = _friendlyFromEmail(email);
+        }
+        _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
       });
     } catch (_) {}
+  }
+
+  String _friendlyFromEmail(String email) {
+    if (email.contains('@')) {
+      final local = email.split('@').first;
+      final parts = local.split(RegExp(r'[._\s]+')).where((s) => s.isNotEmpty);
+      if (parts.isEmpty) return email;
+      return parts.map((p) => p[0].toUpperCase() + p.substring(1)).join(' ');
+    }
+    return email;
+  }
+
+  void _subscribeProfileChanges() {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return;
+    _profileChannel = client
+        .channel('public:profile')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'profile',
+          callback: (payload) {
+            final row = payload.newRecord;
+            if (row['id'] != user.id) return;
+            if (!mounted) return;
+            setState(() {
+              final name = (row['fullname'] as String?)?.trim();
+              if (name != null && name.isNotEmpty) _fullName = name;
+              final em = (row['email'] as String?)?.trim();
+              if (em != null && em.isNotEmpty) _email = em;
+              final url = (row['avatar_url'] as String?)?.trim();
+              if (url != null && url.isNotEmpty) {
+                _avatarUrl = '$url?v=${DateTime.now().millisecondsSinceEpoch}';
+              }
+            });
+          },
+        )
+        .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _profileChannel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _loadTodayTasks() async {
@@ -46,7 +109,9 @@ class _TasksScreen extends State<TasksScreen> {
       setState(() {
         _tasks = tasks;
         _taskDone.clear();
-        _taskDone.addAll(_tasks.map((t) => (t['status']?.toString() == 'done')));
+        _taskDone.addAll(
+          _tasks.map((t) => (t['status']?.toString() == 'done')),
+        );
       });
     } catch (e) {
       // ignore errors silently for now
@@ -99,17 +164,22 @@ class _TasksScreen extends State<TasksScreen> {
                     CircleAvatar(
                       radius: 40,
                       backgroundColor: Colors.brown,
-                      backgroundImage:
-                          _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                      backgroundImage: _avatarUrl != null
+                          ? NetworkImage(_avatarUrl!)
+                          : null,
                       child: _avatarUrl == null
-                          ? const Icon(Icons.person, size: 45, color: Colors.white)
+                          ? const Icon(
+                              Icons.person,
+                              size: 45,
+                              color: Colors.white,
+                            )
                           : null,
                     ),
                     const SizedBox(width: 20),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             "USER ID:",
                             style: TextStyle(
@@ -118,20 +188,16 @@ class _TasksScreen extends State<TasksScreen> {
                             ),
                           ),
                           Text(
-                            "SHAWN CABUTIHAN",
-                            style: TextStyle(
+                            _fullName ?? '—',
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           SizedBox(height: 10),
                           Text(
-                            "EMAIL: URIELSHAWN@GMAIL.COM",
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          Text(
-                            "NUMBER: 09541234567",
-                            style: TextStyle(fontSize: 16),
+                            "EMAIL: ${_email ?? '—'}",
+                            style: const TextStyle(fontSize: 16),
                           ),
                         ],
                       ),
@@ -168,7 +234,7 @@ class _TasksScreen extends State<TasksScreen> {
                               'No tasks for today',
                               style: TextStyle(color: Colors.grey[600]),
                             ),
-                          )
+                          ),
                         ]
                       : List.generate(_tasks.length, (i) {
                           final t = _tasks[i];
@@ -179,11 +245,15 @@ class _TasksScreen extends State<TasksScreen> {
                           if (startAt != null) {
                             try {
                               final dt = DateTime.parse(startAt).toLocal();
-                              timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                              timeStr =
+                                  '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
                             } catch (_) {}
                           }
-                          final guardian = (t['guardian_name'] ?? '') as String? ?? '';
-                          final color = i % 2 == 0 ? const Color(0xFFFFD6D6) : const Color(0xFFFFE699);
+                          final guardian =
+                              (t['guardian_name'] ?? '') as String? ?? '';
+                          final color = i % 2 == 0
+                              ? const Color(0xFFFFD6D6)
+                              : const Color(0xFFFFE699);
                           return _taskTile(
                             index: i,
                             color: color,
@@ -233,11 +303,7 @@ class _TasksScreen extends State<TasksScreen> {
                   color: index == 1 ? Colors.amber : Colors.pinkAccent,
                 ),
               ),
-              Container(
-                width: 3,
-                height: 120,
-                color: Colors.grey.shade400,
-              ),
+              Container(width: 3, height: 120, color: Colors.grey.shade400),
             ],
           ),
           const SizedBox(width: 20),
@@ -258,7 +324,9 @@ class _TasksScreen extends State<TasksScreen> {
                       Transform.scale(
                         scale: 1.6,
                         child: Checkbox(
-                          value: index < _taskDone.length ? _taskDone[index] : false,
+                          value: index < _taskDone.length
+                              ? _taskDone[index]
+                              : false,
                           onChanged: (val) async {
                             final newVal = val ?? false;
                             if (index < _taskDone.length) {
@@ -273,7 +341,11 @@ class _TasksScreen extends State<TasksScreen> {
                                 }
                               } catch (e) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Failed to update task status')),
+                                  SnackBar(
+                                    content: Text(
+                                      'Failed to update task status',
+                                    ),
+                                  ),
                                 );
                               }
                               await _loadTodayTasks();
@@ -294,8 +366,10 @@ class _TasksScreen extends State<TasksScreen> {
                   const SizedBox(height: 8),
                   Text(" Time: $time", style: const TextStyle(fontSize: 18)),
                   Text(" Note: $note", style: const TextStyle(fontSize: 18)),
-                  Text(" Guardian: $guardian",
-                      style: const TextStyle(fontSize: 18)),
+                  Text(
+                    " Guardian: $guardian",
+                    style: const TextStyle(fontSize: 18),
+                  ),
                 ],
               ),
             ),
