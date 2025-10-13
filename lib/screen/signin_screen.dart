@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'welcome_screen.dart';
 import '../data/profile_service.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -21,6 +20,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
   bool _rememberMe = false;
   bool _isLoading = false;
+  bool _obscurePassword = true; // 👈 Added for toggle visibility
 
   final supabase = Supabase.instance.client;
   StreamSubscription<AuthState>? _authSub;
@@ -54,13 +54,14 @@ class _SignInScreenState extends State<SignInScreen> {
     final user = supabase.auth.currentUser;
     String? fullName;
     final dynamic rawMeta = user?.userMetadata;
-    final Map<String, dynamic>? meta =
-        rawMeta is Map<String, dynamic> ? rawMeta : null;
+    final Map<String, dynamic>? meta = rawMeta is Map<String, dynamic>
+        ? rawMeta
+        : null;
     if (meta != null) {
-      final String? given =
-          (meta['first_name'] ?? meta['given_name'])?.toString();
-      final String? family =
-          (meta['last_name'] ?? meta['family_name'])?.toString();
+      final String? given = (meta['first_name'] ?? meta['given_name'])
+          ?.toString();
+      final String? family = (meta['last_name'] ?? meta['family_name'])
+          ?.toString();
       final String? composite = (meta['full_name'] ?? meta['name'])?.toString();
 
       final parts = <String>[
@@ -78,7 +79,7 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  /// ✅ Email + Password Sign In (match reference flow)
+  /// ✅ Email + Password Sign In
   Future<void> _signInWithEmail() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -92,98 +93,40 @@ class _SignInScreenState extends State<SignInScreen> {
         if (!mounted) return;
 
         if (response.user != null) {
-          // Ensure profile exists in database
           await _ensureProfileExists();
 
           if (!mounted) return;
-          // Fetch role and route accordingly
-          final role = await ProfileService.getCurrentUserRole(supabase);
-          if (!mounted) return;
-          if (role != null) {
-            final r = role.toLowerCase();
-            if (r == 'assisted' || r == 'assistee') {
-              Navigator.pushReplacementNamed(context, '/tasks'); // Assisted
-            } else if (r == 'regular' || r == 'caregiver') {
-              Navigator.pushReplacementNamed(context, '/tasks_regular');
-            } else {
-              Navigator.pushReplacementNamed(context, '/role_selection');
-            }
-          } else {
-            Navigator.pushReplacementNamed(context, '/role_selection');
-          }
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          );
         }
       } on AuthException catch (e) {
         if (!mounted) return;
-        final msg = (e.message).toLowerCase();
-
-        // Unconfirmed email → resend & go to verify screen
-        if (msg.contains('confirm')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Please verify your email first. We\'ll resend the code.'),
-            ),
-          );
-          try {
-            final email = _emailController.text.trim();
-            if (email.isNotEmpty) {
-              await supabase.auth.resend(type: OtpType.signup, email: email);
-            }
-          } catch (_) {}
-          Navigator.pushReplacementNamed(context, '/verify_email');
-          return;
-        }
-
-        // Invalid credentials → offer quick reset
-        if (msg.contains('invalid login credentials')) {
-          final email = _emailController.text.trim();
-          final snack = SnackBar(
-            content: const Text(
-                'Invalid email or password. You can reset your password.'),
-            action: SnackBarAction(
-              label: 'Reset now',
-              onPressed: () async {
-                if (email.isEmpty) return;
-                try {
-                  final redirect = kIsWeb
-                      ? Uri.base.origin
-                      : 'io.supabase.flutter://callback';
-                  await supabase.auth
-                      .resetPasswordForEmail(email, redirectTo: redirect);
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content:
-                            Text('Password reset email sent. Check your inbox.')),
-                  );
-                } catch (err) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to send reset email: $err')),
-                  );
-                }
-              },
-            ),
-          );
-          ScaffoldMessenger.of(context).showSnackBar(snack);
-          return;
-        }
-
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.message)));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Sign-in failed: $e")));
       } finally {
-        if (mounted) setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }
 
-  /// ✅ Google Sign In (match reference flow; navigation done in onAuthStateChange)
+  /// ✅ Google Sign In
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
+
     try {
       _googleOAuthPending = true;
-      final redirect =
-          kIsWeb ? Uri.base.origin : 'io.supabase.flutter://callback';
+      final redirect = kIsWeb
+          ? Uri.base.origin
+          : 'io.supabase.flutter://callback';
       await supabase.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirect,
@@ -191,40 +134,44 @@ class _SignInScreenState extends State<SignInScreen> {
       );
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Google sign-in failed: $e")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Google sign-in failed: $e")));
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   void initState() {
     super.initState();
-    // Listen for auth state changes to complete OAuth flows reliably
     _authSub = supabase.auth.onAuthStateChange.listen((data) async {
       final event = data.event;
       if (event == AuthChangeEvent.signedIn) {
         await _ensureProfileExists();
         if (!mounted) return;
         final user = supabase.auth.currentUser;
-
         if (_googleOAuthPending) {
           _googleOAuthPending = false;
           Navigator.pushReplacementNamed(context, '/google_registration');
           return;
         }
-
         final Map<String, dynamic>? meta = user?.appMetadata;
         final provider = (meta != null ? meta['provider'] : '')?.toString();
         if (provider == 'google') {
           Navigator.pushReplacementNamed(context, '/google_registration');
         } else {
-          // For email/password sign-ins, navigation happens in _signInWithEmail().
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          );
         }
       }
     });
@@ -281,7 +228,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Email
+                // Email field
                 Text(
                   "Email",
                   style: GoogleFonts.nunito(
@@ -310,7 +257,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // Password
+                // Password field with toggle 👇
                 Text(
                   "Password",
                   style: GoogleFonts.nunito(
@@ -321,7 +268,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 const SizedBox(height: 5),
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
+                  obscureText: _obscurePassword,
                   validator: _validatePassword,
                   enabled: !_isLoading,
                   decoration: InputDecoration(
@@ -335,12 +282,25 @@ class _SignInScreenState extends State<SignInScreen> {
                       vertical: 12,
                       horizontal: 12,
                     ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: const Color(0xFFCA5000),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
                   ),
                   style: GoogleFonts.nunito(color: const Color(0xFFCA5000)),
                 ),
                 const SizedBox(height: 15),
 
-                // Remember + Forgot
+                // Remember Me + Forgot Password
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -375,7 +335,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 30),
 
-                // Log In
+                // Log In button
                 Center(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -416,7 +376,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Google
+                // Google logo as button
                 Center(
                   child: InkWell(
                     onTap: _isLoading ? null : _signInWithGoogle,

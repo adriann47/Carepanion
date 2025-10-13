@@ -10,26 +10,24 @@ class AccountPage extends StatefulWidget {
 
 class _AccountPageState extends State<AccountPage> {
   String email = "URIEL.SHAWN@GMAIL.COM";
-  String mobile = "09541234567";
   List<String> guardians = [];
 
   final TextEditingController _currentPass = TextEditingController();
   final TextEditingController _newPass = TextEditingController();
   final TextEditingController _confirmPass = TextEditingController();
 
-  // Edit Field Dialog
+  // Edit Field Dialog (still used for other editable items if needed)
   void _editField(String title, String currentValue, Function(String) onSave) {
     final controller = TextEditingController(text: currentValue);
-
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text("Edit $title"),
         content: TextField(
           controller: controller,
-          decoration: InputDecoration(
-            hintText: "Enter new $title",
-            border: const OutlineInputBorder(),
+          decoration: const InputDecoration(
+            hintText: "Enter new value",
+            border: OutlineInputBorder(),
           ),
         ),
         actions: [
@@ -51,10 +49,9 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
-  // Add Guardian Dialog
+  // Add Guardian Dialog (updated hint text ✅)
   void _addGuardian() {
     final controller = TextEditingController();
-
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -62,7 +59,7 @@ class _AccountPageState extends State<AccountPage> {
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
-            hintText: "Enter guardian name or email",
+            hintText: "Enter guardian ID", // ✅ changed here
             border: OutlineInputBorder(),
           ),
         ),
@@ -87,8 +84,8 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
-  // Editable Row (Email, Mobile)
-  Widget _buildEditableRow(String label, String value, VoidCallback onEdit) {
+  // Read-only row (for Email)
+  Widget _buildReadOnlyRow(String label, String value) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -124,10 +121,6 @@ class _AccountPageState extends State<AccountPage> {
               ],
             ),
           ),
-          IconButton(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit, color: Colors.black54),
-          ),
         ],
       ),
     );
@@ -139,7 +132,7 @@ class _AccountPageState extends State<AccountPage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0x99B3E5FC), // 60% opacity of light blue
+        color: const Color(0x99B3E5FC),
         borderRadius: BorderRadius.circular(28),
       ),
       child: TextField(
@@ -154,43 +147,44 @@ class _AccountPageState extends State<AccountPage> {
           filled: true,
           fillColor: const Color(0x66B3E5FC),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         ),
       ),
     );
   }
 
   Widget _buildGuardianRow(String guardian) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(
-      color: const Color(0xFFB3E5FC),
-      borderRadius: BorderRadius.circular(28),
-    ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          guardian,
-          style: GoogleFonts.nunito(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFB3E5FC),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            guardian,
+            style: GoogleFonts.nunito(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
           ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.delete, color: Colors.redAccent),
-          onPressed: () {
-            setState(() {
-              guardians.remove(guardian);
-            });
-          },
-        ),
-      ],
-    ),
-  );
-}
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.redAccent),
+            onPressed: () {
+              setState(() {
+                guardians.remove(guardian);
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +196,7 @@ class _AccountPageState extends State<AccountPage> {
       backgroundColor: const Color(0xFFFBF5F0),
       body: Column(
         children: [
-          // 🔹 Header
+          // Header
           Container(
             width: double.infinity,
             height: h * 0.18,
@@ -215,7 +209,8 @@ class _AccountPageState extends State<AccountPage> {
             ),
             child: SafeArea(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: w * 0.05, vertical: h * 0.02),
+                padding:
+                    EdgeInsets.symmetric(horizontal: w * 0.05, vertical: h * 0.02),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -238,27 +233,20 @@ class _AccountPageState extends State<AccountPage> {
             ),
           ),
 
-          // 🔹 Content
+          // Content
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: w * 0.08, vertical: h * 0.025),
+              padding:
+                  EdgeInsets.symmetric(horizontal: w * 0.08, vertical: h * 0.025),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildEditableRow("Email", email, () {
-                    _editField("Email", email, (val) {
-                      setState(() => email = val);
-                    });
-                  }),
-                  _buildEditableRow("Mobile Number", mobile, () {
-                    _editField("Mobile Number", mobile, (val) {
-                      setState(() => mobile = val);
-                    });
-                  }),
+                  // Email (read-only)
+                  _buildReadOnlyRow("Email", email),
 
                   SizedBox(height: h * 0.03),
 
-                  // 🔹 Reset Password Section
+                  // Reset Password
                   Center(
                     child: Text(
                       "RESET PASSWORD",
@@ -278,8 +266,9 @@ class _AccountPageState extends State<AccountPage> {
                     child: ElevatedButton(
                       onPressed: () {},
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0x99B3E5FC), // also lighter
-                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                        backgroundColor: const Color(0x99B3E5FC),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 40, vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -297,7 +286,6 @@ class _AccountPageState extends State<AccountPage> {
 
                   SizedBox(height: h * 0.03),
 
-                  // 🔹 Divider line between sections
                   const Divider(
                     color: Colors.black26,
                     thickness: 1,
@@ -307,7 +295,7 @@ class _AccountPageState extends State<AccountPage> {
 
                   SizedBox(height: h * 0.02),
 
-                  // 🔹 Guardian Section
+                  // Guardian Section
                   Center(
                     child: Text(
                       "GUARDIAN’S ACCOUNT",
@@ -326,7 +314,8 @@ class _AccountPageState extends State<AccountPage> {
                     onTap: _addGuardian,
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
                         color: const Color(0xFFB3E5FC),
                         borderRadius: BorderRadius.circular(28),
