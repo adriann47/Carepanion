@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'welcome_screen.dart';
 import '../data/profile_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -42,7 +43,7 @@ class _SignInScreenState extends State<SignInScreen> {
       return "Must contain 1 uppercase letter";
     }
     if (!RegExp(r'[0-9]').hasMatch(value)) return "Must contain 1 number";
-    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value)) {
+    if (!RegExp(r'[!@#\$%^&*(),.?\":{}|<>]').hasMatch(value)) {
       return "Must contain 1 special character";
     }
     return null;
@@ -53,14 +54,13 @@ class _SignInScreenState extends State<SignInScreen> {
     final user = supabase.auth.currentUser;
     String? fullName;
     final dynamic rawMeta = user?.userMetadata;
-    final Map<String, dynamic>? meta = rawMeta is Map<String, dynamic>
-        ? rawMeta
-        : null;
+    final Map<String, dynamic>? meta =
+        rawMeta is Map<String, dynamic> ? rawMeta : null;
     if (meta != null) {
-      final String? given = (meta['first_name'] ?? meta['given_name'])
-          ?.toString();
-      final String? family = (meta['last_name'] ?? meta['family_name'])
-          ?.toString();
+      final String? given =
+          (meta['first_name'] ?? meta['given_name'])?.toString();
+      final String? family =
+          (meta['last_name'] ?? meta['family_name'])?.toString();
       final String? composite = (meta['full_name'] ?? meta['name'])?.toString();
 
       final parts = <String>[
@@ -78,7 +78,7 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  /// ✅ Email + Password Sign In
+  /// ✅ Email + Password Sign In (match reference flow)
   Future<void> _signInWithEmail() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -96,61 +96,109 @@ class _SignInScreenState extends State<SignInScreen> {
           await _ensureProfileExists();
 
           if (!mounted) return;
-          // Navigate to welcome screen
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
-          );
+          // Fetch role and route accordingly
+          final role = await ProfileService.getCurrentUserRole(supabase);
+          if (!mounted) return;
+          if (role != null) {
+            final r = role.toLowerCase();
+            if (r == 'assisted' || r == 'assistee') {
+              Navigator.pushReplacementNamed(context, '/tasks'); // Assisted
+            } else if (r == 'regular' || r == 'caregiver') {
+              Navigator.pushReplacementNamed(context, '/tasks_regular');
+            } else {
+              Navigator.pushReplacementNamed(context, '/role_selection');
+            }
+          } else {
+            Navigator.pushReplacementNamed(context, '/role_selection');
+          }
         }
       } on AuthException catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Sign-in failed: $e")));
-      } finally {
-        if (mounted) {
-          setState(() => _isLoading = false);
+        final msg = (e.message).toLowerCase();
+
+        // Unconfirmed email → resend & go to verify screen
+        if (msg.contains('confirm')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Please verify your email first. We\'ll resend the code.'),
+            ),
+          );
+          try {
+            final email = _emailController.text.trim();
+            if (email.isNotEmpty) {
+              await supabase.auth.resend(type: OtpType.signup, email: email);
+            }
+          } catch (_) {}
+          Navigator.pushReplacementNamed(context, '/verify_email');
+          return;
         }
+
+        // Invalid credentials → offer quick reset
+        if (msg.contains('invalid login credentials')) {
+          final email = _emailController.text.trim();
+          final snack = SnackBar(
+            content: const Text(
+                'Invalid email or password. You can reset your password.'),
+            action: SnackBarAction(
+              label: 'Reset now',
+              onPressed: () async {
+                if (email.isEmpty) return;
+                try {
+                  final redirect = kIsWeb
+                      ? Uri.base.origin
+                      : 'io.supabase.flutter://callback';
+                  await supabase.auth
+                      .resetPasswordForEmail(email, redirectTo: redirect);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content:
+                            Text('Password reset email sent. Check your inbox.')),
+                  );
+                } catch (err) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to send reset email: $err')),
+                  );
+                }
+              },
+            ),
+          );
+          ScaffoldMessenger.of(context).showSnackBar(snack);
+          return;
+        }
+
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
 
-  /// ✅ Google Sign In
+  /// ✅ Google Sign In (match reference flow; navigation done in onAuthStateChange)
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
-
     try {
       _googleOAuthPending = true;
-      // Web: redirect back to current origin; Mobile: use deep link scheme
-      final redirect = kIsWeb
-          ? Uri.base.origin
-          : 'io.supabase.flutter://callback';
-      // Force external system browser for the auth flow to avoid embedded webviews
+      final redirect =
+          kIsWeb ? Uri.base.origin : 'io.supabase.flutter://callback';
       await supabase.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirect,
         authScreenLaunchMode: LaunchMode.externalApplication,
       );
-      // Navigation will be handled by onAuthStateChange listener in initState.
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Google sign-in failed: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Google sign-in failed: $e")));
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -161,25 +209,22 @@ class _SignInScreenState extends State<SignInScreen> {
     _authSub = supabase.auth.onAuthStateChange.listen((data) async {
       final event = data.event;
       if (event == AuthChangeEvent.signedIn) {
-        // Ensure profile exists, then navigate
         await _ensureProfileExists();
         if (!mounted) return;
         final user = supabase.auth.currentUser;
+
         if (_googleOAuthPending) {
           _googleOAuthPending = false;
           Navigator.pushReplacementNamed(context, '/google_registration');
           return;
         }
+
         final Map<String, dynamic>? meta = user?.appMetadata;
         final provider = (meta != null ? meta['provider'] : '')?.toString();
         if (provider == 'google') {
-          // After Google OAuth, go to GoogleRegistration screen
           Navigator.pushReplacementNamed(context, '/google_registration');
         } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
-          );
+          // For email/password sign-ins, navigation happens in _signInWithEmail().
         }
       }
     });
@@ -236,7 +281,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Email field
+                // Email
                 Text(
                   "Email",
                   style: GoogleFonts.nunito(
@@ -265,7 +310,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // Password field
+                // Password
                 Text(
                   "Password",
                   style: GoogleFonts.nunito(
@@ -295,7 +340,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 15),
 
-                // Remember Me + Forgot Password
+                // Remember + Forgot
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -330,7 +375,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 30),
 
-                // Log In button
+                // Log In
                 Center(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -347,9 +392,8 @@ class _SignInScreenState extends State<SignInScreen> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : Text(
@@ -372,7 +416,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Google logo as button
+                // Google
                 Center(
                   child: InkWell(
                     onTap: _isLoading ? null : _signInWithGoogle,
