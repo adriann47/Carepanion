@@ -179,22 +179,16 @@ class TaskService {
   static Future<void> markSkip(int id) => setTaskStatus(id: id, status: 'skip');
   static Future<void> markTodo(int id) => setTaskStatus(id: id, status: 'todo');
 
-  /// Delete a task by id. Returns true when a row was deleted, false otherwise.
-  static Future<bool> deleteTask(int id) async {
-    try {
-      var del = _client.from('tasks').delete().eq('id', id);
-      final uid = _uid;
-      if (uid != null) {
-        del = del.eq('user_id', uid);
-      }
-      final res = await del.select('id').maybeSingle();
-      return res != null;
-    } catch (e) {
-      final msg = e.toString().toLowerCase();
-      if (msg.contains('permission denied') || msg.contains('policy')) {
-        throw Exception('Delete blocked by security policy. Please sign in as the owner of the task or adjust RLS policies.');
-      }
-      rethrow;
+/// Delete a task by id.
+  static Future<void> deleteTask(int id) async {
+    var del = _client.from('tasks').delete().eq('id', id);
+    final uid = _uid;
+    if (uid != null) {
+      del = del.eq('user_id', uid);
+    }
+    final List deletedList = await del.select('id');
+    if (deletedList.isEmpty) {
+      throw Exception('Task not deleted. It may not exist or you may not have permission.');
     }
   }
 
