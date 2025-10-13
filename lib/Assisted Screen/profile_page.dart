@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -17,6 +18,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final ImagePicker _picker = ImagePicker();
   String? _avatarUrl;
   bool _saving = false;
+  Timer? _nameSaveDebounce;
 
   // ✏️ edit states
   bool _isEditingName = false;
@@ -44,13 +46,30 @@ class _ProfilePageState extends State<ProfilePage> {
     super.dispose();
   }
 
+  void _onNameChanged(String value) {
+    _nameSaveDebounce?.cancel();
+    _nameSaveDebounce = Timer(const Duration(milliseconds: 500), () async {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) return;
+      final fullName = value.trim();
+      try {
+        await ProfileService.upsertProfile(
+          client,
+          id: user.id,
+          fullName: fullName.isEmpty ? null : fullName,
+        );
+      } catch (_) {}
+    });
+  }
+
   Future<void> _loadProfile() async {
     try {
       final client = Supabase.instance.client;
       final data = await ProfileService.fetchProfile(client);
       if (!mounted) return;
 
-      _nameController.text  = (data?['fullname'] as String?) ?? '';
+      _nameController.text = (data?['fullname'] as String?) ?? '';
       _emailController.text = (data?['email'] as String?) ?? '';
 
       // birthday: convert stored text (possibly ISO) -> readable UI + keep ISO for saving
@@ -85,7 +104,9 @@ class _ProfilePageState extends State<ProfilePage> {
     if (user == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be signed in to update avatar.')),
+        const SnackBar(
+          content: Text('You must be signed in to update avatar.'),
+        ),
       );
       return;
     }
@@ -113,14 +134,14 @@ class _ProfilePageState extends State<ProfilePage> {
           '${result.publicUrl}?v=${DateTime.now().millisecondsSinceEpoch}';
       if (!mounted) return;
       setState(() => _avatarUrl = withBuster);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile picture updated.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile picture updated.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update avatar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update avatar: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -145,8 +166,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   static const _months = [
     '', // 1-based
-    'January','February','March','April','May','June',
-    'July','August','September','October','November','December'
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
   static String _toReadable(DateTime d) {
@@ -160,7 +181,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final today = DateTime.now();
     final first = DateTime(1900, 1, 1);
-    final last  = DateTime(today.year, today.month, today.day);
+    final last = DateTime(today.year, today.month, today.day);
 
     final picked = await showDatePicker(
       context: context,
@@ -173,7 +194,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (picked != null) {
-      _birthdayIso = _toIso(picked);                 // store ISO for DB
+      _birthdayIso = _toIso(picked); // store ISO for DB
       _birthdayController.text = _toReadable(picked); // show readable in UI
       setState(() {}); // refresh styles if needed
     }
@@ -208,14 +229,19 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: w * 0.05, vertical: h * 0.02),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: w * 0.05,
+                      vertical: h * 0.02,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         IconButton(
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.arrow_back, color: Color(0xFF3D3D3D)),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Color(0xFF3D3D3D),
+                          ),
                         ),
                         const SizedBox(height: 5),
                         Text(
@@ -250,9 +276,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   CircleAvatar(
                     radius: 60,
                     backgroundColor: const Color(0xFFF1D2B6),
-                    backgroundImage: _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                    backgroundImage: _avatarUrl != null
+                        ? NetworkImage(_avatarUrl!)
+                        : null,
                     child: _avatarUrl == null
-                        ? const Icon(Icons.person, size: 70, color: Colors.white)
+                        ? const Icon(
+                            Icons.person,
+                            size: 70,
+                            color: Colors.white,
+                          )
                         : null,
                   ),
                   Positioned(
@@ -272,10 +304,16 @@ class _ProfilePageState extends State<ProfilePage> {
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
-                            : const Icon(Icons.edit, color: Colors.white, size: 18),
+                            : const Icon(
+                                Icons.edit,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                       ),
                     ),
                   ),
@@ -296,6 +334,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       onEditToggle: () {
                         setState(() => _isEditingName = !_isEditingName);
                       },
+                      onChanged: _onNameChanged,
                     ),
                     const SizedBox(height: 15),
 
@@ -312,7 +351,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       controller: _birthdayController,
                       isEditing: _isEditingBirthday,
                       onEditToggle: () {
-                        setState(() => _isEditingBirthday = !_isEditingBirthday);
+                        setState(
+                          () => _isEditingBirthday = !_isEditingBirthday,
+                        );
                       },
                       onPickDate: () {
                         // Ensure gray "editing" style is shown, then open picker
@@ -330,7 +371,9 @@ class _ProfilePageState extends State<ProfilePage> {
                         final user = client.auth.currentUser;
                         if (user == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('You must be signed in.')),
+                            const SnackBar(
+                              content: Text('You must be signed in.'),
+                            ),
                           );
                           return;
                         }
@@ -367,8 +410,10 @@ class _ProfilePageState extends State<ProfilePage> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(25),
                         ),
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 55, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 55,
+                          vertical: 14,
+                        ),
                         elevation: 0,
                       ),
                       child: Text(
@@ -423,7 +468,10 @@ class _ProfilePageState extends State<ProfilePage> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.black26),
@@ -440,6 +488,7 @@ class _ProfilePageState extends State<ProfilePage> {
     required TextEditingController controller,
     required bool isEditing,
     required VoidCallback onEditToggle,
+    void Function(String)? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,6 +505,7 @@ class _ProfilePageState extends State<ProfilePage> {
         TextField(
           controller: controller,
           readOnly: !isEditing,
+          onChanged: onChanged,
           style: GoogleFonts.nunito(
             color: isEditing ? Colors.grey[600] : Colors.black87,
             fontSize: 14,
@@ -464,7 +514,10 @@ class _ProfilePageState extends State<ProfilePage> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.black26),
@@ -490,7 +543,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }) {
     void _openPickerNow() {
       if (!isEditing) onEditToggle(); // show gray "editing" state
-      onPickDate();                   // open date picker immediately
+      onPickDate(); // open date picker immediately
     }
 
     return Column(
@@ -520,14 +573,21 @@ class _ProfilePageState extends State<ProfilePage> {
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.black26),
                 ),
                 suffixIcon: IconButton(
                   onPressed: _openPickerNow, // icon also opens picker now
-                  icon: Icon(Icons.calendar_today, color: Colors.grey[600], size: 20),
+                  icon: Icon(
+                    Icons.calendar_today,
+                    color: Colors.grey[600],
+                    size: 20,
+                  ),
                   tooltip: 'Pick date',
                 ),
               ),
