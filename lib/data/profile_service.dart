@@ -64,29 +64,59 @@ class ProfileService {
 
     final table = await _resolveTable(client);
     try {
-      final payload = <String, dynamic>{'id': user.id};
-      if (email != null) payload['email'] = email;
-      if (fullName != null) payload['fullname'] = fullName;
-      if (effectiveRole != null) payload['role'] = effectiveRole;
+      // 1) Read existing row once
+      final existing = await client
+          .from(table)
+          .select('id, email, fullname, role, public_id')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      // If this is a regular user, ensure they have a short public_id (8 digits)
-      if (effectiveRole != null && effectiveRole.toLowerCase() == 'regular') {
-        try {
-          final existing = await client
-              .from(table)
-              .select('public_id')
-              .eq('id', user.id)
-              .maybeSingle();
-          final existingId =
-              existing == null ? null : (existing['public_id'] as dynamic);
-          if (existingId == null) {
-            final pub = await _generateUniquePublicId(client, table);
-            if (pub != null) payload['public_id'] = pub;
-          }
-        } catch (_) {}
+      // 2) If no row, insert with provided metadata (including fullname if available)
+      if (existing == null) {
+        final insertPayload = <String, dynamic>{
+          'id': user.id,
+          if (email != null) 'email': email,
+          if (fullName != null && fullName.trim().isNotEmpty) 'fullname': fullName.trim(),
+          if (effectiveRole != null) 'role': effectiveRole,
+        };
+
+        // Generate public_id for new Regular users
+        if ((effectiveRole ?? '').toLowerCase() == 'regular') {
+          final pub = await _generateUniquePublicId(client, table);
+          if (pub != null) insertPayload['public_id'] = pub;
+        }
+
+        await client.from(table).insert(insertPayload);
+        return;
       }
 
-      await client.from(table).upsert(payload);
+      // 3) Row exists — only patch missing fields. Never overwrite an existing fullname here.
+      final updatePayload = <String, dynamic>{};
+
+      // Set email if currently null and we have one
+      final dynamic existingEmail = existing['email'];
+      if ((existingEmail == null || existingEmail.toString().trim().isEmpty) && email != null) {
+        updatePayload['email'] = email;
+      }
+
+      // Set role if currently null and we have one
+      final dynamic existingRole = existing['role'];
+      if ((existingRole == null || existingRole.toString().trim().isEmpty) && effectiveRole != null) {
+        updatePayload['role'] = effectiveRole;
+      }
+
+      // Ensure Regular users have public_id; don't touch if it already exists
+      final dynamic existingPublicId = existing['public_id'];
+      if ((effectiveRole ?? existingRole?.toString() ?? '').toLowerCase() == 'regular') {
+        if (existingPublicId == null || existingPublicId.toString().trim().isEmpty) {
+          final pub = await _generateUniquePublicId(client, table);
+          if (pub != null) updatePayload['public_id'] = pub;
+        }
+      }
+
+      if (updatePayload.isNotEmpty) {
+        await client.from(table).update(updatePayload).eq('id', user.id);
+      }
     } catch (e) {
       if (kDebugMode) {
         print('ProfileService.ensureProfileExists error: $e');
