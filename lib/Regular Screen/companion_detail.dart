@@ -49,7 +49,7 @@ class _CompanionDetailScreenState extends State<CompanionDetailScreen> {
     } else if (index == 3) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const NotificationScreen()),
+        MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
       );
     }
   }

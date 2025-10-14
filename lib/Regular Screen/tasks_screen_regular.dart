@@ -9,6 +9,9 @@ import 'package:intl/intl.dart';
 import 'package:softeng/data/profile_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:softeng/services/task_service.dart';
+import 'dart:async';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter/foundation.dart'; // <-- add this for kIsWeb
 
 class TasksScreenRegular extends StatefulWidget {
   const TasksScreenRegular({super.key});
@@ -25,12 +28,32 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   String? _fullName;
   String? _email;
   RealtimeChannel? _profileChannel;
+  Timer? _taskTimer;
+  List<Map<String, dynamic>> _todayTasks = [];
+  Map<String, dynamic>? _activeAlertTask;
+  final FlutterTts _tts = FlutterTts();
+  List<Map<String, dynamic>> _completedNotifications = [];
+  Set<String> _alertedTaskIds = {}; // Track alerted tasks for current minute
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
     _subscribeProfileChanges();
+    _startTaskTimer();
+  }
+
+  void _startTaskTimer() {
+    _taskTimer?.cancel();
+    print('Starting task timer'); // debug: ensure only called once
+    _taskTimer = Timer.periodic(const Duration(seconds: 60), (_) => _checkDueTasks());
+  }
+
+  @override
+  void dispose() {
+    _profileChannel?.unsubscribe();
+    _taskTimer?.cancel();
+    super.dispose();
   }
 
   String _friendlyFromEmail(String email) {
@@ -110,13 +133,102 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         .subscribe();
   }
 
-  @override
-  void dispose() {
-    _profileChannel?.unsubscribe();
-    super.dispose();
+  // Called by _TodayTasksStream via callback
+  void _updateTodayTasks(List<Map<String, dynamic>> tasks) {
+    _todayTasks = tasks;
   }
 
-  void _onTabTapped(int index) {
+  void _checkDueTasks() {
+    if (_activeAlertTask != null) return;
+    final now = DateTime.now();
+    final nowStr = DateFormat('HH:mm').format(now);
+
+    // Clear alerts if minute has changed
+    _alertedTaskIds.removeWhere((id) {
+      final task = _todayTasks.firstWhere((t) => t['id'] == id, orElse: () => {});
+      if (task.isEmpty) return true;
+      final startAt = task['start_at'];
+      if (startAt == null) return true;
+      try {
+        final dt = DateTime.parse(startAt.toString()).toLocal();
+        final taskMinute = DateFormat('HH:mm').format(dt);
+        return taskMinute != nowStr;
+      } catch (_) {
+        return true;
+      }
+    });
+
+    for (final t in _todayTasks) {
+      final id = t['id'].toString();
+      if (_isTaskDue(t, nowStr) && !_alertedTaskIds.contains(id)) {
+        _alertedTaskIds.add(id);
+        _activeAlertTask = t; // <-- set before showing dialog
+        _showTaskAlert(t);
+        break;
+      }
+    }
+  }
+
+  bool _isTaskDue(Map<String, dynamic> t, String nowStr) {
+    if ((t['is_done'] ?? t['done'] ?? false) == true) return false;
+    final startAt = t['start_at'];
+    if (startAt == null) return false;
+    try {
+      final dt = DateTime.parse(startAt.toString()).toLocal();
+      final taskTime = DateFormat('HH:mm').format(dt);
+      return taskTime == nowStr;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _showTaskAlert(Map<String, dynamic> task) async {
+    if (_activeAlertTask == null) return; // <-- prevent multiple dialogs
+    // Voice reminder
+    final title = (task['title'] ?? 'Task').toString();
+    final note = (task['description'] ?? '').toString();
+    if (!kIsWeb) {
+      await _tts.speak('Reminder: $title. ${note.isNotEmpty ? note : ""}');
+    }
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _TaskAlertDialog(
+        task: task,
+        onSkip: () async {
+          await TaskService.setTaskStatus(id: task['id'], status: 'skipped');
+          _addNotification(task, false);
+          if (mounted) setState(() => _activeAlertTask = null);
+          Navigator.of(context).pop();
+        },
+        onDone: () async {
+          await TaskService.setTaskStatus(id: task['id'], status: 'done');
+          _addNotification(task, true);
+          if (mounted) setState(() => _activeAlertTask = null);
+          Navigator.of(context).pop();
+        },
+      ),
+    ).then((_) {
+      if (mounted) setState(() => _activeAlertTask = null);
+    });
+  }
+
+  void _addNotification(Map<String, dynamic> task, bool isDone) {
+    final notif = {
+      'title': task['title'],
+      'user': _fullName ?? '',
+      'time': task['start_at'],
+      'isDone': isDone,
+      'avatarUrl': _avatarUrl,
+    };
+    setState(() {
+      _completedNotifications.add(notif);
+    });
+  }
+
+  void _onTabTapped(int index) async {
     setState(() => _currentIndex = index);
 
     if (index == 1) {
@@ -130,10 +242,18 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         MaterialPageRoute(builder: (_) => const CompanionListScreen()),
       );
     } else if (index == 3) {
-      Navigator.push(
+      // Await result and update notifications if returned
+      final result = await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const NotificationScreen()),
+        MaterialPageRoute(
+          builder: (_) => NotificationScreen(notifications: _completedNotifications),
+        ),
       );
+      if (result is List<Map<String, dynamic>>) {
+        setState(() {
+          _completedNotifications = result;
+        });
+      }
     } else if (index == 4) {
       Navigator.push(
         context,
@@ -235,7 +355,10 @@ class _TasksScreenState extends State<TasksScreenRegular> {
               // --- TASK LIST (from Supabase, realtime) ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _TodayTasksStream(onEdited: () => setState(() {})),
+                child: _TodayTasksStream(
+                  onEdited: () => setState(() {}),
+                  onTasksUpdated: _updateTodayTasks, // <-- pass callback
+                ),
               ),
             ],
           ),
@@ -402,8 +525,9 @@ class _UserHeaderCard extends StatelessWidget {
 // ===================== Today stream =====================
 
 class _TodayTasksStream extends StatelessWidget {
-  const _TodayTasksStream({required this.onEdited});
+  const _TodayTasksStream({required this.onEdited, required this.onTasksUpdated});
   final VoidCallback onEdited;
+  final void Function(List<Map<String, dynamic>>) onTasksUpdated;
 
   @override
   Widget build(BuildContext context) {
@@ -449,6 +573,8 @@ class _TodayTasksStream extends StatelessWidget {
           if (sb == null) return -1;
           return DateTime.parse(sa).compareTo(DateTime.parse(sb));
         });
+
+        onTasksUpdated(tasks); // <-- notify parent
 
         if (tasks.isEmpty) {
           return Padding(
@@ -762,6 +888,115 @@ class _TaskTileState extends State<_TaskTile> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ===================== Task Alert Dialog =====================
+
+class _TaskAlertDialog extends StatelessWidget {
+  const _TaskAlertDialog({
+    required this.task,
+    required this.onSkip,
+    required this.onDone,
+  });
+
+  final Map<String, dynamic> task;
+  final VoidCallback onSkip;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = (task['title'] ?? '').toString().toUpperCase();
+    final time = (() {
+      final startAt = task['start_at'];
+      if (startAt == null) return '';
+      try {
+        final dt = DateTime.parse(startAt.toString()).toLocal();
+        return TimeOfDay(hour: dt.hour, minute: dt.minute).format(context);
+      } catch (_) {
+        return '';
+      }
+    })();
+    final note = (task['description'] ?? '').toString();
+    final guardian = (task['guardian_name'] ?? '').toString();
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      backgroundColor: Colors.white,
+      child: SingleChildScrollView( // <-- Fix overflow
+        child: Container(
+          width: 260,
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'ACTIVITY ALERT',
+                style: GoogleFonts.nunito(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: const Color(0xFF2D2D2D),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE1E1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text('Time: $time', style: GoogleFonts.nunito(fontSize: 14)),
+                    if (note.isNotEmpty)
+                      Text('Note: $note', style: GoogleFonts.nunito(fontSize: 14)),
+                    if (guardian.isNotEmpty)
+                      Text('Guardian: $guardian', style: GoogleFonts.nunito(fontSize: 14)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF77CA0),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: onSkip,
+                    child: Text('SKIP', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700)),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7DECF7),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: onDone,
+                    child: Text('DONE', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

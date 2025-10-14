@@ -42,7 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else if (index == 3) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => NotificationScreen()),
+        MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
       );
     } else if (index == 4) {
       Navigator.pushReplacement(

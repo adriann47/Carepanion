@@ -3,8 +3,10 @@ import 'tasks_screen_regular.dart'; // For Home (example)
 import 'calendar_screen_regular.dart'; // For Menu (example)
 import 'companion_list.dart'; // For Companions tab (example)
 import 'profile_screen_regular.dart';
+
 class NotificationScreen extends StatefulWidget {
-  const NotificationScreen({super.key});
+  const NotificationScreen({super.key, required this.notifications});
+  final List<Map<String, dynamic>> notifications;
 
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();
@@ -31,25 +33,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
         context,
         MaterialPageRoute(builder: (context) => const CompanionListScreen()),
       );
-    } else if (index == 0) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const TasksScreenRegular()),
-      );
-    } else if (index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const CalendarScreenRegular()),
-      );
     } else if (index == 3) {
-      // ✅ Go to Notification Screen when Notification icon clicked
+      // Fix: Pass notifications from parent via ModalRoute
+      final notifications = ModalRoute.of(context)?.settings.arguments as List<Map<String, dynamic>>?;
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const NotificationScreen()),
+        MaterialPageRoute(
+          builder: (context) => NotificationScreen(
+            notifications: notifications ?? [],
+          ),
+        ),
       );
-    }
-    else if (index == 4) {
-      // ✅ Go to Notification Screen when Notification icon clicked
+    } else if (index == 4) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const ProfileScreen()),
@@ -83,133 +78,84 @@ class _NotificationScreenState extends State<NotificationScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ✅ Notification 1
-              Container(
-                width: double.infinity,
-                height: 110,
-                margin:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.lightBlue[100],
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(width: 10),
-                    const CircleAvatar(
-                      radius: 36,
-                      backgroundImage: AssetImage("assets/neriah.png"),
-                    ),
-                    const SizedBox(width: 30),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Text(
-                            "NERIAH VILLAPANA",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(Icons.check_circle,
-                                  color: Colors.green, size: 18),
-                              SizedBox(width: 4),
-                              Text(
-                                "DRINK VITAMINS",
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            "7:30 AM",
-                            style: TextStyle(fontSize: 13),
-                          ),
-                        ],
+              if (widget.notifications.isEmpty)
+                const Text("No notifications yet."),
+              for (final notif in widget.notifications)
+                Container(
+                  width: double.infinity,
+                  height: 110,
+                  margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.lightBlue[100],
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ✅ Notification 2
-              Container(
-                width: double.infinity,
-                height: 110,
-                margin:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.lightBlue[100],
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(width: 10),
-                    const CircleAvatar(
-                      radius: 36,
-                      backgroundImage: AssetImage("assets/aldrich.png"),
-                    ),
-                    const SizedBox(width: 30),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Text(
-                            "ALDRICH SABANDO",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                    ],
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(width: 10),
+                      notif['avatarUrl'] != null
+                        ? CircleAvatar(
+                            radius: 36,
+                            backgroundImage: NetworkImage(notif['avatarUrl']),
+                          )
+                        : CircleAvatar(
+                            radius: 36,
+                            child: Icon(
+                              notif['isDone'] ? Icons.check_circle : Icons.cancel,
+                              color: notif['isDone'] ? Colors.green : Colors.red,
+                              size: 36,
                             ),
+                            backgroundColor: Colors.white,
                           ),
-                          SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(Icons.cancel,
-                                  color: Colors.red, size: 18),
-                              SizedBox(width: 4),
-                              Text(
-                                "DRINK VITAMINS",
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                      const SizedBox(width: 30),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              notif['user'] ?? '',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
                               ),
-                            ],
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            "7:30 AM",
-                            style: TextStyle(fontSize: 13),
-                          ),
-                        ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  notif['isDone'] ? Icons.check_circle : Icons.cancel,
+                                  color: notif['isDone'] ? Colors.green : Colors.red,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  notif['title'] ?? '',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              notif['time'] != null
+                                ? TimeOfDay.fromDateTime(DateTime.parse(notif['time']).toLocal()).format(context)
+                                : '',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),

@@ -108,169 +108,173 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF6EF),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Top pink header
-            Container(
-              width: double.infinity,
-              height: 320,
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFA8A8),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(50),
-                  bottomRight: Radius.circular(50),
+      resizeToAvoidBottomInset: true, // <-- Fix overflow when keyboard appears
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // <-- Prevent overflow
+            children: [
+              // Top pink header
+              Container(
+                width: double.infinity,
+                height: 320,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFFA8A8),
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(50),
+                    bottomRight: Radius.circular(50),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.black),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      "TASK",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+                    // Title input
+                    _buildInputField(
+                      label: "TITLE",
+                      controller: _titleController,
+                      icon: Icons.edit,
+                    ),
+                    const SizedBox(height: 20),
+                    // Date picker
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDateField(),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.black),
-                    onPressed: () => Navigator.pop(context),
+
+              const SizedBox(height: 35),
+
+              // Start and End Time
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildTimeField(
+                        label: "START TIME",
+                        time: _startTime,
+                        onTap: () => _selectTime(true),
+                      ),
+                    ),
+                    const SizedBox(width: 30),
+                    Expanded(
+                      child: _buildTimeField(
+                        label: "END TIME",
+                        time: _endTime,
+                        onTap: () => _selectTime(false),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 35),
+
+              // Description
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: _buildInputField(
+                  label: "DESCRIPTION",
+                  controller: _descriptionController,
+                  icon: Icons.edit,
+                ),
+              ),
+
+              const SizedBox(height: 35),
+
+              // Category
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "CATEGORY",
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: _buildCategoryChip(
+                            "MEDICATION",
+                            const Color(0xFFFFD6D6),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildCategoryChip(
+                            "EXERCISE",
+                            const Color(0xFFFFE28C),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildCategoryChip(
+                            "OTHER",
+                            const Color(0xFFB6EAFF),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              // Save Button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: ElevatedButton(
+                  onPressed: _saveTask,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF9BE8D8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    minimumSize: const Size(double.infinity, 45),
                   ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    "TASK",
+                  child: const Text(
+                    "SAVE",
                     style: TextStyle(
-                      fontSize: 22,
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      letterSpacing: 1,
                     ),
-                  ),
-                  const SizedBox(height: 25),
-                  // Title input
-                  _buildInputField(
-                    label: "TITLE",
-                    controller: _titleController,
-                    icon: Icons.edit,
-                  ),
-                  const SizedBox(height: 20),
-                  // Date picker
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDateField(),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 35),
-
-            // Start and End Time
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildTimeField(
-                      label: "START TIME",
-                      time: _startTime,
-                      onTap: () => _selectTime(true),
-                    ),
-                  ),
-                  const SizedBox(width: 30),
-                  Expanded(
-                    child: _buildTimeField(
-                      label: "END TIME",
-                      time: _endTime,
-                      onTap: () => _selectTime(false),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 35),
-
-            // Description
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
-              child: _buildInputField(
-                label: "DESCRIPTION",
-                controller: _descriptionController,
-                icon: Icons.edit,
-              ),
-            ),
-
-            const SizedBox(height: 35),
-
-            // Category
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "CATEGORY",
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: _buildCategoryChip(
-                          "MEDICATION",
-                          const Color(0xFFFFD6D6),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildCategoryChip(
-                          "EXERCISE",
-                          const Color(0xFFFFE28C),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildCategoryChip(
-                          "OTHER",
-                          const Color(0xFFB6EAFF),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            // Save Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
-              child: ElevatedButton(
-                onPressed: _saveTask,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF9BE8D8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  minimumSize: const Size(double.infinity, 45),
-                ),
-                child: const Text(
-                  "SAVE",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
                   ),
                 ),
               ),
-            ),
 
-            const SizedBox(height: 40), // Adjusted spacing after removing navbar
-          ],
+              const SizedBox(height: 40), // Adjusted spacing after removing navbar
+            ],
+          ),
         ),
       ),
     );

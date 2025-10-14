@@ -61,7 +61,7 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
       // ✅ Go to Notification Screen when Notification icon clicked
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const NotificationScreen()),
+        MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
       );
     }
     else if (index == 4) {

@@ -36,7 +36,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     } else if (index == 3) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const NotificationScreen()),
+        MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
       );
     } else if (index == 4) {
       Navigator.pushReplacement(
