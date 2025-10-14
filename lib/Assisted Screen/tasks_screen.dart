@@ -7,6 +7,7 @@ import 'emergency_screen.dart';
 import 'calendar_screen.dart';
 import 'navbar_assisted.dart'; // ✅ Import reusable navbar
 // Global ReminderService handles popups across screens; no local timer here.
+import 'package:intl/intl.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -247,8 +248,7 @@ class _TasksScreen extends State<TasksScreen> {
                           if (startAt != null) {
                             try {
                               final dt = DateTime.parse(startAt).toLocal();
-                              timeStr =
-                                  '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                              timeStr = DateFormat('h:mm a').format(dt);
                             } catch (_) {}
                           }
                           final guardian =
