@@ -103,14 +103,29 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         );
       }
 
-      final payload = <String, dynamic>{
-        'assisted_id': assistedId,
+      // Build payload; prefer including assisted_id when the column exists.
+      final basePayload = <String, dynamic>{
         if (guardianId != null && guardianId.isNotEmpty) 'guardian_id': guardianId,
         'created_at': DateTime.now().toUtc().toIso8601String(),
         'status': 'active',
       };
 
-      await client.from('emergency_alerts').insert(payload);
+      // First try with assisted_id (for newer schema). If that fails due to missing column, retry without it.
+      try {
+        final withAssisted = {
+          ...basePayload,
+          'assisted_id': assistedId,
+        };
+        await client.from('emergency_alerts').insert(withAssisted);
+      } catch (e) {
+        final msg = e.toString().toLowerCase();
+        final missingAssisted = msg.contains('assisted_id') && (msg.contains('column') || msg.contains('does not exist'));
+        if (missingAssisted) {
+          await client.from('emergency_alerts').insert(basePayload);
+        } else {
+          rethrow;
+        }
+      }
     } catch (_) {
       // Non-blocking; UI flow proceeds regardless
     }
