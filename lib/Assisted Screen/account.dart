@@ -59,7 +59,7 @@ class _AccountPageState extends State<AccountPage> {
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
-            hintText: "Enter guardian ID", // ✅ changed here
+            hintText: "Enter guardian id", // ✅ changed here
             border: OutlineInputBorder(),
           ),
         ),
