@@ -21,6 +21,11 @@ class TasksScreenRegular extends StatefulWidget {
 }
 
 class _TasksScreenState extends State<TasksScreenRegular> {
+  // Global guards to avoid duplicate popups when multiple instances are alive
+  static final Set<String> _gAlertedToday = <String>{};
+  static String? _gAlertedDay; // yyyy-MM-dd
+  static bool _gPopupActive = false;
+
   int _currentIndex = 0;
 
   String? _avatarUrl;
@@ -33,7 +38,9 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   Map<String, dynamic>? _activeAlertTask;
   final FlutterTts _tts = FlutterTts();
   List<Map<String, dynamic>> _completedNotifications = [];
-  Set<String> _alertedTaskIds = {}; // Track alerted tasks for current minute
+  // Track alerted task IDs per day to avoid duplicate popups
+  Set<String> _alertedToday = {};
+  String? _alertedDay; // yyyy-MM-dd of the last day we tracked
 
   @override
   void initState() {
@@ -46,7 +53,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   void _startTaskTimer() {
     _taskTimer?.cancel();
     print('Starting task timer'); // debug: ensure only called once
-    _taskTimer = Timer.periodic(const Duration(seconds: 60), (_) => _checkDueTasks());
+    // Check every 1 second to fire exactly when the start time matches current time
+    _taskTimer = Timer.periodic(const Duration(seconds: 1), (_) => _checkDueTasks());
   }
 
   @override
@@ -141,28 +149,61 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   void _checkDueTasks() {
     if (_activeAlertTask != null) return;
     final now = DateTime.now();
-    final nowStr = DateFormat('HH:mm').format(now);
+  final nowStr = DateFormat('HH:mm:ss').format(now);
+    final todayStr = DateFormat('yyyy-MM-dd').format(now);
 
-    // Clear alerts if minute has changed
-    _alertedTaskIds.removeWhere((id) {
-      final task = _todayTasks.firstWhere((t) => t['id'] == id, orElse: () => {});
-      if (task.isEmpty) return true;
-      final startAt = task['start_at'];
-      if (startAt == null) return true;
-      try {
-        final dt = DateTime.parse(startAt.toString()).toLocal();
-        final taskMinute = DateFormat('HH:mm').format(dt);
-        return taskMinute != nowStr;
-      } catch (_) {
-        return true;
-      }
-    });
+    // Reset per-day dedup set at day boundary
+    if (_alertedDay != todayStr) {
+      _alertedToday.clear();
+      _alertedDay = todayStr;
+    }
+    // Reset global per-day set at day boundary
+    if (_gAlertedDay != todayStr) {
+      _gAlertedToday.clear();
+      _gAlertedDay = todayStr;
+    }
 
     for (final t in _todayTasks) {
-      final id = t['id'].toString();
-      if (_isTaskDue(t, nowStr) && !_alertedTaskIds.contains(id)) {
-        _alertedTaskIds.add(id);
-        _activeAlertTask = t; // <-- set before showing dialog
+      final startAt = t['start_at'];
+      if (startAt == null) continue;
+      DateTime dt;
+      try {
+        dt = DateTime.parse(startAt.toString()).toLocal();
+      } catch (_) {
+        continue;
+      }
+
+      // Only consider tasks scheduled for today
+      final taskDay = DateFormat('yyyy-MM-dd').format(dt);
+      if (taskDay != todayStr) continue;
+
+      if (_isTaskDue(t, nowStr)) {
+        final idKey = '${t['id']}_$todayStr';
+        // Skip if alerted locally or globally already
+        if (_alertedToday.contains(idKey) || _gAlertedToday.contains(idKey)) continue;
+
+        // Mark all tasks due at this exact second as alerted (both local and global) to ensure only one popup for that instant
+        for (final other in _todayTasks) {
+          final startAt2 = other['start_at'];
+          if (startAt2 == null) continue;
+          DateTime dt2;
+          try {
+            dt2 = DateTime.parse(startAt2.toString()).toLocal();
+          } catch (_) {
+            continue;
+          }
+          final sameDay = DateFormat('yyyy-MM-dd').format(dt2) == todayStr;
+          final sameSecond = DateFormat('HH:mm:ss').format(dt2) == nowStr;
+          if (sameDay && sameSecond) {
+            final key = '${other['id']}_$todayStr';
+            _alertedToday.add(key);
+            _gAlertedToday.add(key);
+          }
+        }
+
+        if (_gPopupActive) break; // another instance already showing a popup
+        _gPopupActive = true;
+        _activeAlertTask = t; // set before showing dialog
         _showTaskAlert(t);
         break;
       }
@@ -175,7 +216,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     if (startAt == null) return false;
     try {
       final dt = DateTime.parse(startAt.toString()).toLocal();
-      final taskTime = DateFormat('HH:mm').format(dt);
+      final taskTime = DateFormat('HH:mm:ss').format(dt);
       return taskTime == nowStr;
     } catch (_) {
       return false;
@@ -212,6 +253,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
       ),
     ).then((_) {
       if (mounted) setState(() => _activeAlertTask = null);
+      _gPopupActive = false; // release global lock when dialog closes
     });
   }
 
@@ -232,18 +274,18 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     setState(() => _currentIndex = index);
 
     if (index == 1) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const CalendarScreenRegular()),
       );
     } else if (index == 2) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const CompanionListScreen()),
       );
     } else if (index == 3) {
       // Await result and update notifications if returned
-      final result = await Navigator.push(
+      final result = await Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => NotificationScreen(notifications: _completedNotifications),
@@ -255,7 +297,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         });
       }
     } else if (index == 4) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const ProfileScreen()),
       );
@@ -743,7 +785,7 @@ class _TaskTileState extends State<_TaskTile> {
               child: Opacity(
                 opacity: opacity,
                 child: Container(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFD8F1FF), Color(0xFFBEE6FF)],
@@ -867,28 +909,33 @@ class _TaskTileState extends State<_TaskTile> {
   Widget _infoLine({required String label, required String value}) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 4),
-      child: RichText(
-        text: TextSpan(
-          children: [
-            TextSpan(
-              text: '$label: ',
-              style: GoogleFonts.nunito(
-                color: const Color(0xFF2D2D2D),
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-                letterSpacing: 0.2,
-              ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            '$label: ',
+            style: GoogleFonts.nunito(
+              color: const Color(0xFF2D2D2D),
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+              height: 1.2,
+              letterSpacing: 0.2,
             ),
-            TextSpan(
-              text: value,
+          ),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.nunito(
                 color: const Color(0xFF2D2D2D),
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
+                height: 1.2,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
