@@ -23,6 +23,7 @@ class _TasksScreen extends State<TasksScreen> {
   String? _avatarUrl;
   String? _fullName;
   String? _email;
+  String? _guardianFullName;
   List<Map<String, dynamic>> _tasks = [];
   RealtimeChannel? _profileChannel;
 
@@ -56,6 +57,21 @@ class _TasksScreen extends State<TasksScreen> {
         }
         _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
       });
+
+      // Fetch linked guardian's full name if present
+      final guardianId = (data?['guardian_id'] as String?)?.trim();
+      if (guardianId != null && guardianId.isNotEmpty) {
+        try {
+          final g = await ProfileService.fetchProfile(client, userId: guardianId);
+          if (!mounted) return;
+          final gName = (g?['fullname'] as String?)?.trim();
+          if (gName != null && gName.isNotEmpty) {
+            setState(() {
+              _guardianFullName = gName;
+            });
+          }
+        } catch (_) {}
+      }
     } catch (_) {}
   }
 
@@ -251,8 +267,11 @@ class _TasksScreen extends State<TasksScreen> {
                               timeStr = DateFormat('h:mm a').format(dt);
                             } catch (_) {}
                           }
-                          final guardian =
-                              (t['guardian_name'] ?? '') as String? ?? '';
+              // Prefer linked guardian's full name; fallback to any task-provided fields
+              final guardianRaw = _guardianFullName?.trim().isNotEmpty == true
+                  ? _guardianFullName
+                  : (t['guardian_name'] ?? t['created_by_name'] ?? '') as String?;
+              final guardian = (guardianRaw ?? '').toString();
                           final color = i % 2 == 0
                               ? const Color(0xFFFFD6D6)
                               : const Color(0xFFFFE699);
@@ -369,7 +388,7 @@ class _TasksScreen extends State<TasksScreen> {
                   Text(" Time: $time", style: const TextStyle(fontSize: 18)),
                   Text(" Note: $note", style: const TextStyle(fontSize: 18)),
                   Text(
-                    " Guardian: $guardian",
+                    " Guardian: ${guardian.isNotEmpty ? guardian : 'Unknown'}",
                     style: const TextStyle(fontSize: 18),
                   ),
                 ],

@@ -6,6 +6,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/navigation.dart';
+import '../data/profile_service.dart';
 
 class ReminderService {
   ReminderService._();
@@ -14,6 +15,8 @@ class ReminderService {
   static bool _popupActive = false;
   static String? _today; // yyyy-MM-dd
   static final Set<String> _alerted = {};
+  static String? _guardianFullNameCache;
+  static String? _guardianCacheForUserId;
 
   static void start() {
     _timer?.cancel();
@@ -40,6 +43,22 @@ class ReminderService {
       _alerted.clear();
     }
     final nowStr = DateFormat('HH:mm:ss').format(now);
+
+    // Cache guardian full name for the current user (assisted) if available
+    if (_guardianCacheForUserId != user.id || _guardianFullNameCache == null) {
+      try {
+        final me = await ProfileService.fetchProfile(client);
+        final guardianId = (me?['guardian_id'] as String?)?.trim();
+        String? gName;
+        if (guardianId != null && guardianId.isNotEmpty) {
+          final g = await ProfileService.fetchProfile(client, userId: guardianId);
+          final gn = (g?['fullname'] as String?)?.trim();
+          if (gn != null && gn.isNotEmpty) gName = gn;
+        }
+        _guardianFullNameCache = gName;
+        _guardianCacheForUserId = user.id;
+      } catch (_) {}
+    }
 
     // Fetch today's tasks for the signed-in user (only tasks assigned to them).
     List<dynamic> rows;
@@ -95,6 +114,7 @@ class ReminderService {
         barrierDismissible: false,
         builder: (dialogCtx) => _ReminderDialog(
           task: r as Map<String, dynamic>,
+          guardianFullName: _guardianFullNameCache,
           onSkip: () async {
             try {
               await client.from('tasks').update({'status': 'skipped'}).eq('id', id);
@@ -115,16 +135,20 @@ class ReminderService {
 }
 
 class _ReminderDialog extends StatelessWidget {
-  const _ReminderDialog({required this.task, required this.onSkip, required this.onDone});
+  const _ReminderDialog({required this.task, required this.onSkip, required this.onDone, this.guardianFullName});
   final Map<String, dynamic> task;
   final VoidCallback onSkip;
   final VoidCallback onDone;
+  final String? guardianFullName;
 
   @override
   Widget build(BuildContext context) {
     final title = (task['title'] ?? '').toString().toUpperCase();
     final note = (task['description'] ?? '').toString();
-    final guardian = (task['guardian_name'] ?? '').toString();
+  final guardian = (guardianFullName?.trim().isNotEmpty == true
+      ? guardianFullName
+      : (task['guardian_name'] ?? ''))
+    .toString();
 
     String fmt(dynamic iso) {
       if (iso == null) return '';
