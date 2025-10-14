@@ -52,12 +52,14 @@ class EmergencyService {
             event: PostgresChangeEvent.insert,
             schema: 'public',
             table: 'emergency_alerts',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'guardian_id',
-              value: user.id,
-            ),
             callback: (payload) async {
+              try {
+                final newRec = payload.newRecord as Map<String, dynamic>?;
+                final gid = newRec?['guardian_id']?.toString();
+                if (gid != user.id) return;
+              } catch (_) {
+                return;
+              }
               final nav = navKey.currentState;
               final ctx = nav?.overlay?.context;
               if (ctx == null) return;

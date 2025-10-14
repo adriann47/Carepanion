@@ -97,6 +97,13 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       final assistedId = user.id;
       final guardianId = (me?['guardian_id'] as String?)?.trim();
 
+      if ((guardianId == null || guardianId.isEmpty) && mounted) {
+        // Helpful hint so users know why guardians won't be notified
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No guardian linked. Guardian will not be notified.')),
+        );
+      }
+
       final payload = <String, dynamic>{
         'assisted_id': assistedId,
         if (guardianId != null && guardianId.isNotEmpty) 'guardian_id': guardianId,
