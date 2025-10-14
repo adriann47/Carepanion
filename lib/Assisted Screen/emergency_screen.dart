@@ -77,14 +77,26 @@ class _EmergencyScreenState extends State<EmergencyScreen>
     }
   }
 
-  void _triggerEmergency() {
+  void _triggerEmergency() async {
     _createEmergencyAlert();
-    Navigator.push(
+    // Resolve assisted name for display
+    String assistedName = '';
+    try {
+      final me = await ProfileService.fetchProfile(Supabase.instance.client);
+      assistedName = (me?['fullname'] ?? '').toString().trim();
+    } catch (_) {}
+    if (!mounted) return;
+    await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const EmergencyAlertScreen()),
-    ).then((_) {
-      _controller.reset(); // Reset when returning
-    });
+      MaterialPageRoute(
+        builder: (context) => EmergencyAlertScreen(
+          assistedName: assistedName,
+          isGuardianView: false,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _controller.reset(); // Reset when returning
   }
 
   Future<void> _createEmergencyAlert() async {

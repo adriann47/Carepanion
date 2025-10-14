@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 // Keep alert as a modal confirmation; return to prior screen on pop
 
 class EmergencyAlertScreen extends StatelessWidget {
-  const EmergencyAlertScreen({super.key});
+  const EmergencyAlertScreen({super.key, required this.assistedName, required this.isGuardianView});
+
+  final String assistedName;
+  final bool isGuardianView;
 
   @override
   Widget build(BuildContext context) {
@@ -16,19 +19,19 @@ class EmergencyAlertScreen extends StatelessWidget {
               const Icon(Icons.notifications_active,
                   size: 100, color: Colors.white),
               const SizedBox(height: 30),
-              const Text(
+              Text(
                 "EMERGENCY",
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                "USER HAS PRESSED THE\nEMERGENCY BUTTON",
+              Text(
+                "${assistedName.isNotEmpty ? assistedName : 'User'} HAS PRESSED THE\nEMERGENCY BUTTON",
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -36,7 +39,7 @@ class EmergencyAlertScreen extends StatelessWidget {
               ),
               const SizedBox(height: 50),
 
-              /// --- CONFIRM BUTTON ---
+              /// --- Button (STOP for Assisted, CONFIRM for Guardian) ---
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).pop();
@@ -51,9 +54,9 @@ class EmergencyAlertScreen extends StatelessWidget {
                   ),
                   elevation: 5,
                 ),
-                child: const Text(
-                  "CONFIRM",
-                  style: TextStyle(
+                child: Text(
+                  isGuardianView ? "CONFIRM" : "STOP",
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.2,

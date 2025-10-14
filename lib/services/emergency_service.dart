@@ -61,10 +61,27 @@ class EmergencyService {
               final nav = navKey.currentState;
               final ctx = nav?.overlay?.context;
               if (ctx == null) return;
-              // Present the alert screen
+
+              // Try to resolve assisted name if assisted_id is present
+              String assistedName = '';
+              try {
+                final newRec = payload.newRecord as Map<String, dynamic>?;
+                final assistedId = newRec?['assisted_id']?.toString();
+                if (assistedId != null && assistedId.isNotEmpty) {
+                  final prof = await ProfileService.fetchProfile(Supabase.instance.client, userId: assistedId);
+                  assistedName = (prof?['fullname'] ?? '').toString().trim();
+                }
+              } catch (_) {}
+
+              // Present the alert screen for guardian
               // ignore: use_build_context_synchronously
               await Navigator.of(ctx).push(
-                MaterialPageRoute(builder: (_) => const EmergencyAlertScreen()),
+                MaterialPageRoute(
+                  builder: (_) => EmergencyAlertScreen(
+                    assistedName: assistedName,
+                    isGuardianView: true,
+                  ),
+                ),
               );
             },
           )
