@@ -4,6 +4,8 @@ import 'calendar_screen.dart';
 import 'profile_screen.dart';
 import 'emergency_alert_screen.dart';
 import 'navbar_assisted.dart'; // ✅ Import your reusable navbar
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:softeng/data/profile_service.dart';
 
 class EmergencyScreen extends StatefulWidget {
   const EmergencyScreen({super.key});
@@ -75,12 +77,37 @@ class _EmergencyScreenState extends State<EmergencyScreen>
   }
 
   void _triggerEmergency() {
+    _createEmergencyAlert();
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const EmergencyAlertScreen()),
     ).then((_) {
       _controller.reset(); // Reset when returning
     });
+  }
+
+  Future<void> _createEmergencyAlert() async {
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) return;
+
+      // Resolve table names dynamically if needed; here we assume 'profile' exists (configured in main)
+      final me = await ProfileService.fetchProfile(client);
+      final assistedId = user.id;
+      final guardianId = (me?['guardian_id'] as String?)?.trim();
+
+      final payload = <String, dynamic>{
+        'assisted_id': assistedId,
+        if (guardianId != null && guardianId.isNotEmpty) 'guardian_id': guardianId,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+        'status': 'active',
+      };
+
+      await client.from('emergency_alerts').insert(payload);
+    } catch (_) {
+      // Non-blocking; UI flow proceeds regardless
+    }
   }
 
   @override

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'emergency_screen.dart';
 
 class EmergencyAlertScreen extends StatelessWidget {
   const EmergencyAlertScreen({super.key});
@@ -36,14 +35,10 @@ class EmergencyAlertScreen extends StatelessWidget {
               ),
               const SizedBox(height: 50),
 
-              /// --- STOP BUTTON ---
+              /// --- CONFIRM BUTTON ---
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const EmergencyScreen()),
-                  );
+                  Navigator.of(context).pop();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
@@ -56,7 +51,7 @@ class EmergencyAlertScreen extends StatelessWidget {
                   elevation: 5,
                 ),
                 child: const Text(
-                  "STOP",
+                  "CONFIRM",
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,

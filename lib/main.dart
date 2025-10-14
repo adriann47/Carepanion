@@ -19,6 +19,7 @@ import 'Assisted Screen/settings.dart';
 import 'data/profile_service.dart';
 import 'services/navigation.dart';
 import 'services/reminder_service.dart';
+import 'services/emergency_service.dart';
 import 'Regular Screen/tasks_screen_regular.dart';
 
 Future<void> main() async {
@@ -75,6 +76,8 @@ class CarePanionApp extends StatelessWidget {
     // Start global reminder service once MaterialApp builds
     // (safe to call multiple times - it restarts its timer)
     ReminderService.start();
+  // Start emergency listener for guardian users
+  EmergencyService.start();
 
     return MaterialApp(
       navigatorKey: _navKey,

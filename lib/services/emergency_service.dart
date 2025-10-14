@@ -1,0 +1,82 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/profile_service.dart';
+import 'navigation.dart';
+import '../Assisted Screen/emergency_alert_screen.dart';
+
+/// Global emergency listener.
+/// For guardian users, subscribes to emergency_alerts from linked assisteds
+/// and surfaces EmergencyAlertScreen when a new alert is inserted.
+class EmergencyService {
+  EmergencyService._();
+  static StreamSubscription<AuthState>? _authSub;
+  static RealtimeChannel? _channel;
+  static String? _forGuardianId;
+
+  static void start() {
+    final client = Supabase.instance.client;
+    _authSub?.cancel();
+    _authSub = client.auth.onAuthStateChange.listen((event) async {
+      await _refresh();
+    });
+    // initial
+    _refresh();
+  }
+
+  static Future<void> _refresh() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      _unsubscribe();
+      return;
+    }
+
+    try {
+      final role = await ProfileService.getCurrentUserRole(client);
+      if ((role ?? '').toLowerCase() != 'regular') {
+        // Not a guardian user → no subscription
+        _unsubscribe();
+        return;
+      }
+
+      if (_forGuardianId == user.id && _channel != null) return; // already active
+      _unsubscribe();
+      _forGuardianId = user.id;
+
+      // Subscribe to emergency_alerts targeted to this guardian or all alerts from their assisteds
+      // Here we subscribe to guardian_id == current guardian, which avoids extra joins client side.
+      _channel = client
+          .channel('emergency_alerts_${user.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'emergency_alerts',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'guardian_id',
+              value: user.id,
+            ),
+            callback: (payload) async {
+              final nav = navKey.currentState;
+              final ctx = nav?.overlay?.context;
+              if (ctx == null) return;
+              // Present the alert screen
+              // ignore: use_build_context_synchronously
+              await Navigator.of(ctx).push(
+                MaterialPageRoute(builder: (_) => const EmergencyAlertScreen()),
+              );
+            },
+          )
+          .subscribe();
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  static void _unsubscribe() {
+    _channel?.unsubscribe();
+    _channel = null;
+    _forGuardianId = null;
+  }
+}
