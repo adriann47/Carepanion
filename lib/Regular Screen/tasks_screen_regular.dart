@@ -10,8 +10,7 @@ import 'package:softeng/data/profile_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:softeng/services/task_service.dart';
 import 'dart:async';
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:flutter/foundation.dart'; // <-- add this for kIsWeb
+// Removed local TTS usage; global ReminderService handles any speech if needed.
 
 class TasksScreenRegular extends StatefulWidget {
   const TasksScreenRegular({super.key});
@@ -21,11 +20,6 @@ class TasksScreenRegular extends StatefulWidget {
 }
 
 class _TasksScreenState extends State<TasksScreenRegular> {
-  // Global guards to avoid duplicate popups when multiple instances are alive
-  static final Set<String> _gAlertedToday = <String>{};
-  static String? _gAlertedDay; // yyyy-MM-dd
-  static bool _gPopupActive = false;
-
   int _currentIndex = 0;
 
   String? _avatarUrl;
@@ -33,34 +27,22 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   String? _fullName;
   String? _email;
   RealtimeChannel? _profileChannel;
-  Timer? _taskTimer;
-  List<Map<String, dynamic>> _todayTasks = [];
-  Map<String, dynamic>? _activeAlertTask;
-  final FlutterTts _tts = FlutterTts();
+  // Local per-screen timer removed; popups handled by global ReminderService
   List<Map<String, dynamic>> _completedNotifications = [];
-  // Track alerted task IDs per day to avoid duplicate popups
-  Set<String> _alertedToday = {};
-  String? _alertedDay; // yyyy-MM-dd of the last day we tracked
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
     _subscribeProfileChanges();
-    _startTaskTimer();
+    // Popups are handled globally by ReminderService; no local timer here.
   }
 
-  void _startTaskTimer() {
-    _taskTimer?.cancel();
-    print('Starting task timer'); // debug: ensure only called once
-    // Check every 1 second to fire exactly when the start time matches current time
-    _taskTimer = Timer.periodic(const Duration(seconds: 1), (_) => _checkDueTasks());
-  }
+  // Removed local timer; see ReminderService for global checks
 
   @override
   void dispose() {
     _profileChannel?.unsubscribe();
-    _taskTimer?.cancel();
     super.dispose();
   }
 
@@ -141,134 +123,9 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         .subscribe();
   }
 
-  // Called by _TodayTasksStream via callback
-  void _updateTodayTasks(List<Map<String, dynamic>> tasks) {
-    _todayTasks = tasks;
-  }
+  // No local popup logic; handled by global ReminderService
 
-  void _checkDueTasks() {
-    if (_activeAlertTask != null) return;
-    final now = DateTime.now();
-  final nowStr = DateFormat('HH:mm:ss').format(now);
-    final todayStr = DateFormat('yyyy-MM-dd').format(now);
-
-    // Reset per-day dedup set at day boundary
-    if (_alertedDay != todayStr) {
-      _alertedToday.clear();
-      _alertedDay = todayStr;
-    }
-    // Reset global per-day set at day boundary
-    if (_gAlertedDay != todayStr) {
-      _gAlertedToday.clear();
-      _gAlertedDay = todayStr;
-    }
-
-    for (final t in _todayTasks) {
-      final startAt = t['start_at'];
-      if (startAt == null) continue;
-      DateTime dt;
-      try {
-        dt = DateTime.parse(startAt.toString()).toLocal();
-      } catch (_) {
-        continue;
-      }
-
-      // Only consider tasks scheduled for today
-      final taskDay = DateFormat('yyyy-MM-dd').format(dt);
-      if (taskDay != todayStr) continue;
-
-      if (_isTaskDue(t, nowStr)) {
-        final idKey = '${t['id']}_$todayStr';
-        // Skip if alerted locally or globally already
-        if (_alertedToday.contains(idKey) || _gAlertedToday.contains(idKey)) continue;
-
-        // Mark all tasks due at this exact second as alerted (both local and global) to ensure only one popup for that instant
-        for (final other in _todayTasks) {
-          final startAt2 = other['start_at'];
-          if (startAt2 == null) continue;
-          DateTime dt2;
-          try {
-            dt2 = DateTime.parse(startAt2.toString()).toLocal();
-          } catch (_) {
-            continue;
-          }
-          final sameDay = DateFormat('yyyy-MM-dd').format(dt2) == todayStr;
-          final sameSecond = DateFormat('HH:mm:ss').format(dt2) == nowStr;
-          if (sameDay && sameSecond) {
-            final key = '${other['id']}_$todayStr';
-            _alertedToday.add(key);
-            _gAlertedToday.add(key);
-          }
-        }
-
-        if (_gPopupActive) break; // another instance already showing a popup
-        _gPopupActive = true;
-        _activeAlertTask = t; // set before showing dialog
-        _showTaskAlert(t);
-        break;
-      }
-    }
-  }
-
-  bool _isTaskDue(Map<String, dynamic> t, String nowStr) {
-    if ((t['is_done'] ?? t['done'] ?? false) == true) return false;
-    final startAt = t['start_at'];
-    if (startAt == null) return false;
-    try {
-      final dt = DateTime.parse(startAt.toString()).toLocal();
-      final taskTime = DateFormat('HH:mm:ss').format(dt);
-      return taskTime == nowStr;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<void> _showTaskAlert(Map<String, dynamic> task) async {
-    if (_activeAlertTask == null) return; // <-- prevent multiple dialogs
-    // Voice reminder
-    final title = (task['title'] ?? 'Task').toString();
-    final note = (task['description'] ?? '').toString();
-    if (!kIsWeb) {
-      await _tts.speak('Reminder: $title. ${note.isNotEmpty ? note : ""}');
-    }
-
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _TaskAlertDialog(
-        task: task,
-        onSkip: () async {
-          await TaskService.setTaskStatus(id: task['id'], status: 'skipped');
-          _addNotification(task, false);
-          if (mounted) setState(() => _activeAlertTask = null);
-          Navigator.of(context).pop();
-        },
-        onDone: () async {
-          await TaskService.setTaskStatus(id: task['id'], status: 'done');
-          _addNotification(task, true);
-          if (mounted) setState(() => _activeAlertTask = null);
-          Navigator.of(context).pop();
-        },
-      ),
-    ).then((_) {
-      if (mounted) setState(() => _activeAlertTask = null);
-      _gPopupActive = false; // release global lock when dialog closes
-    });
-  }
-
-  void _addNotification(Map<String, dynamic> task, bool isDone) {
-    final notif = {
-      'title': task['title'],
-      'user': _fullName ?? '',
-      'time': task['start_at'],
-      'isDone': isDone,
-      'avatarUrl': _avatarUrl,
-    };
-    setState(() {
-      _completedNotifications.add(notif);
-    });
-  }
+  // Local add-notification removed; rely on DB changes and NotificationScreen input
 
   void _onTabTapped(int index) async {
     setState(() => _currentIndex = index);
@@ -399,7 +256,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: _TodayTasksStream(
                   onEdited: () => setState(() {}),
-                  onTasksUpdated: _updateTodayTasks, // <-- pass callback
                 ),
               ),
             ],
@@ -466,8 +322,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   }
 }
 
-// ===================== User Header Card =====================
-
+// ===================== User header card =====================
 class _UserHeaderCard extends StatelessWidget {
   const _UserHeaderCard({
     required this.avatarUrl,
@@ -485,47 +340,66 @@ class _UserHeaderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFC58F), Color(0xFFFFA94D)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.orange.shade200),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFFA94D).withOpacity(0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            color: Colors.orange.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Row(
         children: [
-          // Avatar
           CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.white,
-            backgroundImage: avatarUrl != null
+            radius: 28,
+            backgroundColor: Colors.orange.shade100,
+            backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
                 ? NetworkImage(avatarUrl!)
                 : null,
-            child: avatarUrl == null
-                ? const Icon(Icons.person, size: 40, color: Colors.black87)
+            child: (avatarUrl == null || avatarUrl!.isEmpty)
+                ? const Icon(Icons.person, color: Colors.orange)
                 : null,
           ),
-          const SizedBox(width: 16),
-
-          // Details
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _kv('USER ID', userId),
-                const SizedBox(height: 6),
-                _kv('NAME', fullName),
-                const SizedBox(height: 6),
-                _kv('EMAIL', email),
+                Text(
+                  fullName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    color: const Color(0xFF2D2D2D),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.nunito(
+                    fontSize: 13,
+                    color: const Color(0xFF4A4A4A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'ID: $userId',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    color: Colors.black54,
+                  ),
+                ),
               ],
             ),
           ),
@@ -533,43 +407,13 @@ class _UserHeaderCard extends StatelessWidget {
       ),
     );
   }
-
-  // Label–value line with improved typography
-  Widget _kv(String label, String value) {
-    return RichText(
-      text: TextSpan(
-        children: [
-          TextSpan(
-            text: '$label: ',
-            style: GoogleFonts.nunito(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-              color: const Color(0xFF2D2D2D),
-            ),
-          ),
-          TextSpan(
-            text: value,
-            style: GoogleFonts.nunito(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF1D1D1D),
-            ),
-          ),
-        ],
-      ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
 }
 
 // ===================== Today stream =====================
 
 class _TodayTasksStream extends StatelessWidget {
-  const _TodayTasksStream({required this.onEdited, required this.onTasksUpdated});
+  const _TodayTasksStream({required this.onEdited});
   final VoidCallback onEdited;
-  final void Function(List<Map<String, dynamic>>) onTasksUpdated;
 
   @override
   Widget build(BuildContext context) {
@@ -616,7 +460,7 @@ class _TodayTasksStream extends StatelessWidget {
           return DateTime.parse(sa).compareTo(DateTime.parse(sb));
         });
 
-        onTasksUpdated(tasks); // <-- notify parent
+  // no-op: global reminder service handles timing
 
         if (tasks.isEmpty) {
           return Padding(
@@ -702,10 +546,11 @@ class _TaskTileState extends State<_TaskTile> {
       widget.task['is_done'] = value;
       widget.task['done'] = value;
     } catch (e) {
-      if (mounted) setState(() => _done = prev);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to update task: $e')));
+      if (mounted) {
+        setState(() => _done = prev);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to update task: $e')));
+      }
     }
   }
 
@@ -936,115 +781,6 @@ class _TaskTileState extends State<_TaskTile> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ===================== Task Alert Dialog =====================
-
-class _TaskAlertDialog extends StatelessWidget {
-  const _TaskAlertDialog({
-    required this.task,
-    required this.onSkip,
-    required this.onDone,
-  });
-
-  final Map<String, dynamic> task;
-  final VoidCallback onSkip;
-  final VoidCallback onDone;
-
-  @override
-  Widget build(BuildContext context) {
-    final title = (task['title'] ?? '').toString().toUpperCase();
-    final time = (() {
-      final startAt = task['start_at'];
-      if (startAt == null) return '';
-      try {
-        final dt = DateTime.parse(startAt.toString()).toLocal();
-        return TimeOfDay(hour: dt.hour, minute: dt.minute).format(context);
-      } catch (_) {
-        return '';
-      }
-    })();
-    final note = (task['description'] ?? '').toString();
-    final guardian = (task['guardian_name'] ?? '').toString();
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      backgroundColor: Colors.white,
-      child: SingleChildScrollView( // <-- Fix overflow
-        child: Container(
-          width: 260,
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'ACTIVITY ALERT',
-                style: GoogleFonts.nunito(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                  color: const Color(0xFF2D2D2D),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFE1E1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.nunito(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 20,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text('Time: $time', style: GoogleFonts.nunito(fontSize: 14)),
-                    if (note.isNotEmpty)
-                      Text('Note: $note', style: GoogleFonts.nunito(fontSize: 14)),
-                    if (guardian.isNotEmpty)
-                      Text('Guardian: $guardian', style: GoogleFonts.nunito(fontSize: 14)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF77CA0),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: onSkip,
-                    child: Text('SKIP', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700)),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF7DECF7),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: onDone,
-                    child: Text('DONE', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700)),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

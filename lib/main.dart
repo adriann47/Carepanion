@@ -17,6 +17,8 @@ import 'Assisted Screen/notification.dart';
 import 'Assisted Screen/account.dart';
 import 'Assisted Screen/settings.dart';
 import 'data/profile_service.dart';
+import 'services/navigation.dart';
+import 'services/reminder_service.dart';
 import 'Regular Screen/tasks_screen_regular.dart';
 
 Future<void> main() async {
@@ -39,7 +41,9 @@ Future<void> main() async {
 }
 
 // Global navigator key to allow navigation from auth-state listener
-final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
+// Use shared global nav key so services can present dialogs from anywhere
+// (defined in services/navigation.dart)
+final GlobalKey<NavigatorState> _navKey = navKey;
 StreamSubscription<AuthState>? _authSub;
 
 void _setupGlobalAuthListener() {
@@ -68,6 +72,10 @@ class CarePanionApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Start global reminder service once MaterialApp builds
+    // (safe to call multiple times - it restarts its timer)
+    ReminderService.start();
+
     return MaterialApp(
       navigatorKey: _navKey,
       debugShowCheckedModeBanner: false,

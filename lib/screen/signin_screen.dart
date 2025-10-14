@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'welcome_screen.dart';
 import '../data/profile_service.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
