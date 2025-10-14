@@ -41,14 +41,15 @@ class ReminderService {
     }
     final nowStr = DateFormat('HH:mm:ss').format(now);
 
-    // Fetch today's tasks. RLS should ensure only permitted tasks are returned for this user.
+    // Fetch today's tasks for the signed-in user (only tasks assigned to them).
     List<dynamic> rows;
     try {
-    rows = await client
-      .from('tasks')
-      .select('id,title,description,start_at,end_at,due_date,status')
-      .eq('due_date', today)
-      .limit(200);
+      rows = await client
+          .from('tasks')
+          .select('id,title,description,start_at,end_at,due_date,status,user_id')
+          .eq('due_date', today)
+          .eq('user_id', user.id)
+          .limit(200);
     } catch (_) {
       return;
     }
