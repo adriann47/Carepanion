@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+// Keep alert as a modal confirmation; return to prior screen on pop
 
 class EmergencyAlertScreen extends StatelessWidget {
   const EmergencyAlertScreen({super.key});

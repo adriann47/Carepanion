@@ -6,6 +6,7 @@ import 'emergency_alert_screen.dart';
 import 'navbar_assisted.dart'; // ✅ Import your reusable navbar
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:softeng/data/profile_service.dart';
+// removed db wiring to revert to previous behavior
 
 class EmergencyScreen extends StatefulWidget {
   const EmergencyScreen({super.key});
@@ -92,13 +93,11 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       final user = client.auth.currentUser;
       if (user == null) return;
 
-      // Resolve table names dynamically if needed; here we assume 'profile' exists (configured in main)
       final me = await ProfileService.fetchProfile(client);
       final assistedId = user.id;
       final guardianId = (me?['guardian_id'] as String?)?.trim();
 
       if ((guardianId == null || guardianId.isEmpty) && mounted) {
-        // Helpful hint so users know why guardians won't be notified
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No guardian linked. Guardian will not be notified.')),
         );
