@@ -124,6 +124,83 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
   // Email validity indicator
   bool _emailValid = false;
 
+  // 👇 Added: duplicate-email UI state (for popup + red indicator)
+  bool _emailAlreadyUsed = false;
+  String? _emailStatusMessage;
+
+  // ---------- Added helpers ----------
+
+  Future<bool> _showEmailInUseDialog() async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Email already in use',
+          style: GoogleFonts.nunito(
+            color: const Color(0xFFDA6319),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        content: Text(
+          'This email address is already in use.',
+          style: GoogleFonts.nunito(
+            color: const Color(0xFF6B4B3A),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.nunito(
+                color: const Color(0xFFDA6319),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.pinkAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: Text(
+              'OK',
+              style: GoogleFonts.nunito(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  Future<void> _showSimpleAlert(String title, String message) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(title, style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+        content: Text(message, style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
+  // ---------- validation ----------
+
   void _updateEmailValidity(String value) {
     final v = value.trim().toLowerCase();
     // Simple rule: must be a @gmail.com address with something before @
@@ -131,6 +208,9 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
     final hasLocal = atIndex > 0; // at least 1 char before '@'
     setState(() {
       _emailValid = v.endsWith('@gmail.com') && hasLocal;
+      // When user edits, clear any previous "already used" state
+      _emailAlreadyUsed = false;
+      _emailStatusMessage = null;
     });
   }
 
@@ -160,7 +240,7 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
       return "Must contain 1 uppercase letter";
     }
     if (!RegExp(r'[0-9]').hasMatch(value)) return "Must contain 1 number";
-    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value)) {
+    if (!RegExp(r'[!@#\$%^&*(),.?\":{}|<>]').hasMatch(value)) {
       return "Must contain 1 special character";
     }
     return null;
@@ -180,7 +260,7 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
 
       try {
         // 1. Create auth user
-        final authResponse = await supabase.auth.signUp(
+        final res = await supabase.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
           data: {
@@ -190,22 +270,36 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
           emailRedirectTo: 'https://eyalgnlsdseuvmmtgefk.supabase.co',
         );
 
-        if (authResponse.user != null) {
-          // 2. Only upsert profile if there's an active session (email confirmation might be required)
+        // DUPLICATE DETECTION #1: identities empty edge case
+        final identities = res.user?.identities;
+        final identitiesEmpty = identities != null && identities.isEmpty;
+        if (identitiesEmpty) {
+          final ok = await _showEmailInUseDialog();
+          if (ok) {
+            setState(() {
+              _emailAlreadyUsed = true;
+              _emailValid = false;
+              _emailStatusMessage = "Email already in use";
+            });
+          }
+          return;
+        }
+
+        // Normal success path
+        if (res.user != null) {
           final hasSession =
-              supabase.auth.currentSession != null ||
-              authResponse.session != null;
+              supabase.auth.currentSession != null || res.session != null;
+
           if (hasSession) {
             await ProfileService.upsertProfile(
               supabase,
-              id: authResponse.user!.id,
+              id: res.user!.id,
               email: _emailController.text.trim(),
               fullName:
                   '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
             );
           }
 
-          // 3. Navigate to verify email screen
           if (!mounted) return;
           Navigator.pushReplacement(
             context,
@@ -214,17 +308,65 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
                   VerifyEmailScreen(email: _emailController.text.trim()),
             ),
           );
+          return;
         }
+
+        // DUPLICATE DETECTION #2: no user returned at all
+        final ok = await _showEmailInUseDialog();
+        if (ok) {
+          setState(() {
+            _emailAlreadyUsed = true;
+            _emailValid = false;
+            _emailStatusMessage = "Email already in use";
+          });
+        }
+        return;
+
       } on AuthException catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
+
+        // ignore: avoid_print
+        print('AuthException(signUp): status=${e.statusCode} message=${e.message}');
+
+        final emailText = _emailController.text.trim();
+        final locallyValid = _validateEmail(emailText) == null;
+        final msg = e.message.toLowerCase();
+
+        // DUPLICATE DETECTION #3: normalize all common messages / 422 /
+        // "invalid" when locally valid (GoTrue quirk)
+        final looksDuplicate =
+            msg.contains('already registered') ||
+            msg.contains('already exists') ||
+            msg.contains('is already registered') ||
+            msg.contains('user already registered') ||
+            msg.contains('email address is already registered') ||
+            msg.contains('duplicate') ||
+            msg.contains('violates unique constraint') ||
+            msg.contains('user already exists') ||
+            (e.statusCode == 422) ||
+            (locallyValid && msg.contains('invalid'));
+
+        if (looksDuplicate) {
+          final ok = await _showEmailInUseDialog();
+          if (ok) {
+            setState(() {
+              _emailAlreadyUsed = true;
+              _emailValid = false;
+              _emailStatusMessage = "Email already in use";
+            });
+          }
+          return;
+        }
+
+        // Original fallback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Registration failed: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Registration failed: $e")),
+        );
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -376,10 +518,17 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
                   decoration: _inputDecoration(),
                 ),
                 const SizedBox(height: 8),
+
+                // ✅ Dynamic indicator (turns red if duplicate)
                 _RuleIndicatorRow(
-                  ok: _emailValid,
-                  text: 'Valid @gmail.com email',
+                  ok: !_emailAlreadyUsed && _emailValid,
+                  text: _emailAlreadyUsed
+                      ? (_emailStatusMessage ?? 'Email already in use')
+                      : _emailValid
+                          ? 'Valid @gmail.com email'
+                          : 'Invalid email format',
                 ),
+
                 const SizedBox(height: 20),
 
                 // First Name
