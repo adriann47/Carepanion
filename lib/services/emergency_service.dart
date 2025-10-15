@@ -33,13 +33,6 @@ class EmergencyService {
     }
 
     try {
-      final role = await ProfileService.getCurrentUserRole(client);
-      if ((role ?? '').toLowerCase() != 'regular') {
-        // Not a guardian user → no subscription
-        _unsubscribe();
-        return;
-      }
-
       if (_forGuardianId == user.id && _channel != null) return; // already active
       _unsubscribe();
       _forGuardianId = user.id;

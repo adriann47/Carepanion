@@ -109,12 +109,10 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       final assistedId = user.id;
 
       // Resolve all guardians for this assisted (join table + legacy fallback)
-      final guardians = await MultiGuardianService.listGuardians(client, assistedUserId: assistedId);
-    final Set<String> guardianIds = guardians
-      .map((g) => g['id']?.toString())
-      .where((id) => id != null && id.isNotEmpty)
-      .cast<String>()
-      .toSet();
+      final Set<String> guardianIds = await MultiGuardianService.listGuardianIds(
+        client,
+        assistedUserId: assistedId,
+      );
 
       if (guardianIds.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -123,6 +121,8 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       }
 
       // Insert one alert row per guardian, including assisted_id when available
+      int successCount = 0;
+      final int attempts = guardianIds.length;
       bool assistedIdSupported = true; // assume column exists until proven otherwise
       for (final gid in guardianIds) {
         final basePayload = <String, dynamic>{
@@ -137,6 +137,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
               ...basePayload,
               'assisted_id': assistedId,
             });
+            successCount++;
             continue; // success with assisted_id
           } catch (e) {
             final msg = e.toString().toLowerCase();
@@ -148,9 +149,21 @@ class _EmergencyScreenState extends State<EmergencyScreen>
         // Fallback insert without assisted_id (older schema)
         try {
           await client.from('emergency_alerts').insert(basePayload);
+          successCount++;
         } catch (_) {
           // ignore individual insert failures
         }
+      }
+
+      // Inform the assisted how many guardians were notified
+      if (mounted && attempts > 0) {
+        final msg = (successCount == attempts)
+            ? 'Emergency sent to $successCount guardian${successCount == 1 ? '' : 's'}'
+            : 'Emergency sent to $successCount of $attempts guardians';
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg)),
+        );
       }
     } catch (_) {
       // Non-blocking; UI flow proceeds regardless
