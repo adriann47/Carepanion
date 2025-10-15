@@ -107,6 +107,31 @@ class ReminderService {
         return;
       }
 
+      // Try to resolve the creator name for the popup (created_by_name > created_by profile > cached guardian)
+      String? popupGuardianName = _guardianFullNameCache;
+      try {
+        final detail = await client
+            .from('tasks')
+            .select('created_by_name, created_by')
+            .eq('id', id)
+            .maybeSingle();
+        final n = (detail?['created_by_name'] ?? '').toString().trim();
+        if (n.isNotEmpty) {
+          popupGuardianName = n;
+        } else {
+          final createdBy = (detail?['created_by'] ?? '').toString().trim();
+          if (createdBy.isNotEmpty) {
+            try {
+              final p = await ProfileService.fetchProfile(client, userId: createdBy);
+              final fn = (p?['fullname'] ?? '').toString().trim();
+              if (fn.isNotEmpty) popupGuardianName = fn;
+            } catch (_) {}
+          }
+        }
+      } catch (_) {
+        // Column may not exist or RLS may block read; fall back to cached guardian
+      }
+
       // Show dialog immediately using the current overlay context
       // ignore: use_build_context_synchronously
       await showDialog(
@@ -114,7 +139,7 @@ class ReminderService {
         barrierDismissible: false,
         builder: (dialogCtx) => _ReminderDialog(
           task: r as Map<String, dynamic>,
-          guardianFullName: _guardianFullNameCache,
+          guardianFullName: popupGuardianName,
           onSkip: () async {
             try {
               await client.from('tasks').update({'status': 'skipped'}).eq('id', id);
@@ -145,10 +170,16 @@ class _ReminderDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final title = (task['title'] ?? '').toString().toUpperCase();
     final note = (task['description'] ?? '').toString();
-  final guardian = (guardianFullName?.trim().isNotEmpty == true
-      ? guardianFullName
-      : (task['guardian_name'] ?? ''))
-    .toString();
+    // Prefer task's own created_by_name if present; else use provided guardianFullName; else fallback field
+    String guardian = '';
+    final createdByName = (task['created_by_name'] ?? '').toString().trim();
+    if (createdByName.isNotEmpty) {
+      guardian = createdByName;
+    } else if ((guardianFullName ?? '').trim().isNotEmpty) {
+      guardian = guardianFullName!.trim();
+    } else {
+      guardian = (task['guardian_name'] ?? '').toString();
+    }
 
     String fmt(dynamic iso) {
       if (iso == null) return '';
