@@ -99,6 +99,140 @@ class _AccountPageState extends State<AccountPage> {
     } catch (_) {}
   }
 
+  Future<void> _handleSavePassword() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to change password.')),
+      );
+      return;
+    }
+
+    // Disallow for Google-only accounts (no existing password)
+    try {
+      final provider = user.appMetadata['provider']?.toString();
+      if ((provider ?? '').toLowerCase() == 'google') {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password change isn't available for Google sign-in accounts.")),
+        );
+        return;
+      }
+    } catch (_) {}
+
+    final current = _currentPass.text.trim();
+    final newPass = _newPass.text.trim();
+    final confirm = _confirmPass.text.trim();
+
+    if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all password fields.')),
+      );
+      return;
+    }
+    if (newPass != confirm) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New passwords do not match.')),
+      );
+      return;
+    }
+    // Match registration requirements: at least 1 uppercase, 1 digit, 1 special
+    if (!RegExp(r'[A-Z]').hasMatch(newPass)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 uppercase letter')),
+      );
+      return;
+    }
+    if (!RegExp(r'[0-9]').hasMatch(newPass)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 number')),
+      );
+      return;
+    }
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(newPass)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 special character')),
+      );
+      return;
+    }
+
+    setState(() => _savingPassword = true);
+    try {
+      // Optional re-authenticate to verify current password (email accounts only)
+      if ((user.email ?? '').isNotEmpty) {
+        try {
+          await client.auth.signInWithPassword(
+            email: user.email!,
+            password: current,
+          );
+        } on AuthException catch (e) {
+          if (!mounted) return;
+          final msg = e.message.toLowerCase();
+          final friendly = msg.contains('invalid')
+              ? 'Current password is incorrect.'
+              : 'Failed to verify current password.';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(friendly)),
+          );
+          return;
+        }
+      }
+
+      // Update password
+      final res = await client.auth.updateUser(UserAttributes(password: newPass));
+      if (res.user == null) {
+        throw Exception('Password update failed.');
+      }
+
+      if (!mounted) return;
+      _currentPass.clear();
+      _newPass.clear();
+      _confirmPass.clear();
+      if (_signOutAll) {
+        // Revoke sessions on all devices (including current) and take user to sign-in
+        try {
+          await client.auth.signOut(scope: SignOutScope.global);
+        } catch (_) {
+          // Fallback: local sign out if scope not supported
+          await client.auth.signOut();
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password updated. Signed out of all devices.')),
+        );
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
+        }
+        return;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password updated successfully.')),
+        );
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      final msg = e.message;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update password: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _savingPassword = false);
+    }
+  }
+
   Future<void> _loadInitial() async {
     // Try to get email and guardians
     try {
@@ -366,139 +500,7 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
-  Future<void> _handleSavePassword() async {
-    final client = Supabase.instance.client;
-    final user = client.auth.currentUser;
-    if (user == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be signed in to change password.')),
-      );
-      return;
-    }
-
-    // Disallow for Google-only accounts (no existing password)
-    try {
-      final provider = user.appMetadata['provider']?.toString();
-      if ((provider ?? '').toLowerCase() == 'google') {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Password change isn't available for Google sign-in accounts.")),
-        );
-        return;
-      }
-    } catch (_) {}
-
-    final current = _currentPass.text.trim();
-    final newPass = _newPass.text.trim();
-    final confirm = _confirmPass.text.trim();
-
-    if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all password fields.')),
-      );
-      return;
-    }
-    if (newPass != confirm) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('New passwords do not match.')),
-      );
-      return;
-    }
-    // Match registration requirements: at least 1 uppercase, 1 digit, 1 special
-    if (!RegExp(r'[A-Z]').hasMatch(newPass)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Must contain 1 uppercase letter')),
-      );
-      return;
-    }
-    if (!RegExp(r'[0-9]').hasMatch(newPass)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Must contain 1 number')),
-      );
-      return;
-    }
-    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(newPass)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Must contain 1 special character')),
-      );
-      return;
-    }
-
-    setState(() => _savingPassword = true);
-    try {
-      // Optional re-authenticate to verify current password (email accounts only)
-      if ((user.email ?? '').isNotEmpty) {
-        try {
-          await client.auth.signInWithPassword(
-            email: user.email!,
-            password: current,
-          );
-        } on AuthException catch (e) {
-          if (!mounted) return;
-          final msg = e.message.toLowerCase();
-          final friendly = msg.contains('invalid')
-              ? 'Current password is incorrect.'
-              : 'Failed to verify current password.';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(friendly)),
-          );
-          return;
-        }
-      }
-
-      // Update password
-      final res = await client.auth.updateUser(UserAttributes(password: newPass));
-      if (res.user == null) {
-        throw Exception('Password update failed.');
-      }
-
-      if (!mounted) return;
-      _currentPass.clear();
-      _newPass.clear();
-      _confirmPass.clear();
-      if (_signOutAll) {
-        // Revoke sessions on all devices (including current) and take user to sign-in
-        try {
-          await client.auth.signOut(scope: SignOutScope.global);
-        } catch (_) {
-          // Fallback: local sign out if scope not supported
-          await client.auth.signOut();
-        }
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Password updated. Signed out of all devices.')),
-        );
-        await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
-        }
-        return;
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Password updated successfully.')),
-        );
-      }
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      final msg = e.message;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update password: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _savingPassword = false);
-    }
-  }
+  
 
   Widget _buildGuardianRow(Map<String, dynamic> guardian) {
     final name = (guardian['fullname'] ?? '').toString().trim();
