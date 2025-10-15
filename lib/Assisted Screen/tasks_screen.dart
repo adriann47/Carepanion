@@ -267,11 +267,38 @@ class _TasksScreen extends State<TasksScreen> {
                               timeStr = DateFormat('h:mm a').format(dt);
                             } catch (_) {}
                           }
-              // Prefer linked guardian's full name; fallback to any task-provided fields
-              final guardianRaw = _guardianFullName?.trim().isNotEmpty == true
-                  ? _guardianFullName
-                  : (t['guardian_name'] ?? t['created_by_name'] ?? '') as String?;
-              final guardian = (guardianRaw ?? '').toString();
+                          // Determine which guardian set the task
+                          // 1) Use created_by_name if present
+                          String guardian = (t['created_by_name'] ?? '')
+                                  .toString()
+                                  .trim();
+                          // 2) If missing, and we have a creator id, resolve it (best-effort cache-less)
+                          if (guardian.isEmpty) {
+                            final createdBy = t['created_by']?.toString();
+                            if (createdBy != null && createdBy.isNotEmpty) {
+                              // Best-effort fetch; not awaited per item to avoid rebuild jank.
+                              ProfileService.fetchProfile(Supabase.instance.client, userId: createdBy)
+                                  .then((p) {
+                                if (!mounted || p == null) return;
+                                final name = (p['fullname'] ?? '')
+                                    .toString()
+                                    .trim();
+                                if (name.isNotEmpty) {
+                                  setState(() {
+                                    // Update task map locally so subsequent builds show the name
+                                    _tasks[i]['created_by_name'] = name;
+                                  });
+                                }
+                              }).catchError((_) {});
+                            }
+                          }
+                          // 3) As final fallback, show linked guardian of assisted (legacy single guardian)
+                          if (guardian.isEmpty) {
+                            guardian = (_guardianFullName ??
+                                    (t['guardian_name'] ?? t['created_by_name'] ?? ''))
+                                .toString()
+                                .trim();
+                          }
                           final color = i % 2 == 0
                               ? const Color(0xFFFFD6D6)
                               : const Color(0xFFFFE699);

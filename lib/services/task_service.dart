@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:softeng/data/profile_service.dart';
 
 /// Task service for interacting with Supabase `tasks` table.
 ///
@@ -44,6 +45,28 @@ class TaskService {
     final startAt = _combineDateAndTime(dueDate, startTime)?.toUtc();
     final endAt = _combineDateAndTime(dueDate, endTime)?.toUtc();
 
+    // Determine creator (guardian) and their display name
+    final creatorId = _client.auth.currentUser?.id;
+    String? creatorName;
+    try {
+      final prof = await ProfileService.fetchProfile(_client);
+      final raw = (prof?['fullname'] as String?)?.trim();
+      if (raw != null && raw.isNotEmpty) {
+        creatorName = raw;
+      } else {
+        final email = _client.auth.currentUser?.email;
+        if (email != null && email.isNotEmpty) {
+          final local = email.split('@').first;
+          final parts = local
+              .split(RegExp(r'[._\s]+'))
+              .where((s) => s.isNotEmpty)
+              .map((p) => p[0].toUpperCase() + p.substring(1))
+              .join(' ');
+          creatorName = parts.isNotEmpty ? parts : email;
+        }
+      }
+    } catch (_) {}
+
     final data = <String, dynamic>{
       'title': title,
       'description': description,
@@ -53,16 +76,31 @@ class TaskService {
       'end_at': endAt?.toIso8601String(),
       'status': 'todo',
       'user_id': forUserId ?? _client.auth.currentUser?.id,
+      if (creatorId != null) 'created_by': creatorId,
+      if (creatorName != null && creatorName.trim().isNotEmpty)
+        'created_by_name': creatorName.trim(),
     }..removeWhere((key, value) => value == null);
 
     try {
       await _client.from('tasks').insert(data);
     } catch (e) {
       final msg = e.toString().toLowerCase();
-      // Fallback if 'category' column doesn't exist in DB
-      if (msg.contains("'category'") || (msg.contains('category') && data.containsKey('category'))) {
-        final fallback = Map<String, dynamic>.from(data);
+      // Fallback if optional columns don't exist in DB
+      final fallback = Map<String, dynamic>.from(data);
+      bool modified = false;
+      if (msg.contains('created_by_name') && fallback.containsKey('created_by_name')) {
+        fallback.remove('created_by_name');
+        modified = true;
+      }
+      if (msg.contains('created_by') && fallback.containsKey('created_by')) {
+        fallback.remove('created_by');
+        modified = true;
+      }
+      if (msg.contains("'category'") || (msg.contains('category') && fallback.containsKey('category'))) {
         fallback.remove('category');
+        modified = true;
+      }
+      if (modified) {
         await _client.from('tasks').insert(fallback);
         return;
       }

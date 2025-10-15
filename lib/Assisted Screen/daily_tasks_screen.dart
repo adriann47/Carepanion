@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:softeng/services/task_service.dart';
 import '../Regular Screen/edit_task.dart';
+// no extra imports needed for created-by display
 
 class DailyTasksScreen extends StatefulWidget {
   final DateTime selectedDate;
@@ -397,12 +398,22 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
               // NOTE
               if (note.isNotEmpty)
                 _infoLine(label: 'NOTE', value: note, color: textColor),
+
+              // CREATED BY (guardian who created the task), if available on the row
+              if ((task['created_by_name'] ?? '').toString().trim().isNotEmpty)
+                _infoLine(
+                  label: 'CREATED BY',
+                  value: (task['created_by_name'] ?? '').toString().trim(),
+                  color: textColor,
+                ),
             ],
           ),
         ),
       ),
     );
   }
+
+  /// Formats a time or time range for a task row
 
   Widget _infoLine({
     required String label,
