@@ -37,7 +37,9 @@ class _NotificationPageState extends State<NotificationPage> {
               ),
               child: Padding(
                 padding: EdgeInsets.symmetric(
-                    horizontal: w * 0.05, vertical: h * 0.02),
+                  horizontal: w * 0.05,
+                  vertical: h * 0.02,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -92,7 +94,7 @@ class _NotificationPageState extends State<NotificationPage> {
                   audioAlerts = val;
                 });
               },
-              activeColor: Colors.black87,
+              activeColor: const Color(0xFFF7A9AC),
             ),
 
             const SizedBox(height: 20),
@@ -106,7 +108,7 @@ class _NotificationPageState extends State<NotificationPage> {
                   vibration = val;
                 });
               },
-              activeColor: Colors.black87,
+              activeColor: const Color(0xFFF7A9AC),
             ),
           ],
         ),
