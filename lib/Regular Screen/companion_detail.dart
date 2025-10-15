@@ -210,18 +210,43 @@ class _CompanionDetailScreenState extends State<CompanionDetailScreen> {
             const SizedBox(height: 16),
 
             // Add Task button (creates task for assisted user)
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => AddTaskScreen(forUserId: widget.assistedId, selectedDate: _selectedDate)));
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add Task for Companion'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.pink),
-            ),
-            const SizedBox(height: 16),
+Padding(
+  padding: const EdgeInsets.only(top: 12.0), // 🟢 adds space above the button
+  child: ElevatedButton.icon(
+    onPressed: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddTaskScreen(
+            forUserId: widget.assistedId,
+            selectedDate: _selectedDate,
+          ),
+        ),
+      );
+    },
+    icon: const Icon(Icons.add, color: Colors.white), // 🟢 consistent icon color
+    label: const Text(
+      'Add Task for Companion',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.pink, // 🟢 button color
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      elevation: 4, // 🟢 subtle shadow for modern look
+    ),
+  ),
+),
+const SizedBox(height: 16),
           ],
         ),
-      ),
+      ),  
 
       // --- Bottom Navigation Bar ---
       bottomNavigationBar: BottomNavigationBar(

@@ -44,7 +44,7 @@ class ReminderService {
     }
     final nowStr = DateFormat('HH:mm:ss').format(now);
 
-    // Cache guardian full name for the current user (assisted) if available
+    // Determine role once per user and cache guardian full name for assisted
     if (_guardianCacheForUserId != user.id || _guardianFullNameCache == null) {
       try {
         final me = await ProfileService.fetchProfile(client);
@@ -132,6 +132,13 @@ class ReminderService {
         // Column may not exist or RLS may block read; fall back to cached guardian
       }
 
+      // Resolve role to hide Guardian line for Regular users
+      bool isRegularUser = false;
+      try {
+        final role = await ProfileService.getCurrentUserRole(client);
+        isRegularUser = ((role ?? '').toLowerCase() == 'regular');
+      } catch (_) {}
+
       // Show dialog immediately using the current overlay context
       // ignore: use_build_context_synchronously
       await showDialog(
@@ -140,6 +147,7 @@ class ReminderService {
         builder: (dialogCtx) => _ReminderDialog(
           task: r as Map<String, dynamic>,
           guardianFullName: popupGuardianName,
+          isRegularUser: isRegularUser,
           onSkip: () async {
             try {
               await client.from('tasks').update({'status': 'skipped'}).eq('id', id);
@@ -160,11 +168,12 @@ class ReminderService {
 }
 
 class _ReminderDialog extends StatelessWidget {
-  const _ReminderDialog({required this.task, required this.onSkip, required this.onDone, this.guardianFullName});
+  const _ReminderDialog({required this.task, required this.onSkip, required this.onDone, this.guardianFullName, this.isRegularUser = false});
   final Map<String, dynamic> task;
   final VoidCallback onSkip;
   final VoidCallback onDone;
   final String? guardianFullName;
+  final bool isRegularUser;
 
   @override
   Widget build(BuildContext context) {
@@ -237,7 +246,7 @@ class _ReminderDialog extends StatelessWidget {
                     Text('Time: $time', style: GoogleFonts.nunito(fontSize: 14)),
                     if (note.isNotEmpty)
                       Text('Note: $note', style: GoogleFonts.nunito(fontSize: 14)),
-                    if (guardian.isNotEmpty)
+                    if (guardian.isNotEmpty && !isRegularUser)
                       Text('Guardian: $guardian', style: GoogleFonts.nunito(fontSize: 14)),
                   ],
                 ),
