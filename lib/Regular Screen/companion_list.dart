@@ -43,7 +43,22 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
         callback: (payload) {
           final newRec = payload.newRecord as Map<String, dynamic>?;
           if (newRec?['guardian_id']?.toString() == gid) {
-            _loadAssisteds();
+            final assistedId = newRec?['assisted_id']?.toString();
+            if (assistedId != null && assistedId.isNotEmpty) {
+              // Fetch the assisted profile and append to the list if not present
+              ProfileService.fetchProfile(client, userId: assistedId).then((p) {
+                if (!mounted || p == null) return;
+                final already = _assisteds.any((e) => e['id'] == p['id']);
+                if (!already) {
+                  setState(() => _assisteds = [..._assisteds, p]);
+                }
+              }).catchError((_) {
+                // fallback to full reload if direct fetch fails
+                _loadAssisteds();
+              });
+            } else {
+              _loadAssisteds();
+            }
           }
         },
       )
@@ -54,7 +69,13 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
         callback: (payload) {
           final oldRec = payload.oldRecord as Map<String, dynamic>?;
           if (oldRec?['guardian_id']?.toString() == gid) {
-            _loadAssisteds();
+            final assistedId = oldRec?['assisted_id']?.toString();
+            if (assistedId != null && assistedId.isNotEmpty) {
+              setState(() => _assisteds =
+                  _assisteds.where((e) => e['id']?.toString() != assistedId).toList());
+            } else {
+              _loadAssisteds();
+            }
           }
         },
       )
@@ -68,7 +89,15 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
         event: PostgresChangeEvent.update,
         schema: 'public',
         table: 'profile',
-        callback: (_) => _loadAssisteds(),
+        callback: (payload) {
+          final newRec = payload.newRecord as Map<String, dynamic>?;
+          final oldRec = payload.oldRecord as Map<String, dynamic>?;
+          final newG = newRec?['guardian_id']?.toString();
+          final oldG = oldRec?['guardian_id']?.toString();
+          if (newG == gid || oldG == gid) {
+            _loadAssisteds();
+          }
+        },
       )
       ..subscribe();
   }
