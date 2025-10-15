@@ -8,9 +8,8 @@ import 'legaldatapage_regular.dart';
 import 'settings_regular.dart';
 import 'help_regular.dart';
 import 'notification_screen.dart';
-import 'profile_page.dart'; // ✅ Added ProfilePage import
+import 'profile_page.dart';
 import 'companion_list.dart';
-
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,9 +19,9 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _currentIndex = 4; // Profile tab selected
+  int _currentIndex = 4;
   String? _avatarUrl;
-  String? _fullName; // ✅ pulled from public.profile.fullname
+  String? _fullName;
 
   @override
   void initState() {
@@ -38,13 +37,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final data = await ProfileService.fetchProfile(client);
       if (!mounted) return;
 
-      // fullname from profile table; fallback to email local-part for a friendly default
       final fullname = (data?['fullname'] as String?)?.trim();
       final friendlyFromEmail = () {
         final email = authUser?.email ?? '';
         if (email.contains('@')) {
           final local = email.split('@').first;
-          // Capitalize each word-ish (split by . or _)
           final parts = local.split(RegExp(r'[._\s]+')).where((s) => s.isNotEmpty);
           return parts.map((p) => p[0].toUpperCase() + p.substring(1)).join(' ');
         }
@@ -81,7 +78,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } else if (index == 2) {
       Navigator.pushReplacement(
         context,
-         MaterialPageRoute(builder: (context) => const CompanionListScreen()),
+        MaterialPageRoute(builder: (context) => const CompanionListScreen()),
       );
     } else if (index == 3) {
       Navigator.pushReplacement(
@@ -122,7 +119,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 10),
 
-              // ✅ Name from registration/profile (dynamic)
               Text(
                 nameText,
                 textAlign: TextAlign.center,
@@ -135,67 +131,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              const SizedBox(height: 20),
-
-              // --- GUARDIAN CARD (unchanged sample) ---
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 25),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF2CC),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 25,
-                      backgroundColor: Colors.pinkAccent,
-                      child: Icon(Icons.person, color: Colors.white),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'GUARDIAN ID: 1919234',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            'NERIAH VILLAPANA',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'EMAIL: nvilalpana@gmail.com',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          Text(
-                            'NUMBER: 09341243467',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
               const SizedBox(height: 25),
 
               // --- MENU BUTTONS ---
               _menuButton(Icons.person, 'PROFILE', const Color(0xFFB2EBF2), onTap: () async {
-                // Open profile editor; when you return, refresh name/avatar.
                 await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ProfilePage()),
                 );
-                if (mounted) _loadProfile(); // ✅ refresh on return
+                if (mounted) _loadProfile();
               }),
               _menuButton(Icons.settings, 'SETTINGS', const Color(0xFFF8BBD0), onTap: () {
                 Navigator.push(
@@ -275,7 +219,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Helper for nav bar icon styling
   static BottomNavigationBarItem _navItem(
     IconData icon,
     String label, {

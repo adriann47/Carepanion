@@ -4,6 +4,7 @@ import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'notification_screen.dart';
 import '../Assisted Screen/daily_tasks_screen.dart';
+import 'profile_screen_regular.dart';
 
 class CompanionDetailScreen extends StatefulWidget {
   final String name;
@@ -50,6 +51,11 @@ class _CompanionDetailScreenState extends State<CompanionDetailScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
+      );
+    }else if (index == 4) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ProfileScreen()),
       );
     }
   }
