@@ -716,19 +716,7 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
                 const SizedBox(height: 20),
 
                 // Sign up with Google
-                Center(
-                  child: InkWell(
-                    onTap: _isLoading ? null : _signInWithGoogle,
-                    child: Opacity(
-                      opacity: _isLoading ? 0.5 : 1.0,
-                      child: Image.asset(
-                        'assets/google1.png',
-                        width: 40,
-                        height: 40,
-                      ),
-                    ),
-                  ),
-                ),
+                
               ],
             ),
           ),
