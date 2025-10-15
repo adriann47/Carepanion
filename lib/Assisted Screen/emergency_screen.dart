@@ -6,6 +6,7 @@ import 'emergency_alert_screen.dart';
 import 'navbar_assisted.dart'; // ✅ Import your reusable navbar
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:softeng/data/profile_service.dart';
+import 'package:softeng/data/multi_guardian_service.dart';
 // removed db wiring to revert to previous behavior
 
 class EmergencyScreen extends StatefulWidget {
@@ -105,37 +106,50 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       final user = client.auth.currentUser;
       if (user == null) return;
 
-      final me = await ProfileService.fetchProfile(client);
       final assistedId = user.id;
-      final guardianId = (me?['guardian_id'] as String?)?.trim();
 
-      if ((guardianId == null || guardianId.isEmpty) && mounted) {
+      // Resolve all guardians for this assisted (join table + legacy fallback)
+      final guardians = await MultiGuardianService.listGuardians(client, assistedUserId: assistedId);
+    final Set<String> guardianIds = guardians
+      .map((g) => g['id']?.toString())
+      .where((id) => id != null && id.isNotEmpty)
+      .cast<String>()
+      .toSet();
+
+      if (guardianIds.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No guardian linked. Guardian will not be notified.')),
         );
       }
 
-      // Build payload; prefer including assisted_id when the column exists.
-      final basePayload = <String, dynamic>{
-        if (guardianId != null && guardianId.isNotEmpty) 'guardian_id': guardianId,
-        'created_at': DateTime.now().toUtc().toIso8601String(),
-        'status': 'active',
-      };
-
-      // First try with assisted_id (for newer schema). If that fails due to missing column, retry without it.
-      try {
-        final withAssisted = {
-          ...basePayload,
-          'assisted_id': assistedId,
+      // Insert one alert row per guardian, including assisted_id when available
+      bool assistedIdSupported = true; // assume column exists until proven otherwise
+      for (final gid in guardianIds) {
+        final basePayload = <String, dynamic>{
+          'guardian_id': gid,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'status': 'active',
         };
-        await client.from('emergency_alerts').insert(withAssisted);
-      } catch (e) {
-        final msg = e.toString().toLowerCase();
-        final missingAssisted = msg.contains('assisted_id') && (msg.contains('column') || msg.contains('does not exist'));
-        if (missingAssisted) {
+
+        if (assistedIdSupported) {
+          try {
+            await client.from('emergency_alerts').insert({
+              ...basePayload,
+              'assisted_id': assistedId,
+            });
+            continue; // success with assisted_id
+          } catch (e) {
+            final msg = e.toString().toLowerCase();
+            final missingAssisted = msg.contains('assisted_id') && (msg.contains('column') || msg.contains('does not exist'));
+            if (!missingAssisted) rethrow;
+            assistedIdSupported = false; // fallback for subsequent inserts
+          }
+        }
+        // Fallback insert without assisted_id (older schema)
+        try {
           await client.from('emergency_alerts').insert(basePayload);
-        } else {
-          rethrow;
+        } catch (_) {
+          // ignore individual insert failures
         }
       }
     } catch (_) {
