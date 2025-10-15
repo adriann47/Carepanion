@@ -17,11 +17,60 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
   int _currentIndex = 2; // Companions tab selected
   bool _isLoading = true;
   List<Map<String, dynamic>> _assisteds = [];
+  RealtimeChannel? _agChannel;
+  RealtimeChannel? _profileChannel;
 
   @override
   void initState() {
     super.initState();
     _loadAssisteds();
+    _subscribeRealtime();
+  }
+
+  void _subscribeRealtime() {
+    final client = Supabase.instance.client;
+    final gid = client.auth.currentUser?.id;
+    if (gid == null) return;
+
+    // Listen for assisted_guardians changes for this guardian
+    _agChannel?.unsubscribe();
+    _agChannel = client
+        .channel('public:assisted_guardians:guardian:$gid')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'assisted_guardians',
+        callback: (payload) {
+          final newRec = payload.newRecord as Map<String, dynamic>?;
+          if (newRec?['guardian_id']?.toString() == gid) {
+            _loadAssisteds();
+          }
+        },
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: 'assisted_guardians',
+        callback: (payload) {
+          final oldRec = payload.oldRecord as Map<String, dynamic>?;
+          if (oldRec?['guardian_id']?.toString() == gid) {
+            _loadAssisteds();
+          }
+        },
+      )
+      ..subscribe();
+
+    // Also listen for legacy profile updates where assisted rows change guardian_id to this guardian
+    _profileChannel?.unsubscribe();
+    _profileChannel = client
+        .channel('public:profile_guardian:guardian:$gid')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'profile',
+        callback: (_) => _loadAssisteds(),
+      )
+      ..subscribe();
   }
 
   Future<void> _loadAssisteds() async {
@@ -217,5 +266,12 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _agChannel?.unsubscribe();
+    _profileChannel?.unsubscribe();
+    super.dispose();
   }
 }

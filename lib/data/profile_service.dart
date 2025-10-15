@@ -176,9 +176,41 @@ class ProfileService {
   }) async {
     try {
       final table = await _resolveTable(client);
-      final res =
-          await client.from(table).select().eq('guardian_id', guardianUserId);
-      return List<Map<String, dynamic>>.from(res as List);
+
+      // 1) Legacy single-link via profile.guardian_id
+      List legacy = [];
+      try {
+        legacy = await client
+            .from(table)
+            .select()
+            .eq('guardian_id', guardianUserId);
+      } catch (_) {}
+
+      // 2) Multi-link via assisted_guardians join table
+      final Set<String> ids = <String>{};
+      for (final r in legacy) {
+        final id = r['id']?.toString();
+        if (id != null && id.isNotEmpty) ids.add(id);
+      }
+      try {
+        final links = await client
+            .from('assisted_guardians')
+            .select('assisted_id')
+            .eq('guardian_id', guardianUserId);
+        for (final e in links as List) {
+          final v = e['assisted_id']?.toString();
+          if (v != null && v.isNotEmpty) ids.add(v);
+        }
+      } catch (_) {}
+
+  if (ids.isEmpty) return List<Map<String, dynamic>>.from(legacy);
+
+      // Fetch full profiles for union set
+      final rows = await client
+          .from(table)
+          .select()
+          .inFilter('id', ids.toList());
+      return List<Map<String, dynamic>>.from(rows as List);
     } catch (_) {
       return [];
     }
