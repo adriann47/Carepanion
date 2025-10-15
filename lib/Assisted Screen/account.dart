@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:softeng/data/multi_guardian_service.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -9,8 +11,11 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
-  String email = "URIEL.SHAWN@GMAIL.COM";
-  List<String> guardians = [];
+  String email = "";
+  List<Map<String, dynamic>> guardians = [];
+  bool _loadingGuardians = false;
+  RealtimeChannel? _agChannel;
+  RealtimeChannel? _profileChannel;
 
   final TextEditingController _currentPass = TextEditingController();
   final TextEditingController _newPass = TextEditingController();
@@ -49,6 +54,89 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _loadInitial();
+    _subscribeRealtime();
+  }
+
+  Future<void> _loadInitial() async {
+    // Try to get email and guardians
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      setState(() {
+        email = user?.email ?? '';
+      });
+    } catch (_) {}
+    await _refreshGuardians();
+  }
+
+  Future<void> _refreshGuardians() async {
+    setState(() => _loadingGuardians = true);
+    try {
+      final rows = await MultiGuardianService.listGuardians(Supabase.instance.client);
+      if (!mounted) return;
+      setState(() => guardians = rows);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => guardians = []);
+    } finally {
+      if (mounted) setState(() => _loadingGuardians = false);
+    }
+  }
+
+  void _subscribeRealtime() {
+    final client = Supabase.instance.client;
+    final uid = client.auth.currentUser?.id;
+    if (uid == null) return;
+
+    // Subscribe to assisted_guardians insert/delete for this assisted user
+    _agChannel?.unsubscribe();
+    _agChannel = client
+        .channel('public:assisted_guardians:$uid')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'assisted_guardians',
+        callback: (payload) {
+          final newRec = payload.newRecord as Map<String, dynamic>?;
+          if (newRec?['assisted_id']?.toString() == uid) {
+            _refreshGuardians();
+          }
+        },
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: 'assisted_guardians',
+        callback: (payload) {
+          final oldRec = payload.oldRecord as Map<String, dynamic>?;
+          if (oldRec?['assisted_id']?.toString() == uid) {
+            _refreshGuardians();
+          }
+        },
+      )
+      ..subscribe();
+
+    // Subscribe to legacy profile guardian_id updates for current assisted
+    _profileChannel?.unsubscribe();
+    _profileChannel = client
+        .channel('public:profile_guardian:$uid')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'profile',
+        callback: (payload) {
+          final newRec = payload.newRecord as Map<String, dynamic>?;
+          if (newRec?['id']?.toString() == uid) {
+            _refreshGuardians();
+          }
+        },
+      )
+      ..subscribe();
+  }
+
   // Add Guardian Dialog (updated hint text ✅)
   void _addGuardian() {
     final controller = TextEditingController();
@@ -69,13 +157,33 @@ class _AccountPageState extends State<AccountPage> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                setState(() {
-                  guardians.add(controller.text.trim());
-                });
+            onPressed: () async {
+              final code = controller.text.trim();
+              if (code.isEmpty) return;
+              try {
+                final ok = await MultiGuardianService.addGuardianByPublicId(
+                  Supabase.instance.client,
+                  guardianPublicId: code,
+                );
+                if (!mounted) return;
+                Navigator.pop(ctx);
+                if (ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Guardian linked')),
+                  );
+                  await _refreshGuardians();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to link guardian. Ensure table and code are correct.')),
+                  );
+                }
+              } catch (e) {
+                if (!mounted) return;
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to link guardian: $e')),
+                );
               }
-              Navigator.pop(ctx);
             },
             child: const Text("Add"),
           ),
@@ -154,7 +262,10 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
-  Widget _buildGuardianRow(String guardian) {
+  Widget _buildGuardianRow(Map<String, dynamic> guardian) {
+    final name = (guardian['fullname'] ?? '').toString().trim();
+    final pub = (guardian['public_id'] ?? '').toString().trim();
+    final gid = (guardian['id'] ?? '').toString();
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -165,20 +276,57 @@ class _AccountPageState extends State<AccountPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            guardian,
-            style: GoogleFonts.nunito(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name.isNotEmpty ? name : '(No name)',
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (pub.isNotEmpty)
+                  Text(
+                    'ID: $pub',
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
             ),
           ),
           IconButton(
             icon: const Icon(Icons.delete, color: Colors.redAccent),
-            onPressed: () {
-              setState(() {
-                guardians.remove(guardian);
-              });
+            onPressed: () async {
+              try {
+                final ok = await MultiGuardianService.removeGuardian(
+                  Supabase.instance.client,
+                  guardianId: gid,
+                );
+                if (!mounted) return;
+                if (ok) {
+                  await _refreshGuardians();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Guardian unlinked')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to unlink guardian')),
+                  );
+                }
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed: $e')),
+                );
+              }
             },
           ),
         ],
@@ -308,6 +456,11 @@ class _AccountPageState extends State<AccountPage> {
                   ),
                   const SizedBox(height: 14),
 
+                  if (_loadingGuardians)
+                    const Center(child: Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: CircularProgressIndicator(),
+                    )),
                   ...guardians.map((g) => _buildGuardianRow(g)),
 
                   GestureDetector(
@@ -343,5 +496,12 @@ class _AccountPageState extends State<AccountPage> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _agChannel?.unsubscribe();
+    _profileChannel?.unsubscribe();
+    super.dispose();
   }
 }
