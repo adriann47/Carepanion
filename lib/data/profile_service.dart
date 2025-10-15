@@ -224,6 +224,7 @@ class ProfileService {
     String? fullName,
     String? role,
     String? birthday,
+    String? phone,
   }) async {
     final table = await _resolveTable(client);
     final payload = <String, dynamic>{'id': id};
@@ -231,7 +232,19 @@ class ProfileService {
     if (fullName != null) payload['fullname'] = fullName;
     if (role != null) payload['role'] = role;
     if (birthday != null) payload['birthday'] = birthday;
-    await client.from(table).upsert(payload);
+    if (phone != null) payload['phone'] = phone; // best-effort; may fail if column missing
+    try {
+      await client.from(table).upsert(payload);
+    } catch (_) {
+      // If 'phone' column doesn't exist, ignore; callers can use setPhone for robust writes
+      await client.from(table).upsert({
+        'id': id,
+        if (email != null) 'email': email,
+        if (fullName != null) 'fullname': fullName,
+        if (role != null) 'role': role,
+        if (birthday != null) 'birthday': birthday,
+      });
+    }
   }
 
   /// Fetch the profile row for the supplied [id] or the current auth user.
@@ -323,6 +336,66 @@ class ProfileService {
       if (r == null) return null;
       final s = r.toString().trim();
       return s.isEmpty ? null : s;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Robustly set a phone/mobile field for the given user id, trying common column names.
+  /// Tries 'phone', then 'mobile', then 'mobile_number'. Returns true on success.
+  static Future<bool> setPhone(
+    SupabaseClient client, {
+    required String id,
+    required String phone,
+  }) async {
+    final table = await _resolveTable(client);
+    final List<String> columns = ['phone', 'mobile', 'mobile_number'];
+    for (final col in columns) {
+      try {
+        await client.from(table).update({col: phone}).eq('id', id);
+        return true;
+      } catch (_) {
+        continue;
+      }
+    }
+    // If update failed (row might not exist), try insert/upsert with each column
+    for (final col in columns) {
+      try {
+        await client.from(table).upsert({'id': id, col: phone});
+        return true;
+      } catch (_) {
+        continue;
+      }
+    }
+    return false;
+  }
+
+  /// Helper to read a phone/mobile value from a profile map using common keys.
+  static String? readPhoneFrom(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    final keys = ['phone', 'mobile', 'mobile_number'];
+    for (final k in keys) {
+      final v = data[k];
+      if (v != null) {
+        final s = v.toString().trim();
+        if (s.isNotEmpty) return s;
+      }
+    }
+    return null;
+  }
+
+  /// Read common birthday fields and return a readable string like "January 2, 1990" or null.
+  static String? readBirthdayFrom(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    final raw = (data['birthday'] ?? '').toString().trim();
+    if (raw.isEmpty) return null;
+    try {
+      final dt = DateTime.parse(raw);
+      final months = [
+        '', 'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      return '${months[dt.month]} ${dt.day}, ${dt.year}';
     } catch (_) {
       return null;
     }

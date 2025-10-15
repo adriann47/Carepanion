@@ -19,6 +19,8 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String? _avatarUrl;
   String? _fullName; // ✅ user name
+  String? _phone; // optional phone
+  String? _birthday; // optional birthday readable
   // Support multiple guardians
   List<Map<String, dynamic>> _guardianProfiles = [];
   bool _loadingGuardians = false;
@@ -43,6 +45,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _fullName = (data?['fullname'] ??
                 '${data?['first_name'] ?? ''} ${data?['last_name'] ?? ''}')
             .trim();
+        _phone = ProfileService.readPhoneFrom(data);
+        _birthday = ProfileService.readBirthdayFrom(data);
       });
       // Load all guardians (join table + legacy guardian_id)
       await _loadGuardians();
@@ -152,6 +156,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   letterSpacing: 0.5,
                 ),
               ),
+              if ((_birthday ?? '').isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _birthday!,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+
+              if ((_phone ?? '').isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _phone!,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 22),
 

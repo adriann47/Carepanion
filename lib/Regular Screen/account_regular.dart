@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:softeng/data/profile_service.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -11,17 +12,23 @@ class AccountPage extends StatefulWidget {
 
 class _AccountPageState extends State<AccountPage> {
   String? email; // ← from Supabase Auth
-  String mobile = "09541234567";
+  String mobile = ""; // empty by default
   List<String> guardians = [];
 
   final TextEditingController _currentPass = TextEditingController();
   final TextEditingController _newPass = TextEditingController();
   final TextEditingController _confirmPass = TextEditingController();
+  bool _savingPassword = false;
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+  bool _signOutAll = false;
 
   @override
   void initState() {
     super.initState();
     _loadAuthEmail();
+    _loadPhone();
   }
 
   void _loadAuthEmail() {
@@ -29,6 +36,15 @@ class _AccountPageState extends State<AccountPage> {
     setState(() {
       email = user?.email ?? '—';
     });
+  }
+
+  Future<void> _loadPhone() async {
+    try {
+      final data = await ProfileService.fetchProfile(Supabase.instance.client);
+      if (!mounted) return;
+      final p = ProfileService.readPhoneFrom(data) ?? '';
+      setState(() => mobile = p);
+    } catch (_) {}
   }
 
   // Edit Field Dialog (used for mobile and guardians)
@@ -52,11 +68,31 @@ class _AccountPageState extends State<AccountPage> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                onSave(controller.text.trim());
+            onPressed: () async {
+              final newVal = controller.text.trim();
+              if (newVal.isEmpty) {
+                Navigator.pop(ctx);
+                return;
               }
-              Navigator.pop(ctx);
+              if (title.toLowerCase().contains('mobile')) {
+                final userId = Supabase.instance.client.auth.currentUser?.id;
+                if (userId != null) {
+                  final ok = await ProfileService.setPhone(
+                    Supabase.instance.client,
+                    id: userId,
+                    phone: newVal,
+                  );
+                  if (mounted) {
+                    setState(() => mobile = newVal);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(ok ? 'Mobile updated' : 'Saved locally; server column missing')), 
+                    );
+                  }
+                }
+              } else {
+                onSave(newVal);
+              }
+              if (mounted) Navigator.pop(ctx);
             },
             child: const Text("Save"),
           ),
@@ -189,7 +225,12 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   // TextField for Reset Password (with lower opacity)
-  Widget _buildPasswordField(String hint, TextEditingController controller) {
+  Widget _buildPasswordField(
+    String hint,
+    TextEditingController controller, {
+    required bool obscure,
+    required VoidCallback onToggle,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -199,7 +240,7 @@ class _AccountPageState extends State<AccountPage> {
       ),
       child: TextField(
         controller: controller,
-        obscureText: true,
+        obscureText: obscure,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.nunito(
@@ -210,9 +251,139 @@ class _AccountPageState extends State<AccountPage> {
           fillColor: const Color(0x66B3E5FC),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          suffixIcon: IconButton(
+            tooltip: obscure ? 'Show password' : 'Hide password',
+            icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+            onPressed: onToggle,
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _handleSavePassword() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to change password.')),
+      );
+      return;
+    }
+
+    // Disallow for Google-only accounts
+    try {
+      final provider = user.appMetadata['provider']?.toString();
+      if ((provider ?? '').toLowerCase() == 'google') {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password change isn't available for Google sign-in accounts.")),
+        );
+        return;
+      }
+    } catch (_) {}
+
+    final current = _currentPass.text.trim();
+    final newPass = _newPass.text.trim();
+    final confirm = _confirmPass.text.trim();
+
+    if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all password fields.')),
+      );
+      return;
+    }
+    if (newPass != confirm) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New passwords do not match.')),
+      );
+      return;
+    }
+    // Match registration rules
+    if (!RegExp(r'[A-Z]').hasMatch(newPass)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 uppercase letter')),
+      );
+      return;
+    }
+    if (!RegExp(r'[0-9]').hasMatch(newPass)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 number')),
+      );
+      return;
+    }
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(newPass)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 special character')),
+      );
+      return;
+    }
+
+    setState(() => _savingPassword = true);
+    try {
+      // Re-authenticate for email accounts only
+      if ((user.email ?? '').isNotEmpty) {
+        try {
+          await client.auth.signInWithPassword(email: user.email!, password: current);
+        } on AuthException catch (e) {
+          if (!mounted) return;
+          final msg = e.message.toLowerCase();
+          final friendly = msg.contains('invalid')
+              ? 'Current password is incorrect.'
+              : 'Failed to verify current password.';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(friendly)),
+          );
+          return;
+        }
+      }
+
+      final res = await client.auth.updateUser(UserAttributes(password: newPass));
+      if (res.user == null) throw Exception('Password update failed.');
+
+      if (!mounted) return;
+      _currentPass.clear();
+      _newPass.clear();
+      _confirmPass.clear();
+      if (_signOutAll) {
+        try {
+          await client.auth.signOut(scope: SignOutScope.global);
+        } catch (_) {
+          await client.auth.signOut();
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password updated. Signed out of all devices.')),
+        );
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
+        }
+        return;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password updated successfully.')),
+        );
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update password: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _savingPassword = false);
+    }
   }
 
   Widget _buildGuardianRow(String guardian) {
@@ -312,7 +483,7 @@ class _AccountPageState extends State<AccountPage> {
                   _buildReadOnlyRow("Email", email ?? '—'),
 
                   // MOBILE: editable
-                  _buildEditableRow("Mobile Number", mobile, () {
+                  _buildEditableRow("Mobile Number", mobile.isEmpty ? '—' : mobile, () {
                     _editField("Mobile Number", mobile, (val) {
                       setState(() => mobile = val);
                     });
@@ -332,15 +503,39 @@ class _AccountPageState extends State<AccountPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  _buildPasswordField("CURRENT PASSWORD", _currentPass),
-                  _buildPasswordField("NEW PASSWORD", _newPass),
-                  _buildPasswordField("CONFIRM NEW PASSWORD", _confirmPass),
+                  _buildPasswordField(
+                    "CURRENT PASSWORD",
+                    _currentPass,
+                    obscure: _obscureCurrent,
+                    onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                  ),
+                  _buildPasswordField(
+                    "NEW PASSWORD",
+                    _newPass,
+                    obscure: _obscureNew,
+                    onToggle: () => setState(() => _obscureNew = !_obscureNew),
+                  ),
+                  _buildPasswordField(
+                    "CONFIRM NEW PASSWORD",
+                    _confirmPass,
+                    obscure: _obscureConfirm,
+                    onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                  ),
+
+                  CheckboxListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    value: _signOutAll,
+                    onChanged: (v) => setState(() => _signOutAll = v ?? false),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(
+                      'Sign out of all devices after saving',
+                      style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
 
                   Center(
                     child: ElevatedButton(
-                      onPressed: () {
-                        // TODO: implement password change flow with Supabase auth if desired
-                      },
+                      onPressed: _savingPassword ? null : _handleSavePassword,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0x99B3E5FC),
                         padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
@@ -349,13 +544,15 @@ class _AccountPageState extends State<AccountPage> {
                         ),
                         elevation: 0,
                       ),
-                      child: Text(
-                        "SAVE",
-                        style: GoogleFonts.nunito(
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black87,
-                        ),
-                      ),
+                      child: _savingPassword
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(
+                              "SAVE",
+                              style: GoogleFonts.nunito(
+                                fontWeight: FontWeight.w800,
+                                color: Colors.black87,
+                              ),
+                            ),
                     ),
                   ),
 

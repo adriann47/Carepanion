@@ -369,6 +369,25 @@ class _ProfilePageState extends State<ProfilePage> {
 
               const SizedBox(height: 30),
 
+              // Show birthday under the avatar/title if assigned
+              if (_birthdayController.text.trim().isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 30.0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _birthdayController.text.trim(),
+                      style: GoogleFonts.nunito(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+
               // Fields
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
