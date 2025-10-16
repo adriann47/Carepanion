@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:softeng/data/multi_guardian_service.dart';
+import 'package:softeng/data/profile_service.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -12,16 +13,23 @@ class AccountPage extends StatefulWidget {
 
 class _AccountPageState extends State<AccountPage> {
   String email = "";
+  String mobile = "";
   List<Map<String, dynamic>> guardians = [];
   bool _loadingGuardians = false;
+  bool _savingPassword = false;
+  bool _signOutAll = false;
   RealtimeChannel? _agChannel;
   RealtimeChannel? _profileChannel;
 
   final TextEditingController _currentPass = TextEditingController();
   final TextEditingController _newPass = TextEditingController();
   final TextEditingController _confirmPass = TextEditingController();
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
 
   // Edit Field Dialog (still used for other editable items if needed)
+  // ignore: unused_element
   void _editField(String title, String currentValue, Function(String) onSave) {
     final controller = TextEditingController(text: currentValue);
     showDialog(
@@ -41,11 +49,31 @@ class _AccountPageState extends State<AccountPage> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                onSave(controller.text.trim());
+            onPressed: () async {
+              final newVal = controller.text.trim();
+              if (newVal.isEmpty) {
+                Navigator.pop(ctx);
+                return;
               }
-              Navigator.pop(ctx);
+              if (title.toLowerCase().contains('mobile')) {
+                final userId = Supabase.instance.client.auth.currentUser?.id;
+                if (userId != null) {
+                  final ok = await ProfileService.setPhone(
+                    Supabase.instance.client,
+                    id: userId,
+                    phone: newVal,
+                  );
+                  if (mounted) {
+                    setState(() => mobile = newVal);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(ok ? 'Mobile updated' : 'Saved locally; server column missing')),
+                    );
+                  }
+                }
+              } else {
+                onSave(newVal);
+              }
+              if (mounted) Navigator.pop(ctx);
             },
             child: const Text("Save"),
           ),
@@ -58,7 +86,151 @@ class _AccountPageState extends State<AccountPage> {
   void initState() {
     super.initState();
     _loadInitial();
+    _loadPhone();
     _subscribeRealtime();
+  }
+
+  Future<void> _loadPhone() async {
+    try {
+      final data = await ProfileService.fetchProfile(Supabase.instance.client);
+      if (!mounted) return;
+      final p = ProfileService.readPhoneFrom(data) ?? '';
+      setState(() => mobile = p);
+    } catch (_) {}
+  }
+
+  Future<void> _handleSavePassword() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to change password.')),
+      );
+      return;
+    }
+
+    // Disallow for Google-only accounts (no existing password)
+    try {
+      final provider = user.appMetadata['provider']?.toString();
+      if ((provider ?? '').toLowerCase() == 'google') {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password change isn't available for Google sign-in accounts.")),
+        );
+        return;
+      }
+    } catch (_) {}
+
+    final current = _currentPass.text.trim();
+    final newPass = _newPass.text.trim();
+    final confirm = _confirmPass.text.trim();
+
+    if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all password fields.')),
+      );
+      return;
+    }
+    if (newPass != confirm) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New passwords do not match.')),
+      );
+      return;
+    }
+    // Match registration requirements: at least 1 uppercase, 1 digit, 1 special
+    if (!RegExp(r'[A-Z]').hasMatch(newPass)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 uppercase letter')),
+      );
+      return;
+    }
+    if (!RegExp(r'[0-9]').hasMatch(newPass)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 number')),
+      );
+      return;
+    }
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(newPass)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 special character')),
+      );
+      return;
+    }
+
+    setState(() => _savingPassword = true);
+    try {
+      // Optional re-authenticate to verify current password (email accounts only)
+      if ((user.email ?? '').isNotEmpty) {
+        try {
+          await client.auth.signInWithPassword(
+            email: user.email!,
+            password: current,
+          );
+        } on AuthException catch (e) {
+          if (!mounted) return;
+          final msg = e.message.toLowerCase();
+          final friendly = msg.contains('invalid')
+              ? 'Current password is incorrect.'
+              : 'Failed to verify current password.';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(friendly)),
+          );
+          return;
+        }
+      }
+
+      // Update password
+      final res = await client.auth.updateUser(UserAttributes(password: newPass));
+      if (res.user == null) {
+        throw Exception('Password update failed.');
+      }
+
+      if (!mounted) return;
+      _currentPass.clear();
+      _newPass.clear();
+      _confirmPass.clear();
+      if (_signOutAll) {
+        // Revoke sessions on all devices (including current) and take user to sign-in
+        try {
+          await client.auth.signOut(scope: SignOutScope.global);
+        } catch (_) {
+          // Fallback: local sign out if scope not supported
+          await client.auth.signOut();
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password updated. Signed out of all devices.')),
+        );
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
+        }
+        return;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password updated successfully.')),
+        );
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      final msg = e.message;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update password: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _savingPassword = false);
+    }
   }
 
   Future<void> _loadInitial() async {
@@ -135,6 +307,16 @@ class _AccountPageState extends State<AccountPage> {
         },
       )
       ..subscribe();
+  }
+
+  @override
+  void dispose() {
+    _agChannel?.unsubscribe();
+    _profileChannel?.unsubscribe();
+    _currentPass.dispose();
+    _newPass.dispose();
+    _confirmPass.dispose();
+    super.dispose();
   }
 
   // Add Guardian Dialog (updated hint text ✅)
@@ -234,8 +416,59 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
+  // Editable Row (Mobile) — same look as Regular account
+  Widget _buildEditableRow(String label, String value, VoidCallback onEdit) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFB3E5FC),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit, color: Colors.black54),
+          ),
+        ],
+      ),
+    );
+  }
+
   // TextField for Reset Password (with lower opacity)
-  Widget _buildPasswordField(String hint, TextEditingController controller) {
+  Widget _buildPasswordField(
+    String hint,
+    TextEditingController controller, {
+    required bool obscure,
+    required VoidCallback onToggle,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -245,7 +478,7 @@ class _AccountPageState extends State<AccountPage> {
       ),
       child: TextField(
         controller: controller,
-        obscureText: true,
+        obscureText: obscure,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.nunito(
@@ -257,10 +490,17 @@ class _AccountPageState extends State<AccountPage> {
           border: InputBorder.none,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          suffixIcon: IconButton(
+            tooltip: obscure ? 'Show password' : 'Hide password',
+            icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+            onPressed: onToggle,
+          ),
         ),
       ),
     );
   }
+
+  
 
   Widget _buildGuardianRow(Map<String, dynamic> guardian) {
     final name = (guardian['fullname'] ?? '').toString().trim();
@@ -392,6 +632,13 @@ class _AccountPageState extends State<AccountPage> {
                   // Email (read-only)
                   _buildReadOnlyRow("Email", email),
 
+                  // MOBILE: editable (empty by default)
+                  _buildEditableRow("Mobile Number", mobile.isEmpty ? '—' : mobile, () {
+                    _editField("Mobile Number", mobile, (val) async {
+                      setState(() => mobile = val);
+                    });
+                  }),
+
                   SizedBox(height: h * 0.03),
 
                   // Reset Password
@@ -406,13 +653,40 @@ class _AccountPageState extends State<AccountPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  _buildPasswordField("CURRENT PASSWORD", _currentPass),
-                  _buildPasswordField("NEW PASSWORD", _newPass),
-                  _buildPasswordField("CONFIRM NEW PASSWORD", _confirmPass),
+                  _buildPasswordField(
+                    "CURRENT PASSWORD",
+                    _currentPass,
+                    obscure: _obscureCurrent,
+                    onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                  ),
+                  _buildPasswordField(
+                    "NEW PASSWORD",
+                    _newPass,
+                    obscure: _obscureNew,
+                    onToggle: () => setState(() => _obscureNew = !_obscureNew),
+                  ),
+                  _buildPasswordField(
+                    "CONFIRM NEW PASSWORD",
+                    _confirmPass,
+                    obscure: _obscureConfirm,
+                    onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                  ),
+
+                  // Sign out everywhere option
+                  CheckboxListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    value: _signOutAll,
+                    onChanged: (v) => setState(() => _signOutAll = v ?? false),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(
+                      'Sign out of all devices after saving',
+                      style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
 
                   Center(
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: _savingPassword ? null : _handleSavePassword,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0x99B3E5FC),
                         padding: const EdgeInsets.symmetric(
@@ -422,13 +696,19 @@ class _AccountPageState extends State<AccountPage> {
                         ),
                         elevation: 0,
                       ),
-                      child: Text(
-                        "SAVE",
-                        style: GoogleFonts.nunito(
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black87,
-                        ),
-                      ),
+                      child: _savingPassword
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              "SAVE",
+                              style: GoogleFonts.nunito(
+                                fontWeight: FontWeight.w800,
+                                color: Colors.black87,
+                              ),
+                            ),
                     ),
                   ),
 
@@ -498,10 +778,4 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
-  @override
-  void dispose() {
-    _agChannel?.unsubscribe();
-    _profileChannel?.unsubscribe();
-    super.dispose();
-  }
 }

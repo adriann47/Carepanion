@@ -24,6 +24,46 @@ class MultiGuardianService {
     return 'profile';
   }
 
+  /// List guardian IDs for an assisted; merges join table + legacy guardian_id.
+  /// Returns a unique set of auth user IDs for guardians. Avoids selecting
+  /// guardian profiles to reduce RLS friction when only IDs are needed.
+  static Future<Set<String>> listGuardianIds(
+    SupabaseClient client, {
+    String? assistedUserId,
+  }) async {
+    final assistedId = assistedUserId ?? client.auth.currentUser?.id;
+    if (assistedId == null) return <String>{};
+    final Set<String> idSet = <String>{};
+
+    // 1) Read join table links if available
+    try {
+      final links = await client
+          .from('assisted_guardians')
+          .select('guardian_id')
+          .eq('assisted_id', assistedId);
+      for (final e in links as List) {
+        final v = e['guardian_id']?.toString();
+        if (v != null && v.isNotEmpty) idSet.add(v);
+      }
+    } catch (_) {
+      // table missing or RLS blocked; continue with legacy
+    }
+
+    // 2) Also include legacy single guardian from own profile.guardian_id
+    try {
+      final profileTable = await _resolveProfileTable(client);
+      final me = await client
+          .from(profileTable)
+          .select('guardian_id')
+          .eq('id', assistedId)
+          .maybeSingle();
+      final gid = me?['guardian_id']?.toString();
+      if (gid != null && gid.isNotEmpty) idSet.add(gid);
+    } catch (_) {}
+
+    return idSet;
+  }
+
   /// Find guardian auth user id by their public_id in the profile table.
   static Future<String?> _guardianIdByPublicId(
     SupabaseClient client, {

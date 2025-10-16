@@ -135,40 +135,16 @@ class _SignInScreenState extends State<SignInScreen> {
           return;
         }
 
-        // Invalid credentials → offer quick reset
-        if (msg.contains('invalid login credentials')) {
-          final email = _emailController.text.trim();
-          final snack = SnackBar(
-            content: const Text(
-                'Invalid email or password. You can reset your password.'),
-            action: SnackBarAction(
-              label: 'Reset now',
-              onPressed: () async {
-                if (email.isEmpty) return;
-                try {
-                  final redirect = kIsWeb
-                      ? Uri.base.origin
-                      : 'io.supabase.flutter://callback';
-                  await supabase.auth
-                      .resetPasswordForEmail(email, redirectTo: redirect);
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content:
-                            Text('Password reset email sent. Check your inbox.')),
-                  );
-                } catch (err) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to send reset email: $err')),
-                  );
-                }
-              },
-            ),
-          );
-          ScaffoldMessenger.of(context).showSnackBar(snack);
-          return;
-        }
+       // Invalid credentials → show simple error message
+if (msg.contains('invalid login credentials')) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Invalid email or password. Please try again.'),
+    ),
+  );
+  return;
+}
+
 
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.message)));
@@ -361,31 +337,11 @@ class _SignInScreenState extends State<SignInScreen> {
                   children: [
                     Row(
                       children: [
-                        Checkbox(
-                          value: _rememberMe,
-                          onChanged: _isLoading
-                              ? null
-                              : (value) {
-                                  setState(() => _rememberMe = value ?? false);
-                                },
-                        ),
-                        Text(
-                          "Remember Me",
-                          style: GoogleFonts.nunito(
-                            color: const Color(0xFFCA5000),
-                          ),
-                        ),
+                       
+                        
                       ],
                     ),
-                    TextButton(
-                      onPressed: _isLoading ? null : () {},
-                      child: Text(
-                        "Forgot password?",
-                        style: GoogleFonts.nunito(
-                          color: const Color(0xFFCA5000),
-                        ),
-                      ),
-                    ),
+                    
                   ],
                 ),
                 const SizedBox(height: 30),
@@ -423,29 +379,8 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 30),
 
-                Center(
-                  child: Text(
-                    "Log In with",
-                    style: GoogleFonts.nunito(color: const Color(0xFFCA5000)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Google
-                Center(
-                  child: InkWell(
-                    onTap: _isLoading ? null : _signInWithGoogle,
-                    child: Opacity(
-                      opacity: _isLoading ? 0.5 : 1.0,
-                      child: Image.asset(
-                        'assets/google1.png',
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                ),
+               
+                
 
                 const Spacer(flex: 2),
               ],

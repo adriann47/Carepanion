@@ -53,6 +53,48 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       initialTime: TimeOfDay.now(),
     );
     if (picked != null) {
+      final now = DateTime.now();
+      final pickedDt = DateTime(
+        _selectedDate?.year ?? now.year,
+        _selectedDate?.month ?? now.month,
+        _selectedDate?.day ?? now.day,
+        picked.hour,
+        picked.minute,
+      );
+
+      if (isStart) {
+        // If selecting a start time for today, disallow times before now
+        if (_selectedDate != null && pickedDt.isBefore(now)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cannot set a start time in the past')),
+          );
+          return;
+        }
+      } else {
+        // End time rules: cannot be in the past, and if start exists, must be after start
+        if (pickedDt.isBefore(now)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cannot set an end time in the past')),
+          );
+          return;
+        }
+        if (_startTime != null && _selectedDate != null) {
+          final startDt = DateTime(
+            _selectedDate!.year,
+            _selectedDate!.month,
+            _selectedDate!.day,
+            _startTime!.hour,
+            _startTime!.minute,
+          );
+          if (!pickedDt.isAfter(startDt)) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('End time must be after start time')),
+            );
+            return;
+          }
+        }
+      }
+
       setState(() {
         if (isStart) {
           _startTime = picked;
@@ -78,6 +120,63 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     }
 
     try {
+      // Additional validation: startTime should not be in the past for the selected date
+      if (_startTime != null && _selectedDate != null) {
+        final now = DateTime.now();
+        final startDt = DateTime(
+          _selectedDate!.year,
+          _selectedDate!.month,
+          _selectedDate!.day,
+          _startTime!.hour,
+          _startTime!.minute,
+        );
+        if (startDt.isBefore(now)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Start time cannot be in the past')),
+            );
+          }
+          return;
+        }
+      }
+
+      // Additional validation: end time must be after start and not in the past
+      if (_endTime != null && _selectedDate != null) {
+        final now = DateTime.now();
+        final endDt = DateTime(
+          _selectedDate!.year,
+          _selectedDate!.month,
+          _selectedDate!.day,
+          _endTime!.hour,
+          _endTime!.minute,
+        );
+        if (endDt.isBefore(now)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('End time cannot be in the past')),
+            );
+          }
+          return;
+        }
+        if (_startTime != null) {
+          final startDt = DateTime(
+            _selectedDate!.year,
+            _selectedDate!.month,
+            _selectedDate!.day,
+            _startTime!.hour,
+            _startTime!.minute,
+          );
+          if (!endDt.isAfter(startDt)) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('End time must be after start time')),
+              );
+            }
+            return;
+          }
+        }
+      }
+
       await TaskService.createTask(
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim().isEmpty
