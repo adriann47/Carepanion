@@ -5,9 +5,9 @@ import 'package:softeng/services/task_service.dart';
 import 'profile_screen.dart';
 import 'emergency_screen.dart';
 import 'calendar_screen.dart';
-import 'navbar_assisted.dart'; // ✅ Import reusable navbar
-// Global ReminderService handles popups across screens; no local timer here.
+import 'navbar_assisted.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -17,7 +17,6 @@ class TasksScreen extends StatefulWidget {
 }
 
 class _TasksScreen extends State<TasksScreen> {
-  // ignore: unused_field
   int _currentIndex = 0; // Home tab
   final List<bool> _taskDone = []; // tracked per loaded task
   String? _avatarUrl;
@@ -26,7 +25,6 @@ class _TasksScreen extends State<TasksScreen> {
   String? _guardianFullName;
   List<Map<String, dynamic>> _tasks = [];
   RealtimeChannel? _profileChannel;
-
 
   @override
   void initState() {
@@ -42,6 +40,7 @@ class _TasksScreen extends State<TasksScreen> {
       final authUser = client.auth.currentUser;
       final data = await ProfileService.fetchProfile(client);
       if (!mounted) return;
+
       setState(() {
         final rawUrl = data?['avatar_url'] as String?;
         _avatarUrl = (rawUrl == null || rawUrl.trim().isEmpty)
@@ -58,17 +57,16 @@ class _TasksScreen extends State<TasksScreen> {
         _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
       });
 
-      // Fetch linked guardian's full name if present
+      // Linked guardian (best effort)
       final guardianId = (data?['guardian_id'] as String?)?.trim();
       if (guardianId != null && guardianId.isNotEmpty) {
         try {
-          final g = await ProfileService.fetchProfile(client, userId: guardianId);
+          final g =
+              await ProfileService.fetchProfile(client, userId: guardianId);
           if (!mounted) return;
           final gName = (g?['fullname'] as String?)?.trim();
           if (gName != null && gName.isNotEmpty) {
-            setState(() {
-              _guardianFullName = gName;
-            });
+            setState(() => _guardianFullName = gName);
           }
         } catch (_) {}
       }
@@ -127,17 +125,13 @@ class _TasksScreen extends State<TasksScreen> {
       if (!mounted) return;
       setState(() {
         _tasks = tasks;
-        _taskDone.clear();
-        _taskDone.addAll(
-          _tasks.map((t) => (t['status']?.toString() == 'done')),
-        );
+        _taskDone
+          ..clear()
+          ..addAll(_tasks.map((t) => (t['status']?.toString() == 'done')));
       });
-    } catch (e) {
-      // ignore errors silently for now
-    }
+    } catch (_) {}
   }
 
-  // ignore: unused_element
   void _onTabTapped(int index) {
     setState(() => _currentIndex = index);
 
@@ -161,62 +155,70 @@ class _TasksScreen extends State<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final titleStyle = GoogleFonts.nunito(
+      fontSize: 26, // Slightly reduced from 28
+      fontWeight: FontWeight.w800,
+      color: const Color(0xFF2D2D2D),
+    );
+
     return Scaffold(
       backgroundColor: const Color(0xFFFEF9F4),
       body: SafeArea(
         child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 25),
+              // --- USER ID CARD (smaller profile picture, slightly smaller text) ---
+              _UserHeaderCardAssisted(
+                avatarUrl: _avatarUrl,
+                fullName: _fullName ?? '—',
+                email: _email ?? '—',
+                numberOrId:
+                    _guardianFullName != null && _guardianFullName!.isNotEmpty
+                        ? _guardianFullName!
+                        : '—',
+              ),
+              const SizedBox(height: 18),
 
-              /// --- USER ID CARD ---
+              // --- LARGER STREAK CARD ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(20),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18), // Increased padding
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFB6B6),
-                  borderRadius: BorderRadius.circular(20),
+                  color: Colors.white,
+                  border: Border.all(color: Colors.orange.shade200, width: 2.5), // Thicker border
+                  borderRadius: BorderRadius.circular(20), // Larger radius
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.12), // More prominent shadow
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Colors.brown,
-                      backgroundImage: _avatarUrl != null
-                          ? NetworkImage(_avatarUrl!)
-                          : null,
-                      child: _avatarUrl == null
-                          ? const Icon(
-                              Icons.person,
-                              size: 45,
-                              color: Colors.white,
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 20),
+                    const Icon(Icons.emoji_events,
+                        color: Colors.orange, size: 42), // Larger icon
+                    const SizedBox(width: 16), // More spacing
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Text("3 DAYS STREAK!",
+                              style: GoogleFonts.nunito(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18, // Larger font
+                                  color: const Color(0xFF2D2D2D))),
+                          const SizedBox(height: 6), // More spacing
                           Text(
-                            "USER ID:",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            _fullName ?? '—',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            "EMAIL: ${_email ?? '—'}",
-                            style: const TextStyle(fontSize: 16),
+                            "Thanks for showing up today! Consistency is the key to forming strong habits.",
+                            style: GoogleFonts.nunito(
+                                fontSize: 15, // Larger font
+                                color: const Color(0xFF4A4A4A),
+                                height: 1.3), // Better line height
                           ),
                         ],
                       ),
@@ -224,201 +226,435 @@ class _TasksScreen extends State<TasksScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 24), // Increased spacing
 
-              const SizedBox(height: 30),
-              const Divider(thickness: 1),
-
-              /// --- TODAY'S TASK TITLE ---
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Text(
-                  "TODAY’S TASK",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-
-              /// --- TASK LIST ---
+              // --- TODAY'S TASK TITLE ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: _tasks.isEmpty
-                      ? [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 20),
-                            child: Text(
-                              'No tasks for today',
-                              style: TextStyle(color: Colors.grey[600]),
-                            ),
+                child: Text("TODAY'S TASKS", style: titleStyle),
+              ),
+              const SizedBox(height: 14),
+
+              // --- TASK LIST (slightly smaller tiles) ---
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _tasks.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 28),
+                        child: Text(
+                          'No tasks for today',
+                          style: GoogleFonts.nunito(
+                            fontSize: 17, // Slightly reduced from 18
+                            color: const Color(0xFF4A4A4A),
                           ),
-                        ]
-                      : List.generate(_tasks.length, (i) {
+                        ),
+                      )
+                    : Column(
+                        children: List.generate(_tasks.length, (i) {
                           final t = _tasks[i];
-                          final title = (t['title'] ?? '') as String;
-                          final note = (t['description'] ?? '') as String;
-                          final startAt = t['start_at']?.toString();
-                          String timeStr = '';
-                          if (startAt != null) {
-                            try {
-                              final dt = DateTime.parse(startAt).toLocal();
-                              timeStr = DateFormat('h:mm a').format(dt);
-                            } catch (_) {}
-                          }
-                          // Determine which guardian set the task
-                          // 1) Use created_by_name if present
-                          String guardian = (t['created_by_name'] ?? '')
-                                  .toString()
-                                  .trim();
-                          // 2) If missing, and we have a creator id, resolve it (best-effort cache-less)
+
+                          final title = (t['title'] ?? '').toString();
+                          final note = (t['description'] ?? '').toString();
+
+                          String guardian =
+                              (t['created_by_name'] ?? '').toString().trim();
+
                           if (guardian.isEmpty) {
                             final createdBy = t['created_by']?.toString();
                             if (createdBy != null && createdBy.isNotEmpty) {
-                              // Best-effort fetch; not awaited per item to avoid rebuild jank.
-                              ProfileService.fetchProfile(Supabase.instance.client, userId: createdBy)
+                              ProfileService.fetchProfile(
+                                      Supabase.instance.client,
+                                      userId: createdBy)
                                   .then((p) {
                                 if (!mounted || p == null) return;
-                                final name = (p['fullname'] ?? '')
-                                    .toString()
-                                    .trim();
+                                final name =
+                                    (p['fullname'] ?? '').toString().trim();
                                 if (name.isNotEmpty) {
                                   setState(() {
-                                    // Update task map locally so subsequent builds show the name
                                     _tasks[i]['created_by_name'] = name;
                                   });
                                 }
                               }).catchError((_) {});
                             }
                           }
-                          // 3) As final fallback, show linked guardian of assisted (legacy single guardian)
                           if (guardian.isEmpty) {
                             guardian = (_guardianFullName ??
-                                    (t['guardian_name'] ?? t['created_by_name'] ?? ''))
+                                    (t['guardian_name'] ??
+                                        t['created_by_name'] ??
+                                        ''))
                                 .toString()
                                 .trim();
                           }
-                          final color = i % 2 == 0
-                              ? const Color(0xFFFFD6D6)
-                              : const Color(0xFFFFE699);
-                          return _taskTile(
-                            index: i,
-                            color: color,
+
+                          String fmt(dynamic iso) {
+                            if (iso == null) return '';
+                            try {
+                              final dt = DateTime.parse(iso.toString()).toLocal();
+                              return TimeOfDay(
+                                      hour: dt.hour, minute: dt.minute)
+                                  .format(context);
+                            } catch (_) {
+                              return '';
+                            }
+                          }
+
+                          final s = fmt(t['start_at']);
+                          final e = fmt(t['end_at']);
+                          final time = s.isEmpty && e.isEmpty
+                              ? 'All day'
+                              : (s.isNotEmpty && e.isNotEmpty
+                                  ? '$s - $e'
+                                  : (s + e));
+
+                          final taskId = (t['id'] is int)
+                              ? t['id'] as int
+                              : int.tryParse('${t['id']}');
+
+                          final checked = i < _taskDone.length
+                              ? _taskDone[i]
+                              : (t['status']?.toString() == 'done');
+
+                          return _AssistedTaskTile(
+                            key: ValueKey('assisted_task_$i'),
                             title: title,
-                            time: timeStr,
+                            time: time,
                             note: note,
-                            guardian: guardian,
-                            taskId: t['id'] as int?,
+                            guardian: guardian.isNotEmpty ? guardian : 'Unknown',
+                            checked: checked,
+                            onChanged: (val) async {
+                              final newVal = val ?? false;
+                              if (i < _taskDone.length) {
+                                setState(() => _taskDone[i] = newVal);
+                              }
+                              if (taskId != null) {
+                                try {
+                                  if (newVal) {
+                                    await TaskService.markDone(taskId);
+                                  } else {
+                                    await TaskService.markTodo(taskId);
+                                  }
+                                } catch (_) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content:
+                                            Text('Failed to update task status'),
+                                      ),
+                                    );
+                                  }
+                                }
+                                await _loadTodayTasks();
+                              }
+                            },
                           );
                         }),
-                ),
+                      ),
               ),
             ],
           ),
         ),
       ),
 
-      /// ✅ Reusable navigation bar
-      /// ✅ Custom reusable navigation bar
+      // Reusable navigation bar
       bottomNavigationBar: const NavbarAssisted(currentIndex: 0),
     );
   }
+}
 
-  /// --- TASK TILE ---
-  Widget _taskTile({
-    required int index,
-    required Color color,
-    required String title,
-    required String time,
-    required String note,
-    required String guardian,
-    int? taskId,
-  }) {
+// =============== Assisted Header (smaller profile picture, slightly smaller text) ===============
+class _UserHeaderCardAssisted extends StatelessWidget {
+  const _UserHeaderCardAssisted({
+    required this.avatarUrl,
+    required this.fullName,
+    required this.email,
+    required this.numberOrId,
+  });
+
+  final String? avatarUrl;
+  final String fullName;
+  final String email;
+  final String numberOrId;
+
+  @override
+  Widget build(BuildContext context) {
+    const bg = Color(0xFFFFB04A);
+    const stroke = Color(0xFFE88926);
+    const plusTint = Color(0x22E88926);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 25),
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: Stack(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16), // Slightly reduced
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(26), // Slightly smaller
+              border: Border.all(color: stroke, width: 2.0), // Back to original
+              boxShadow: [
+                BoxShadow(
+                  color: stroke.withOpacity(0.18),
+                  blurRadius: 10, // Back to original
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Smaller profile picture as requested
+                Container(
+                  width: 80, // Made smaller from 110
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: stroke, width: 1.5), // Thinner border
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: (avatarUrl != null && avatarUrl!.isNotEmpty)
+                      ? Image.network(avatarUrl!, fit: BoxFit.cover)
+                      : Center(
+                          child: Icon(Icons.person,
+                              size: 42, color: const Color(0xFF8E4A1E)), // Smaller icon
+                        ),
+                ),
+                const SizedBox(width: 16), // Slightly reduced
+
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'USER ID:',
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15, // Slightly reduced from 16
+                            height: 1.0,
+                            letterSpacing: 0.4,
+                            color: const Color(0xFF3B2717),
+                          ),
+                        ),
+                        const SizedBox(height: 3), // Slightly reduced
+                        Text(
+                          fullName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 24, // Slightly reduced from 26
+                            height: 1.05,
+                            letterSpacing: 0.1,
+                            color: const Color(0xFF23160E),
+                          ),
+                        ),
+                        const SizedBox(height: 6), // Slightly reduced
+                        _kv('EMAIL:', email, size: 15), // Slightly reduced from 16
+                        const SizedBox(height: 3), // Slightly reduced
+                        _kv('NUMBER:', numberOrId, size: 15), // Slightly reduced from 16
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Decorative plus icons (slightly smaller)
+          Positioned(
+            right: 20,
+            top: 10,
+            child: Icon(Icons.add, size: 32, color: plusTint), // Smaller
+          ),
+          const Positioned(
+            right: 30,
+            top: 20,
+            child: Icon(Icons.add, size: 18, color: plusTint), // Smaller
+          ),
+          const Positioned(
+            right: 50,
+            bottom: 12,
+            child: Icon(Icons.add, size: 26, color: plusTint), // Smaller
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String label, String value, {double size = 15}) {
+    return RichText(
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: '$label ',
+            style: GoogleFonts.nunito(
+              fontWeight: FontWeight.w800,
+              fontSize: size,
+              height: 1.05,
+              color: const Color(0xFF3B2717),
+            ),
+          ),
+          TextSpan(
+            text: value,
+            style: GoogleFonts.nunito(
+              fontWeight: FontWeight.w700,
+              fontSize: size,
+              height: 1.05,
+              color: const Color(0xFF3B2717),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============== Assisted Task Tile (slightly smaller) ===============
+class _AssistedTaskTile extends StatelessWidget {
+  const _AssistedTaskTile({
+    super.key,
+    required this.title,
+    required this.time,
+    required this.note,
+    required this.guardian,
+    required this.checked,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String time;
+  final String note;
+  final String guardian;
+  final bool checked;
+  final ValueChanged<bool?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18), // Slightly reduced
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Timeline with slightly smaller dot
+            Column(
+              children: [
+                Container(
+                  width: 16, // Slightly reduced from 18
+                  height: 16,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFF77CA0),
+                    border: Border.all(color: Colors.white, width: 2.0), // Slightly thinner
+                  ),
+                ),
+                Expanded(
+                  child: Container(width: 2.5, color: Colors.grey.shade300), // Slightly thinner
+                ),
+              ],
+            ),
+            const SizedBox(width: 14), // Slightly reduced
+
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 20), // Slightly reduced
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFD8F1FF), Color(0xFFBEE6FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18), // Slightly smaller
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.07), // Slightly less prominent
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Transform.scale(
+                          scale: 1.3, // Slightly reduced from 1.4
+                          child: Checkbox(
+                            value: checked,
+                            onChanged: onChanged,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            visualDensity:
+                                const VisualDensity(horizontal: -4, vertical: -4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4), // Back to original
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10), // Slightly reduced
+                        Expanded(
+                          child: Text(
+                            title.toUpperCase(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.nunito(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 20, // Slightly reduced from 22
+                              letterSpacing: 0.4,
+                              color: const Color(0xFF1E2A36),
+                              height: 1.1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10), // Slightly reduced
+
+                    _infoLine(label: 'TIME', value: time, size: 16), // Slightly reduced from 17
+                    if (note.isNotEmpty)
+                      _infoLine(label: 'NOTE', value: note, size: 16),
+                    _infoLine(label: 'GUARDIAN', value: guardian, size: 16),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoLine({required String label, required String value, double size = 16}) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 5), // Slightly reduced
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// Timeline dot + line
-          Column(
-            children: [
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: index == 1 ? Colors.amber : Colors.pinkAccent,
-                ),
-              ),
-              Container(width: 3, height: 120, color: Colors.grey.shade400),
-            ],
+          Text(
+            '$label: ',
+            style: GoogleFonts.nunito(
+              color: const Color(0xFF2D2D2D),
+              fontWeight: FontWeight.w800,
+              fontSize: size,
+              height: 1.25, // Slightly reduced
+              letterSpacing: 0.2,
+            ),
           ),
-          const SizedBox(width: 20),
-
-          /// Task card
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Transform.scale(
-                        scale: 1.6,
-                        child: Checkbox(
-                          value: index < _taskDone.length
-                              ? _taskDone[index]
-                              : false,
-                          onChanged: (val) async {
-                            final newVal = val ?? false;
-                            if (index < _taskDone.length) {
-                              setState(() => _taskDone[index] = newVal);
-                            }
-                            if (taskId != null) {
-                              try {
-                                if (newVal) {
-                                  await TaskService.markDone(taskId);
-                                } else {
-                                  await TaskService.markTodo(taskId);
-                                }
-                              } catch (e) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Failed to update task status'),
-                                    ),
-                                  );
-                                }
-                              }
-                              await _loadTodayTasks();
-                            }
-                          },
-                        ),
-                      ),
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(" Time: $time", style: const TextStyle(fontSize: 18)),
-                  Text(" Note: $note", style: const TextStyle(fontSize: 18)),
-                  Text(
-                    " Guardian: ${guardian.isNotEmpty ? guardian : 'Unknown'}",
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ],
+            child: Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.nunito(
+                color: const Color(0xFF2D2D2D),
+                fontWeight: FontWeight.w600,
+                fontSize: size,
+                height: 1.25, // Slightly reduced
               ),
             ),
           ),

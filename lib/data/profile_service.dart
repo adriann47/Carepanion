@@ -169,6 +169,91 @@ class ProfileService {
     }
   }
 
+  /// Instead of directly linking, create a guardian request row in
+  /// `assisted_guardians` with status 'pending'. Returns true if the
+  /// request was created.
+  /// Create a guardian request row in `assisted_guardians` with status 'pending'.
+  /// Throws an exception with a helpful message on failure.
+  static Future<void> requestGuardianByPublicId(
+    SupabaseClient client, {
+    required String guardianPublicId,
+  }) async {
+    final table = await _resolveTable(client);
+
+    // Try to locate guardian by multiple likely columns (public_id, share_code)
+    Map<String, dynamic>? guardian;
+    try {
+      guardian = await client
+          .from(table)
+          .select('id')
+          .or('public_id.eq.$guardianPublicId,share_code.eq.$guardianPublicId')
+          .maybeSingle();
+    } catch (e) {
+      throw Exception('Failed to query profile table: $e');
+    }
+
+    if (guardian == null) throw Exception('Guardian not found for id $guardianPublicId');
+    final guardianId = guardian['id'] as String;
+    final user = client.auth.currentUser;
+    if (user == null) throw Exception('Not authenticated');
+
+    // Prevent duplicate pending requests to same guardian
+    try {
+      final exists = await client
+          .from('assisted_guardians')
+          .select('id')
+          .eq('assisted_id', user.id)
+          .eq('guardian_id', guardianId)
+          .eq('status', 'pending')
+          .limit(1)
+          .maybeSingle();
+      if (exists != null) return; // already pending
+    } catch (e) {
+      throw Exception('Failed to check existing requests: $e');
+    }
+
+    // Insert request row
+    try {
+      await client.from('assisted_guardians').insert({
+        'assisted_id': user.id,
+        'guardian_id': guardianId,
+        'status': 'pending',
+      });
+    } catch (e) {
+      throw Exception('Failed to create guardian request (assisted_guardians table may be missing): $e');
+    }
+  }
+
+  /// Poll for guardian response for the currently authenticated user.
+  /// Returns 'accepted'|'rejected'|'timeout'.
+  static Future<String> waitForGuardianResponse(
+    SupabaseClient client, {
+    Duration timeout = const Duration(minutes: 5),
+    Duration pollInterval = const Duration(seconds: 3),
+  }) async {
+    final user = client.auth.currentUser;
+    if (user == null) return 'timeout';
+
+    final end = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(end)) {
+      try {
+        final row = await client
+            .from('assisted_guardians')
+            .select('status')
+            .eq('assisted_id', user.id)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        if (row != null && row['status'] != null) {
+          final status = row['status'] as String;
+          if (status == 'accepted' || status == 'rejected') return status;
+        }
+      } catch (_) {}
+      await Future.delayed(pollInterval);
+    }
+    return 'timeout';
+  }
+
   /// Fetch all assisted users for a given guardian ID.
   static Future<List<Map<String, dynamic>>> fetchAssistedsForGuardian(
     SupabaseClient client, {
@@ -231,7 +316,16 @@ class ProfileService {
     if (fullName != null) payload['fullname'] = fullName;
     if (role != null) payload['role'] = role;
     if (birthday != null) payload['birthday'] = birthday;
-    await client.from(table).upsert(payload);
+    try {
+      await client.from(table).upsert(payload);
+    } catch (e) {
+      // Don't let DB policy failures block client flows like registration.
+      // Log the error for debugging in dev mode and continue.
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('ProfileService.upsertProfile failed: $e');
+      }
+    }
   }
 
   /// Fetch the profile row for the supplied [id] or the current auth user.
