@@ -89,7 +89,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
-  void _startCooldown([int seconds = 60]) {
+  void _startCooldown([int seconds = 65]) {
     _cooldownTimer?.cancel();
     setState(() => _cooldown = seconds);
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -104,6 +104,15 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   Future<void> _sendOtp() async {
+    // Additional safety check to prevent sending during cooldown
+    if (_cooldown > 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please wait ${_cooldown} seconds before requesting another OTP.')),
+      );
+      return;
+    }
+
     if (_devLocalOtp) {
       setState(() => _isSending = true);
       try {
@@ -153,14 +162,30 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString();
-      // If SMS provider isn't configured in Supabase, offer an email fallback (when available)
-      if (_useSms && msg.toLowerCase().contains('phone_provider_disabled')) {
-        await _handleSmsProviderDisabled();
+      final msg = e.toString().toLowerCase();
+      
+      // Handle rate limiting specifically
+      if (msg.contains('can only request this after') || msg.contains('rate limit')) {
+        // Extract the wait time from the error message if possible
+        final secondsMatch = RegExp(r'(\d+)\s*seconds?').firstMatch(msg);
+        if (secondsMatch != null) {
+          final waitSeconds = int.tryParse(secondsMatch.group(1) ?? '60') ?? 60;
+          _startCooldown(waitSeconds + 5); // Add 5 seconds buffer
+        } else {
+          _startCooldown(65); // Default fallback
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Rate limit exceeded. Please wait before requesting another OTP.')),
+        );
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to send OTP: $e')));
+        // If SMS provider isn't configured in Supabase, offer an email fallback (when available)
+        if (_useSms && msg.contains('phone_provider_disabled')) {
+          await _handleSmsProviderDisabled();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to send OTP: $e')),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -429,7 +454,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                       const TextSpan(text: "Didn't receive any code? "),
                       TextSpan(
                         text: _cooldown > 0
-                            ? 'Resend in ${_cooldown}s'
+                            ? 'Resend in ${_cooldown}s (rate limited)'
                             : 'Resend',
                         style: const TextStyle(
                           decoration: TextDecoration.underline,
