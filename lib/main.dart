@@ -65,6 +65,11 @@ void _setupGlobalAuthListener() {
           (route) => false,
         );
       }
+      // Start guardian request listener for signed-in users
+      GuardianRequestService().start();
+    } else if (data.event == AuthChangeEvent.signedOut) {
+      // Stop guardian request listener on sign out
+      GuardianRequestService().stop();
     }
   });
 }
@@ -79,8 +84,10 @@ class CarePanionApp extends StatelessWidget {
     ReminderService.start();
   // Start emergency listener for guardian users
   EmergencyService.start();
-  // Start guardian request listener so guardians get accept/reject popups
-  GuardianRequestService().start();
+  // Start guardian request listener if user is already signed in
+  if (Supabase.instance.client.auth.currentUser != null) {
+    GuardianRequestService().start();
+  }
 
     return MaterialApp(
       navigatorKey: _navKey,

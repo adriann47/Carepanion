@@ -58,78 +58,75 @@ class GuardianRequestService {
                   backgroundColor: Colors.white,
                   child: SingleChildScrollView(
                     child: Container(
-                      width: 260,
-                      padding: const EdgeInsets.all(18),
+                      width: 320,
+                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            'GUARDIAN REQUEST',
+                            'COMPANION REQUEST',
+                            textAlign: TextAlign.center,
                             style: GoogleFonts.nunito(
                               fontWeight: FontWeight.w800,
                               fontSize: 18,
-                              color: const Color(0xFF2D2D2D),
+                              color: const Color(0xFF4A4A4A),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
+
+                          // Orange user id pill
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFE1E1),
-                              borderRadius: BorderRadius.circular(12),
+                              color: const Color(0xFFFFC68A),
+                              borderRadius: BorderRadius.circular(28),
+                              border: Border.all(color: const Color(0xFFCA5000), width: 1.6),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.06),
+                                  offset: const Offset(0, 4),
+                                  blurRadius: 8,
+                                ),
+                              ],
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '$name has requested you as their guardian.',
+                                  'USER ID:',
                                   style: GoogleFonts.nunito(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 16,
-                                    color: Colors.black,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF5A2F00),
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 Text(
-                                  'Would you like to accept or reject this request?',
-                                  style: GoogleFonts.nunito(fontSize: 14),
+                                  name,
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF2B2B2B),
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 18),
+
+                          const SizedBox(height: 20),
+
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFF77CA0),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: () async {
-                                  if (!dctx.mounted) return;
-                                  Navigator.of(dctx).pop();
-                                  try {
-                                    await supa.from('assisted_guardians').update({'status': 'rejected'}).eq('assisted_id', assistedId).eq('guardian_id', gid);
-                                  } catch (_) {}
-                                },
-                                child: Text(
-                                  'REJECT',
-                                  style: GoogleFonts.nunito(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
+                              // Accept (teal) button - left
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF7DECF7),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                                  shape: const StadiumBorder(),
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 28),
+                                  elevation: 0,
                                 ),
                                 onPressed: () async {
                                   if (!dctx.mounted) return;
@@ -142,6 +139,30 @@ class GuardianRequestService {
                                 },
                                 child: Text(
                                   'ACCEPT',
+                                  style: GoogleFonts.nunito(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+
+                              // Reject (pink) button - right
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFF9687C),
+                                  shape: const StadiumBorder(),
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 28),
+                                  elevation: 0,
+                                ),
+                                onPressed: () async {
+                                  if (!dctx.mounted) return;
+                                  Navigator.of(dctx).pop();
+                                  try {
+                                    await supa.from('assisted_guardians').update({'status': 'rejected'}).eq('assisted_id', assistedId).eq('guardian_id', gid);
+                                  } catch (_) {}
+                                },
+                                child: Text(
+                                  'REJECT',
                                   style: GoogleFonts.nunito(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w700,
