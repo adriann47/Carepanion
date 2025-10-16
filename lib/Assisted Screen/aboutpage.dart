@@ -60,8 +60,10 @@ class _AboutPageState extends State<AboutPage> {
 
             /// --- MAIN CONTENT ---
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 22),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 22).copyWith(
+                  bottom: 24,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -99,7 +101,7 @@ class _AboutPageState extends State<AboutPage> {
                       textAlign: TextAlign.justify,
                     ),
 
-                    const Spacer(),
+                    const SizedBox(height: 24),
 
                     /// Contact Us
                     const Align(

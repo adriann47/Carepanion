@@ -217,18 +217,23 @@ if (msg.contains('invalid login credentials')) {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Scaffold(
       backgroundColor: const Color(0xFFFDF8F0),
       resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.all(20).copyWith(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                 Padding(
                   padding: const EdgeInsets.only(top: 30),
                   child: IconButton(
@@ -384,8 +389,11 @@ if (msg.contains('invalid login credentials')) {
               ],
             ),
           ),
-        ),
-      ),
+        );
+      },
+    ),
+  ),
     );
   }
 }
+

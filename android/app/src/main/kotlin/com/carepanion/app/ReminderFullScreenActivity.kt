@@ -8,12 +8,16 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.os.Handler
+import android.os.Looper
 import java.util.Locale
 import android.view.WindowManager
 import android.util.Log
 
 class ReminderFullScreenActivity : Activity() {
     private var tts: TextToSpeech? = null
+    private var forwarded = false
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Turn screen on and show when locked
@@ -67,17 +71,36 @@ class ReminderFullScreenActivity : Activity() {
                         tts?.language = Locale.getDefault() ?: Locale.US
                         val toSpeak = speakText ?: "You have a reminder"
                         // queue the speech; use QUEUE_FLUSH so it plays immediately
+                        tts?.setOnUtteranceProgressListener(object: UtteranceProgressListener() {
+                            override fun onStart(utteranceId: String?) { }
+                            override fun onDone(utteranceId: String?) {
+                                runOnUiThread {
+                                    try {
+                                        tts?.shutdown()
+                                    } catch (_: Exception) {}
+                                    forwardToMain(payload)
+                                }
+                            }
+                            @Deprecated("Deprecated in Java")
+                            override fun onError(utteranceId: String?) {
+                                runOnUiThread { forwardToMain(payload) }
+                            }
+                        })
                         tts?.speak(toSpeak, TextToSpeech.QUEUE_FLUSH, null, "reminder_tts_id")
                         Log.i("ReminderFullScreenActivity", "native tts spoken: $toSpeak")
                     } else {
                         Log.w("ReminderFullScreenActivity", "TTS init failed status=$status")
+                        // If TTS failed to init, just forward immediately
+                        forwardToMain(payload)
                     }
                 } catch (e: Exception) {
                     Log.w("ReminderFullScreenActivity", "TTS speak failed", e)
+                    forwardToMain(payload)
                 }
             }
         } catch (e: Exception) {
             Log.w("ReminderFullScreenActivity", "native TTS setup failed", e)
+            forwardToMain(payload)
         }
 
             // Persist the payload to SharedPreferences as a fallback in case Flutter
@@ -92,22 +115,30 @@ class ReminderFullScreenActivity : Activity() {
                 Log.w("ReminderFullScreenActivity", "failed to save payload to prefs", e)
             }
 
-            // Forward to MainActivity (Flutter) with the payload so Flutter can show the popup
+            // Fallback: if TTS does not call back within a short time, forward anyway
+            Handler(Looper.getMainLooper()).postDelayed({
+                forwardToMain(payload)
+            }, 7000)
+    }
+
+    private fun forwardToMain(payload: String?) {
+        if (forwarded) return
+        forwarded = true
+        try {
             val launchIntent = Intent(this, MainActivity::class.java)
             launchIntent.putExtra("reminder_payload", payload)
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             Log.i("ReminderFullScreenActivity", "forwarding payload to MainActivity and finishing")
             startActivity(launchIntent)
-            finish()
+        } catch (e: Exception) {
+            Log.w("ReminderFullScreenActivity", "failed to start MainActivity", e)
+        } finally {
+            try { finish() } catch (_: Exception) {}
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            tts?.stop()
-            tts?.shutdown()
-        } catch (_: Exception) {
-            // ignore
-        }
+        // Do not forcibly stop TTS here to allow finishing the utterance
     }
 }

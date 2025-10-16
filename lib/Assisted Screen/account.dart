@@ -607,7 +607,6 @@ class _AccountPageState extends State<AccountPage> {
           // Header
           Container(
             width: double.infinity,
-            height: h * 0.18,
             decoration: const BoxDecoration(
               color: Color(0xFFF7A9AC),
               borderRadius: BorderRadius.only(
@@ -615,12 +614,13 @@ class _AccountPageState extends State<AccountPage> {
                 bottomRight: Radius.circular(28),
               ),
             ),
-            child: SafeArea(
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: w * 0.05,
-                  vertical: h * 0.02,
-                ),
+            child: Padding(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 8,
+                left: w * 0.05,
+                right: w * 0.05,
+                bottom: 16,
+              ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -644,14 +644,15 @@ class _AccountPageState extends State<AccountPage> {
                 ),
               ),
             ),
-          ),
 
           // Content
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(
                 horizontal: w * 0.08,
-                vertical: h * 0.025,
+                vertical: h * 0.02,
+              ).copyWith(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -662,7 +663,7 @@ class _AccountPageState extends State<AccountPage> {
                   // MOBILE: editable (empty by default)
                   _buildEditableRow(
                     "Mobile Number",
-                    mobile.isEmpty ? '—' : mobile,
+                    mobile.isEmpty ? '' : mobile,
                     () {
                       _editField("Mobile Number", mobile, (val) async {
                         setState(() => mobile = val);
@@ -820,3 +821,5 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 }
+
+

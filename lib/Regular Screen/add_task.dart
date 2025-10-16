@@ -209,14 +209,14 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       backgroundColor: const Color(0xFFFAF6EF),
       resizeToAvoidBottomInset: true, // <-- Fix overflow when keyboard appears
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: SingleChildScrollView(padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16),
           child: Column(
             mainAxisSize: MainAxisSize.min, // <-- Prevent overflow
             children: [
               // Top pink header
               Container(
                 width: double.infinity,
-                height: 320,
+                // height removed to avoid overflow when keyboard shows\n                // height: 320,
                 decoration: const BoxDecoration(
                   color: Color(0xFFFFA8A8),
                   borderRadius: BorderRadius.only(
@@ -515,3 +515,5 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     );
   }
 }
+
+

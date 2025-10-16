@@ -356,67 +356,29 @@ class _TasksScreen extends State<TasksScreen> {
                           }
                           // Determine which guardian set the task
                           // 1) Use created_by_name if present
-                          String guardian = (t['created_by_name'] ?? '')
-                              .toString()
-                              .trim();
-                          // 2) If missing, and we have a creator id, resolve it (best-effort cache-less)
-                          if (guardian.isEmpty) {
-                            final createdBy = t['created_by']?.toString();
-                            if (createdBy != null && createdBy.isNotEmpty) {
-                              // Best-effort fetch; not awaited per item to avoid rebuild jank.
-                              ProfileService.fetchProfile(
-                                    Supabase.instance.client,
-                                    userId: createdBy,
-                                  )
-                                  .then((p) {
-                                    if (!mounted || p == null) return;
-                                    final name = (p['fullname'] ?? '')
-                                        .toString()
-                                        .trim();
-                                    if (name.isNotEmpty) {
-                                      setState(() {
-                                        // Update task map locally so subsequent builds show the name
-                                        _tasks[i]['created_by_name'] = name;
-                                      });
-                                    }
-                                  })
-                                  .catchError((_) {});
+                          String guardian = (t['created_by_name'] ?? '').toString().trim();
+if (guardian.isEmpty) {
+  final createdBy = t['created_by']?.toString();
+  if (createdBy != null && createdBy.isNotEmpty) {
+    ProfileService.fetchProfile(
+      Supabase.instance.client,
+      userId: createdBy,
+    ).then((p) {
+      if (!mounted || p == null) return;
+      final name = (p['fullname'] ?? '').toString().trim();
+      if (name.isNotEmpty) {
+        setState(() {
+          _tasks[i]['created_by_name'] = name;
+        });
+      }
+    }).catchError((_) {});
+  }
+}
+if (guardian.isEmpty) {
+  guardian = (_guardianFullName ?? (t['guardian_name'] ?? t['created_by_name'] ?? '')).toString().trim();
+}
 
-                          final title = (t['title'] ?? '').toString();
-                          final note = (t['description'] ?? '').toString();
-
-                          String guardian =
-                              (t['created_by_name'] ?? '').toString().trim();
-
-                          if (guardian.isEmpty) {
-                            final createdBy = t['created_by']?.toString();
-                            if (createdBy != null && createdBy.isNotEmpty) {
-                              ProfileService.fetchProfile(
-                                      Supabase.instance.client,
-                                      userId: createdBy)
-                                  .then((p) {
-                                if (!mounted || p == null) return;
-                                final name =
-                                    (p['fullname'] ?? '').toString().trim();
-                                if (name.isNotEmpty) {
-                                  setState(() {
-                                    _tasks[i]['created_by_name'] = name;
-                                  });
-                                }
-                              }).catchError((_) {});
-                            }
-                          }
-                          if (guardian.isEmpty) {
-                            guardian =
-                                (_guardianFullName ??
-                                        (t['guardian_name'] ??
-                                            t['created_by_name'] ??
-                                            ''))
-                                    .toString()
-                                    .trim();
-                          }
-
-                          String fmt(dynamic iso) {
+String fmt(dynamic iso) {
                             if (iso == null) return '';
                             try {
                               final dt = DateTime.parse(iso.toString()).toLocal();
@@ -793,4 +755,5 @@ class _AssistedTaskTile extends StatelessWidget {
     );
   }
 }
+
 

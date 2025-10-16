@@ -149,6 +149,9 @@ class ReminderService {
               'ReminderService: speaking TTS for task id=${r['id']} title="$title"',
             );
           }
+          try {
+            await _tts.awaitSpeakCompletion(true);
+          } catch (_) {}
           await _tts.speak('Reminder: $title. ${note.isNotEmpty ? note : ""}');
           if (kDebugMode) {
             // ignore: avoid_print
@@ -223,7 +226,8 @@ class ReminderService {
         builder: (dialogCtx) => _ReminderDialog(
           task: r as Map<String, dynamic>,
           guardianFullName: popupGuardianName,
-          isRegularUser: isRegularUser,
+          showGuardian: !isRegularUser,
+
           onSkip: () async {
             try {
               await client
@@ -311,6 +315,13 @@ class ReminderService {
       }
     } catch (_) {}
 
+    // Determine if guardian line should be shown for this user
+    bool regularRole = false;
+    try {
+      final role = await ProfileService.getCurrentUserRole(client);
+      regularRole = ((role ?? '').toLowerCase() == 'regular');
+    } catch (_) {}
+
     // ignore: use_build_context_synchronously
     await showDialog(
       context: ctx,
@@ -318,6 +329,7 @@ class ReminderService {
       builder: (dialogCtx) => _ReminderDialog(
         task: r!,
         guardianFullName: popupGuardianName,
+        showGuardian: !regularRole,
         onSkip: () async {
           try {
             await client
@@ -448,11 +460,13 @@ class _ReminderDialog extends StatelessWidget {
     required this.onSkip,
     required this.onDone,
     this.guardianFullName,
+    this.showGuardian = true,
   });
   final Map<String, dynamic> task;
   final VoidCallback onSkip;
   final VoidCallback onDone;
   final String? guardianFullName;
+  final bool showGuardian;
 
   @override
   Widget build(BuildContext context) {
@@ -534,7 +548,7 @@ class _ReminderDialog extends StatelessWidget {
                           'Note: $note',
                           style: GoogleFonts.nunito(fontSize: 14),
                         ),
-                      if (guardian.isNotEmpty)
+                      if (guardian.isNotEmpty && showGuardian)
                         Text(
                           'Guardian: $guardian',
                           style: GoogleFonts.nunito(fontSize: 14),
