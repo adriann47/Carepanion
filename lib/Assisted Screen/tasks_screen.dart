@@ -26,7 +26,7 @@ class _TasksScreen extends State<TasksScreen> {
   String? _guardianFullName;
   List<Map<String, dynamic>> _tasks = [];
   RealtimeChannel? _profileChannel;
-
+  int _streak = 0;
 
   @override
   void initState() {
@@ -34,6 +34,7 @@ class _TasksScreen extends State<TasksScreen> {
     _loadProfile();
     _loadTodayTasks();
     _subscribeProfileChanges();
+    _refreshStreak();
   }
 
   Future<void> _loadProfile() async {
@@ -62,7 +63,10 @@ class _TasksScreen extends State<TasksScreen> {
       final guardianId = (data?['guardian_id'] as String?)?.trim();
       if (guardianId != null && guardianId.isNotEmpty) {
         try {
-          final g = await ProfileService.fetchProfile(client, userId: guardianId);
+          final g = await ProfileService.fetchProfile(
+            client,
+            userId: guardianId,
+          );
           if (!mounted) return;
           final gName = (g?['fullname'] as String?)?.trim();
           if (gName != null && gName.isNotEmpty) {
@@ -132,9 +136,18 @@ class _TasksScreen extends State<TasksScreen> {
           _tasks.map((t) => (t['status']?.toString() == 'done')),
         );
       });
+      await _refreshStreak();
     } catch (e) {
       // ignore errors silently for now
     }
+  }
+
+  Future<void> _refreshStreak() async {
+    try {
+      final s = await TaskService.computeCurrentStreak();
+      if (!mounted) return;
+      setState(() => _streak = s);
+    } catch (_) {}
   }
 
   // ignore: unused_element
@@ -225,6 +238,65 @@ class _TasksScreen extends State<TasksScreen> {
                 ),
               ),
 
+              const SizedBox(height: 18),
+
+              // --- STREAK CARD ---
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.emoji_events,
+                      color: Colors.orange,
+                      size: 30,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _streak <= 0
+                                ? 'NO STREAK YET'
+                                : (_streak == 1
+                                      ? '1 DAY STREAK!'
+                                      : '$_streak DAYS STREAK!'),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: Color(0xFF2D2D2D),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Thanks for showing up today! Consistency is the key to forming strong habits.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF4A4A4A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 30),
               const Divider(thickness: 1),
 
@@ -270,34 +342,41 @@ class _TasksScreen extends State<TasksScreen> {
                           // Determine which guardian set the task
                           // 1) Use created_by_name if present
                           String guardian = (t['created_by_name'] ?? '')
-                                  .toString()
-                                  .trim();
+                              .toString()
+                              .trim();
                           // 2) If missing, and we have a creator id, resolve it (best-effort cache-less)
                           if (guardian.isEmpty) {
                             final createdBy = t['created_by']?.toString();
                             if (createdBy != null && createdBy.isNotEmpty) {
                               // Best-effort fetch; not awaited per item to avoid rebuild jank.
-                              ProfileService.fetchProfile(Supabase.instance.client, userId: createdBy)
+                              ProfileService.fetchProfile(
+                                    Supabase.instance.client,
+                                    userId: createdBy,
+                                  )
                                   .then((p) {
-                                if (!mounted || p == null) return;
-                                final name = (p['fullname'] ?? '')
-                                    .toString()
-                                    .trim();
-                                if (name.isNotEmpty) {
-                                  setState(() {
-                                    // Update task map locally so subsequent builds show the name
-                                    _tasks[i]['created_by_name'] = name;
-                                  });
-                                }
-                              }).catchError((_) {});
+                                    if (!mounted || p == null) return;
+                                    final name = (p['fullname'] ?? '')
+                                        .toString()
+                                        .trim();
+                                    if (name.isNotEmpty) {
+                                      setState(() {
+                                        // Update task map locally so subsequent builds show the name
+                                        _tasks[i]['created_by_name'] = name;
+                                      });
+                                    }
+                                  })
+                                  .catchError((_) {});
                             }
                           }
                           // 3) As final fallback, show linked guardian of assisted (legacy single guardian)
                           if (guardian.isEmpty) {
-                            guardian = (_guardianFullName ??
-                                    (t['guardian_name'] ?? t['created_by_name'] ?? ''))
-                                .toString()
-                                .trim();
+                            guardian =
+                                (_guardianFullName ??
+                                        (t['guardian_name'] ??
+                                            t['created_by_name'] ??
+                                            ''))
+                                    .toString()
+                                    .trim();
                           }
                           final color = i % 2 == 0
                               ? const Color(0xFFFFD6D6)
@@ -380,6 +459,12 @@ class _TasksScreen extends State<TasksScreen> {
                             if (index < _taskDone.length) {
                               setState(() => _taskDone[index] = newVal);
                             }
+                            // Optimistically activate streak immediately
+                            if (newVal && _streak == 0) {
+                              setState(() {
+                                _streak = 1;
+                              });
+                            }
                             if (taskId != null) {
                               try {
                                 if (newVal) {
@@ -391,12 +476,21 @@ class _TasksScreen extends State<TasksScreen> {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Failed to update task status'),
+                                      content: Text(
+                                        'Failed to update task status',
+                                      ),
                                     ),
                                   );
                                 }
                               }
                               await _loadTodayTasks();
+                              await _refreshStreak();
+                              Future.delayed(
+                                const Duration(milliseconds: 400),
+                                () {
+                                  if (mounted) _refreshStreak();
+                                },
+                              );
                             }
                           },
                         ),

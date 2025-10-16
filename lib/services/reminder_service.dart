@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/navigation.dart';
 import '../data/profile_service.dart';
+import 'notification_prefs.dart';
+import 'notification_service.dart';
 
 class ReminderService {
   ReminderService._();
@@ -17,10 +19,15 @@ class ReminderService {
   static final Set<String> _alerted = {};
   static String? _guardianFullNameCache;
   static String? _guardianCacheForUserId;
+  static bool _scheduledForToday = false;
+  static RealtimeChannel? _taskChannel;
+
+  static int _notifIdFor(DateTime dt) => dt.millisecondsSinceEpoch % 2147483647;
 
   static void start() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    _setupRealtime();
   }
 
   static bool get isRunning => _timer != null;
@@ -28,6 +35,12 @@ class ReminderService {
   static void stop() {
     _timer?.cancel();
     _timer = null;
+    if (_taskChannel != null) {
+      try {
+        Supabase.instance.client.removeChannel(_taskChannel!);
+      } catch (_) {}
+      _taskChannel = null;
+    }
   }
 
   static Future<void> _tick() async {
@@ -41,6 +54,7 @@ class ReminderService {
     if (_today != today) {
       _today = today;
       _alerted.clear();
+      _scheduledForToday = false;
     }
     final nowStr = DateFormat('HH:mm:ss').format(now);
 
@@ -51,7 +65,10 @@ class ReminderService {
         final guardianId = (me?['guardian_id'] as String?)?.trim();
         String? gName;
         if (guardianId != null && guardianId.isNotEmpty) {
-          final g = await ProfileService.fetchProfile(client, userId: guardianId);
+          final g = await ProfileService.fetchProfile(
+            client,
+            userId: guardianId,
+          );
           final gn = (g?['fullname'] as String?)?.trim();
           if (gn != null && gn.isNotEmpty) gName = gn;
         }
@@ -65,12 +82,41 @@ class ReminderService {
     try {
       rows = await client
           .from('tasks')
-          .select('id,title,description,start_at,end_at,due_date,status,user_id')
+          .select(
+            'id,title,description,start_at,end_at,due_date,status,user_id',
+          )
           .eq('due_date', today)
           .eq('user_id', user.id)
           .limit(200);
     } catch (_) {
       return;
+    }
+
+    // Ensure today's upcoming tasks are scheduled for background notification delivery
+    if (!_scheduledForToday) {
+      for (final r in rows) {
+        final startAt = r['start_at'];
+        if (startAt == null) continue;
+        DateTime dt;
+        try {
+          dt = DateTime.parse(startAt.toString()).toLocal();
+        } catch (_) {
+          continue;
+        }
+        // Skip past times
+        if (dt.isBefore(DateTime.now())) continue;
+        final title = (r['title'] ?? 'Task').toString();
+        final note = (r['description'] ?? '').toString();
+        final nid = _notifIdFor(dt);
+        await NotificationService.scheduleAt(
+          id: nid,
+          whenLocal: dt,
+          title: 'Task Reminder: $title',
+          body: note.isNotEmpty ? note : "It's time to do this task.",
+          payload: '{"task_id":"${r['id']}"}',
+        );
+      }
+      _scheduledForToday = true;
     }
 
     for (final r in rows) {
@@ -90,22 +136,49 @@ class ReminderService {
       if (!match) continue;
 
       _alerted.add(key);
-      _popupActive = true;
 
       final title = (r['title'] ?? 'Task').toString();
       final note = (r['description'] ?? '').toString();
+      // Speak if enabled (log errors so we can diagnose when speech fails)
       try {
-        if (!kIsWeb) {
+        if (!kIsWeb && NotificationPreferences.ttsEnabled.value) {
+          if (kDebugMode) {
+            // Indicate in logs that we are about to speak
+            // ignore: avoid_print
+            print(
+              'ReminderService: speaking TTS for task id=${r['id']} title="$title"',
+            );
+          }
           await _tts.speak('Reminder: $title. ${note.isNotEmpty ? note : ""}');
+          if (kDebugMode) {
+            // ignore: avoid_print
+            print('ReminderService: TTS complete for task id=${r['id']}');
+          }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        if (kDebugMode) {
+          // ignore: avoid_print
+          print('ReminderService: TTS failed for task id=${r['id']}: $e');
+          // ignore: avoid_print
+          print(st);
+        }
+      }
 
+      // If app is not in foreground or we can't get a context, show a push notification instead of popup
       final navigatorState = navKey.currentState;
       final ctx = navigatorState?.overlay?.context;
       if (navigatorState == null || ctx == null) {
-        _popupActive = false;
-        return;
+        await NotificationService.showNow(
+          id: _notifIdFor(dt),
+          title: 'Task Reminder: $title',
+          body: note.isNotEmpty ? note : 'It\'s time to do this task.',
+          payload: '{"task_id":"$id"}',
+        );
+        continue;
       }
+
+      // Popup path
+      _popupActive = true;
 
       // Try to resolve the creator name for the popup (created_by_name > created_by profile > cached guardian)
       String? popupGuardianName = _guardianFullNameCache;
@@ -122,7 +195,10 @@ class ReminderService {
           final createdBy = (detail?['created_by'] ?? '').toString().trim();
           if (createdBy.isNotEmpty) {
             try {
-              final p = await ProfileService.fetchProfile(client, userId: createdBy);
+              final p = await ProfileService.fetchProfile(
+                client,
+                userId: createdBy,
+              );
               final fn = (p?['fullname'] ?? '').toString().trim();
               if (fn.isNotEmpty) popupGuardianName = fn;
             } catch (_) {}
@@ -142,12 +218,34 @@ class ReminderService {
           guardianFullName: popupGuardianName,
           onSkip: () async {
             try {
-              await client.from('tasks').update({'status': 'skipped'}).eq('id', id);
+              await client
+                  .from('tasks')
+                  .update({'status': 'skipped'})
+                  .eq('id', id);
+              // Cancel scheduled notification if any
+              final sa = r['start_at'];
+              if (sa != null) {
+                try {
+                  final dt = DateTime.parse(sa.toString()).toLocal();
+                  await NotificationService.cancel(_notifIdFor(dt));
+                } catch (_) {}
+              }
             } catch (_) {}
           },
           onDone: () async {
             try {
-              await client.from('tasks').update({'status': 'done'}).eq('id', id);
+              await client
+                  .from('tasks')
+                  .update({'status': 'done'})
+                  .eq('id', id);
+              // Cancel scheduled notification if any
+              final sa = r['start_at'];
+              if (sa != null) {
+                try {
+                  final dt = DateTime.parse(sa.toString()).toLocal();
+                  await NotificationService.cancel(_notifIdFor(dt));
+                } catch (_) {}
+              }
             } catch (_) {}
           },
         ),
@@ -157,10 +255,192 @@ class ReminderService {
       break; // one popup per tick
     }
   }
+
+  // Exposed for notification tap to recreate the popup when user opens from push
+  static Future<void> showPopupForTaskId(String taskId) async {
+    if (kDebugMode) {
+      // ignore: avoid_print
+      print('ReminderService.showPopupForTaskId called with taskId=$taskId');
+    }
+    final client = Supabase.instance.client;
+    Map<String, dynamic>? r;
+    try {
+      final data = await client
+          .from('tasks')
+          .select('*')
+          .eq('id', taskId)
+          .maybeSingle();
+      if (data != null) r = Map<String, dynamic>.from(data);
+    } catch (_) {}
+    if (r == null) return;
+
+    final navigatorState = navKey.currentState;
+    final ctx = navigatorState?.overlay?.context;
+    if (navigatorState == null || ctx == null) return;
+
+    String? popupGuardianName;
+    try {
+      final detail = await client
+          .from('tasks')
+          .select('created_by_name, created_by')
+          .eq('id', taskId)
+          .maybeSingle();
+      final n = (detail?['created_by_name'] ?? '').toString().trim();
+      if (n.isNotEmpty) {
+        popupGuardianName = n;
+      } else {
+        final createdBy = (detail?['created_by'] ?? '').toString().trim();
+        if (createdBy.isNotEmpty) {
+          try {
+            final p = await ProfileService.fetchProfile(
+              client,
+              userId: createdBy,
+            );
+            final fn = (p?['fullname'] ?? '').toString().trim();
+            if (fn.isNotEmpty) popupGuardianName = fn;
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    // ignore: use_build_context_synchronously
+    await showDialog(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (dialogCtx) => _ReminderDialog(
+        task: r!,
+        guardianFullName: popupGuardianName,
+        onSkip: () async {
+          try {
+            await client
+                .from('tasks')
+                .update({'status': 'skipped'})
+                .eq('id', taskId);
+            final sa = r!['start_at'];
+            if (sa != null) {
+              try {
+                final dt = DateTime.parse(sa.toString()).toLocal();
+                await NotificationService.cancel(_notifIdFor(dt));
+              } catch (_) {}
+            }
+          } catch (_) {}
+        },
+        onDone: () async {
+          try {
+            await client
+                .from('tasks')
+                .update({'status': 'done'})
+                .eq('id', taskId);
+            final sa = r!['start_at'];
+            if (sa != null) {
+              try {
+                final dt = DateTime.parse(sa.toString()).toLocal();
+                await NotificationService.cancel(_notifIdFor(dt));
+              } catch (_) {}
+            }
+          } catch (_) {}
+        },
+      ),
+    );
+  }
+
+  static void _setupRealtime() {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return;
+
+    // If already subscribed for this user, skip
+    if (_taskChannel != null) return;
+
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    _taskChannel = client.channel('public:tasks')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'tasks',
+        callback: (payload) async {
+          try {
+            final rec = payload.newRecord;
+            if (rec['user_id']?.toString() != user.id) return;
+            if (rec['due_date']?.toString() != today) return;
+            final startAt = rec['start_at'];
+            if (startAt == null) return;
+            final dt = DateTime.parse(startAt.toString()).toLocal();
+            if (dt.isBefore(DateTime.now())) return;
+            final status = (rec['status'] ?? '').toString();
+            if (status == 'done' || status == 'skipped') return;
+            await NotificationService.scheduleAt(
+              id: _notifIdFor(dt),
+              whenLocal: dt,
+              title: 'Task Reminder: ${rec['title'] ?? 'Task'}',
+              body: (rec['description'] ?? '').toString().isNotEmpty
+                  ? rec['description'].toString()
+                  : "It's time to do this task.",
+              payload: '{"task_id":"${rec['id']}"}',
+            );
+          } catch (_) {}
+        },
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'tasks',
+        callback: (payload) async {
+          try {
+            final oldRec = payload.oldRecord;
+            final newRec = payload.newRecord;
+            if (newRec['user_id']?.toString() != user.id) return;
+            final oldStart = oldRec['start_at'];
+            if (oldStart != null) {
+              final oldDt = DateTime.parse(oldStart.toString()).toLocal();
+              await NotificationService.cancel(_notifIdFor(oldDt));
+            }
+
+            final status = (newRec['status'] ?? '').toString();
+            if (status == 'done' || status == 'skipped') return;
+            if (newRec['due_date']?.toString() != today) return;
+            final startAt = newRec['start_at'];
+            if (startAt == null) return;
+            final dt = DateTime.parse(startAt.toString()).toLocal();
+            if (dt.isBefore(DateTime.now())) return;
+            await NotificationService.scheduleAt(
+              id: _notifIdFor(dt),
+              whenLocal: dt,
+              title: 'Task Reminder: ${newRec['title'] ?? 'Task'}',
+              body: (newRec['description'] ?? '').toString().isNotEmpty
+                  ? newRec['description'].toString()
+                  : "It's time to do this task.",
+              payload: '{"task_id":"${newRec['id']}"}',
+            );
+          } catch (_) {}
+        },
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: 'tasks',
+        callback: (payload) async {
+          try {
+            final oldRec = payload.oldRecord;
+            if (oldRec['user_id']?.toString() != user.id) return;
+            final startAt = oldRec['start_at'];
+            if (startAt == null) return;
+            final dt = DateTime.parse(startAt.toString()).toLocal();
+            await NotificationService.cancel(_notifIdFor(dt));
+          } catch (_) {}
+        },
+      )
+      ..subscribe();
+  }
 }
 
 class _ReminderDialog extends StatelessWidget {
-  const _ReminderDialog({required this.task, required this.onSkip, required this.onDone, this.guardianFullName});
+  const _ReminderDialog({
+    required this.task,
+    required this.onSkip,
+    required this.onDone,
+    this.guardianFullName,
+  });
   final Map<String, dynamic> task;
   final VoidCallback onSkip;
   final VoidCallback onDone;
@@ -190,103 +470,116 @@ class _ReminderDialog extends StatelessWidget {
         return '';
       }
     }
+
     final s = fmt(task['start_at']);
     final e = fmt(task['end_at']);
     final time = s.isEmpty && e.isEmpty
         ? 'All day'
         : (s.isNotEmpty && e.isNotEmpty ? '$s - $e' : (s + e));
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      backgroundColor: Colors.white,
-      child: SingleChildScrollView(
-        child: Container(
-          width: 260,
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'ACTIVITY ALERT',
-                style: GoogleFonts.nunito(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                  color: const Color(0xFF2D2D2D),
+    return WillPopScope(
+      onWillPop: () async => false,
+      child: Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        backgroundColor: Colors.white,
+        child: SingleChildScrollView(
+          child: Container(
+            width: 260,
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'ACTIVITY ALERT',
+                  style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    color: const Color(0xFF2D2D2D),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFE1E1),
-                  borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFE1E1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 20,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Time: $time',
+                        style: GoogleFonts.nunito(fontSize: 14),
+                      ),
+                      if (note.isNotEmpty)
+                        Text(
+                          'Note: $note',
+                          style: GoogleFonts.nunito(fontSize: 14),
+                        ),
+                      if (guardian.isNotEmpty)
+                        Text(
+                          'Guardian: $guardian',
+                          style: GoogleFonts.nunito(fontSize: 14),
+                        ),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.nunito(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 20,
-                        color: Colors.black,
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF77CA0),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        onSkip();
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        'SKIP',
+                        style: GoogleFonts.nunito(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text('Time: $time', style: GoogleFonts.nunito(fontSize: 14)),
-                    if (note.isNotEmpty)
-                      Text('Note: $note', style: GoogleFonts.nunito(fontSize: 14)),
-                    if (guardian.isNotEmpty)
-                      Text('Guardian: $guardian', style: GoogleFonts.nunito(fontSize: 14)),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7DECF7),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        onDone();
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        'DONE',
+                        style: GoogleFonts.nunito(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF77CA0),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () {
-                      onSkip();
-                      Navigator.of(context).pop();
-                    },
-                    child: Text(
-                      'SKIP',
-                      style: GoogleFonts.nunito(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF7DECF7),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () {
-                      onDone();
-                      Navigator.of(context).pop();
-                    },
-                    child: Text(
-                      'DONE',
-                      style: GoogleFonts.nunito(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

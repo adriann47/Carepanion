@@ -22,37 +22,6 @@ class _AccountPageState extends State<AccountPage> {
   final TextEditingController _confirmPass = TextEditingController();
 
   // Edit Field Dialog (still used for other editable items if needed)
-  void _editField(String title, String currentValue, Function(String) onSave) {
-    final controller = TextEditingController(text: currentValue);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text("Edit $title"),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: "Enter new value",
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                onSave(controller.text.trim());
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text("Save"),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   void initState() {
@@ -75,7 +44,9 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _refreshGuardians() async {
     setState(() => _loadingGuardians = true);
     try {
-      final rows = await MultiGuardianService.listGuardians(Supabase.instance.client);
+      final rows = await MultiGuardianService.listGuardians(
+        Supabase.instance.client,
+      );
       if (!mounted) return;
       setState(() => guardians = rows);
     } catch (_) {
@@ -93,8 +64,7 @@ class _AccountPageState extends State<AccountPage> {
 
     // Subscribe to assisted_guardians insert/delete for this assisted user
     _agChannel?.unsubscribe();
-    _agChannel = client
-        .channel('public:assisted_guardians:$uid')
+    _agChannel = client.channel('public:assisted_guardians:$uid')
       ..onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
@@ -121,8 +91,7 @@ class _AccountPageState extends State<AccountPage> {
 
     // Subscribe to legacy profile guardian_id updates for current assisted
     _profileChannel?.unsubscribe();
-    _profileChannel = client
-        .channel('public:profile_guardian:$uid')
+    _profileChannel = client.channel('public:profile_guardian:$uid')
       ..onPostgresChanges(
         event: PostgresChangeEvent.update,
         schema: 'public',
@@ -174,7 +143,11 @@ class _AccountPageState extends State<AccountPage> {
                   await _refreshGuardians();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to link guardian. Ensure table and code are correct.')),
+                    const SnackBar(
+                      content: Text(
+                        'Failed to link guardian. Ensure table and code are correct.',
+                      ),
+                    ),
                   );
                 }
               } catch (e) {
@@ -255,8 +228,10 @@ class _AccountPageState extends State<AccountPage> {
           filled: true,
           fillColor: const Color(0x66B3E5FC),
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 14,
+          ),
         ),
       ),
     );
@@ -323,9 +298,9 @@ class _AccountPageState extends State<AccountPage> {
                 }
               } catch (e) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed: $e')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Failed: $e')));
               }
             },
           ),
@@ -357,14 +332,19 @@ class _AccountPageState extends State<AccountPage> {
             ),
             child: SafeArea(
               child: Padding(
-                padding:
-                    EdgeInsets.symmetric(horizontal: w * 0.05, vertical: h * 0.02),
+                padding: EdgeInsets.symmetric(
+                  horizontal: w * 0.05,
+                  vertical: h * 0.02,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back, color: Color(0xFF3D3D3D)),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Color(0xFF3D3D3D),
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -384,8 +364,10 @@ class _AccountPageState extends State<AccountPage> {
           // Content
           Expanded(
             child: SingleChildScrollView(
-              padding:
-                  EdgeInsets.symmetric(horizontal: w * 0.08, vertical: h * 0.025),
+              padding: EdgeInsets.symmetric(
+                horizontal: w * 0.08,
+                vertical: h * 0.025,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -416,7 +398,9 @@ class _AccountPageState extends State<AccountPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0x99B3E5FC),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 40, vertical: 12),
+                          horizontal: 40,
+                          vertical: 12,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -457,10 +441,12 @@ class _AccountPageState extends State<AccountPage> {
                   const SizedBox(height: 14),
 
                   if (_loadingGuardians)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CircularProgressIndicator(),
-                    )),
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    ),
                   ...guardians.map((g) => _buildGuardianRow(g)),
 
                   GestureDetector(
@@ -468,7 +454,9 @@ class _AccountPageState extends State<AccountPage> {
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFB3E5FC),
                         borderRadius: BorderRadius.circular(28),

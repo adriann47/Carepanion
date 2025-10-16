@@ -200,10 +200,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  void _onTabTapped(int index) {
-    // handle your assisted nav here if needed
-  }
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;

@@ -25,14 +25,15 @@ class TaskService {
   static final SupabaseClient _client = Supabase.instance.client;
   static String? get _uid => _client.auth.currentUser?.id;
 
-  static String _toDateString(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
+  static String _toDateString(DateTime date) =>
+      DateFormat('yyyy-MM-dd').format(date);
 
   static DateTime? _combineDateAndTime(DateTime date, TimeOfDay? tod) {
     if (tod == null) return null;
     return DateTime(date.year, date.month, date.day, tod.hour, tod.minute);
   }
 
-/// Creates a task row in Supabase.
+  /// Creates a task row in Supabase.
   static Future<void> createTask({
     required String title,
     String? description,
@@ -88,7 +89,8 @@ class TaskService {
       // Fallback if optional columns don't exist in DB
       final fallback = Map<String, dynamic>.from(data);
       bool modified = false;
-      if (msg.contains('created_by_name') && fallback.containsKey('created_by_name')) {
+      if (msg.contains('created_by_name') &&
+          fallback.containsKey('created_by_name')) {
         fallback.remove('created_by_name');
         modified = true;
       }
@@ -96,7 +98,8 @@ class TaskService {
         fallback.remove('created_by');
         modified = true;
       }
-      if (msg.contains("'category'") || (msg.contains('category') && fallback.containsKey('category'))) {
+      if (msg.contains("'category'") ||
+          (msg.contains('category') && fallback.containsKey('category'))) {
         fallback.remove('category');
         modified = true;
       }
@@ -108,13 +111,13 @@ class TaskService {
     }
   }
 
-/// Fetch tasks for a specific calendar date (local date match on `due_date`).
-  static Future<List<Map<String, dynamic>>> getTasksForDate(DateTime date, {String? forUserId}) async {
+  /// Fetch tasks for a specific calendar date (local date match on `due_date`).
+  static Future<List<Map<String, dynamic>>> getTasksForDate(
+    DateTime date, {
+    String? forUserId,
+  }) async {
     final dateStr = _toDateString(date);
-    var builder = _client
-        .from('tasks')
-        .select()
-        .eq('due_date', dateStr);
+    var builder = _client.from('tasks').select().eq('due_date', dateStr);
 
     final uid = _uid;
     if (forUserId != null) {
@@ -127,7 +130,7 @@ class TaskService {
     return List<Map<String, dynamic>>.from(result);
   }
 
-/// Update an existing task.
+  /// Update an existing task.
   static Future<void> updateTask({
     required int id,
     String? title,
@@ -142,17 +145,15 @@ class TaskService {
     final Map<String, dynamic> data = {};
     if (title != null) data['title'] = title;
     if (description != null) data['description'] = description;
-    if (category != null) data['category'] = category.trim().isEmpty ? null : category;
+    if (category != null)
+      data['category'] = category.trim().isEmpty ? null : category;
     if (status != null) data['status'] = status;
     if (dueDate != null) data['due_date'] = _toDateString(dueDate);
 
     // We may need the existing due_date when only time changes
     DateTime? effectiveDate = dueDate;
     if (effectiveDate == null && (startTime != null || endTime != null)) {
-      var builder = _client
-          .from('tasks')
-          .select('due_date')
-          .eq('id', id);
+      var builder = _client.from('tasks').select('due_date').eq('id', id);
       final uid2 = forUserId ?? _uid;
       if (uid2 != null) builder = builder.eq('user_id', uid2);
       final List existingList = await builder.limit(1);
@@ -190,11 +191,14 @@ class TaskService {
       }
       final List updatedList = await upd.select('id');
       if (updatedList.isEmpty) {
-        throw Exception('Task not updated. It may not exist or you may not have permission.');
+        throw Exception(
+          'Task not updated. It may not exist or you may not have permission.',
+        );
       }
     } catch (e) {
       final msg = e.toString().toLowerCase();
-      if (msg.contains("'category'") || (msg.contains('category') && data.containsKey('category'))) {
+      if (msg.contains("'category'") ||
+          (msg.contains('category') && data.containsKey('category'))) {
         final fallback = Map<String, dynamic>.from(data);
         fallback.remove('category');
         var upd = _client.from('tasks').update(fallback).eq('id', id);
@@ -204,7 +208,9 @@ class TaskService {
         }
         final List updatedList = await upd.select('id');
         if (updatedList.isEmpty) {
-          throw Exception('Task not updated. It may not exist or you may not have permission.');
+          throw Exception(
+            'Task not updated. It may not exist or you may not have permission.',
+          );
         }
         return;
       }
@@ -213,15 +219,22 @@ class TaskService {
   }
 
   /// Convenience: set only the status field for a task by id.
-  static Future<void> setTaskStatus({required int id, required String status, String? forUserId}) async {
+  static Future<void> setTaskStatus({
+    required int id,
+    required String status,
+    String? forUserId,
+  }) async {
     await updateTask(id: id, status: status, forUserId: forUserId);
   }
 
-  static Future<void> markDone(int id, {String? forUserId}) => setTaskStatus(id: id, status: 'done', forUserId: forUserId);
-  static Future<void> markSkip(int id, {String? forUserId}) => setTaskStatus(id: id, status: 'skip', forUserId: forUserId);
-  static Future<void> markTodo(int id, {String? forUserId}) => setTaskStatus(id: id, status: 'todo', forUserId: forUserId);
+  static Future<void> markDone(int id, {String? forUserId}) =>
+      setTaskStatus(id: id, status: 'done', forUserId: forUserId);
+  static Future<void> markSkip(int id, {String? forUserId}) =>
+      setTaskStatus(id: id, status: 'skip', forUserId: forUserId);
+  static Future<void> markTodo(int id, {String? forUserId}) =>
+      setTaskStatus(id: id, status: 'todo', forUserId: forUserId);
 
-/// Delete a task by id. Returns true if a row was deleted, false otherwise.
+  /// Delete a task by id. Returns true if a row was deleted, false otherwise.
   static Future<bool> deleteTask(int id, {String? forUserId}) async {
     try {
       var del = _client.from('tasks').delete().eq('id', id);
@@ -234,7 +247,9 @@ class TaskService {
     } catch (e) {
       final msg = e.toString().toLowerCase();
       if (msg.contains('permission denied') || msg.contains('policy')) {
-        throw Exception('Delete blocked by security policy. Please sign in as the owner of the task or adjust RLS policies.');
+        throw Exception(
+          'Delete blocked by security policy. Please sign in as the owner of the task or adjust RLS policies.',
+        );
       }
       rethrow;
     }
@@ -255,5 +270,64 @@ class TaskService {
     } catch (_) {
       // ignore silently; non-blocking hygiene step
     }
+  }
+
+  /// Compute the current daily streak for a user: number of consecutive days (starting from today)
+  /// where the user completed at least one task. If today has no completed task, streak is 0 even
+  /// if there were completions yesterday (resets at day end if missed).
+  static Future<int> computeCurrentStreak({
+    String? forUserId,
+    int lookbackDays = 90,
+  }) async {
+    final uid = forUserId ?? _uid;
+    if (uid == null) return 0;
+
+    final today = DateTime.now();
+    final since = today.subtract(Duration(days: lookbackDays));
+    final sinceStr = _toDateString(since);
+
+    // Fetch recent tasks with potential completion markers
+    var q = _client
+        .from('tasks')
+        .select('due_date,status,is_done,done')
+        .gte('due_date', sinceStr)
+        .eq('user_id', uid);
+
+    // Prefer server-side filter by completion when supported
+    try {
+      q = q.or('status.eq.done,is_done.eq.true,done.eq.true');
+    } catch (_) {
+      // Older SDKs may not support .or; we'll filter client-side
+    }
+
+    final List list = await q.limit(2000);
+
+    // Build set of dates where there is at least one completed task
+    final Set<String> completedDays = {};
+    for (final row in list) {
+      final status = (row['status'] ?? '').toString().toLowerCase();
+      final isDoneRaw = row['is_done'] ?? row['done'];
+      final isDone =
+          status == 'done' ||
+          (isDoneRaw is bool && isDoneRaw) ||
+          (isDoneRaw is String && (isDoneRaw == 'true' || isDoneRaw == '1')) ||
+          (isDoneRaw is num && isDoneRaw != 0);
+      if (!isDone) continue;
+      final due = row['due_date']?.toString();
+      if (due != null && due.isNotEmpty) {
+        completedDays.add(due);
+      }
+    }
+
+    // Count consecutive days from today backwards
+    int streak = 0;
+    DateTime d = DateTime(today.year, today.month, today.day);
+    while (true) {
+      final key = _toDateString(d);
+      if (!completedDays.contains(key)) break;
+      streak++;
+      d = d.subtract(const Duration(days: 1));
+    }
+    return streak;
   }
 }

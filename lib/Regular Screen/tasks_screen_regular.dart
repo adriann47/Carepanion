@@ -9,6 +9,8 @@ import 'package:intl/intl.dart';
 import 'package:softeng/data/profile_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:softeng/services/task_service.dart';
+// import 'package:softeng/services/notification_service.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 // Removed local TTS usage; global ReminderService handles any speech if needed.
 
@@ -29,12 +31,14 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   RealtimeChannel? _profileChannel;
   // Local per-screen timer removed; popups handled by global ReminderService
   List<Map<String, dynamic>> _completedNotifications = [];
+  int _streak = 0;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
     _subscribeProfileChanges();
+    _refreshStreak();
     // Popups are handled globally by ReminderService; no local timer here.
   }
 
@@ -44,6 +48,14 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   void dispose() {
     _profileChannel?.unsubscribe();
     super.dispose();
+  }
+
+  Future<void> _refreshStreak() async {
+    try {
+      final s = await TaskService.computeCurrentStreak();
+      if (!mounted) return;
+      setState(() => _streak = s);
+    } catch (_) {}
   }
 
   String _friendlyFromEmail(String email) {
@@ -145,7 +157,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
       final result = await Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => NotificationScreen(notifications: _completedNotifications),
+          builder: (_) =>
+              NotificationScreen(notifications: _completedNotifications),
         ),
       );
       if (result is List<Map<String, dynamic>>) {
@@ -172,6 +185,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFEF9F4),
+      // No debug FAB
+      floatingActionButton: null,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 20),
@@ -220,7 +235,11 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "3 DAYS STREAK!",
+                            _streak <= 0
+                                ? "NO STREAK YET"
+                                : (_streak == 1
+                                      ? "1 DAY STREAK!"
+                                      : "$_streak DAYS STREAK!"),
                             style: GoogleFonts.nunito(
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
@@ -255,7 +274,18 @@ class _TasksScreenState extends State<TasksScreenRegular> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: _TodayTasksStream(
-                  onEdited: () => setState(() {}),
+                  onEdited: (task, done) async {
+                    setState(() {
+                      // Optimistically activate streak immediately for today's tasks
+                      if (done && _streak == 0) {
+                        _streak = 1;
+                      }
+                    });
+                    await _refreshStreak();
+                    Future.delayed(const Duration(milliseconds: 400), () {
+                      if (mounted) _refreshStreak();
+                    });
+                  },
                 ),
               ),
             ],
@@ -295,6 +325,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
       ),
     );
   }
+
+  // Debug helper removed.
 
   static BottomNavigationBarItem _navItem(
     IconData icon,
@@ -413,7 +445,7 @@ class _UserHeaderCard extends StatelessWidget {
 
 class _TodayTasksStream extends StatelessWidget {
   const _TodayTasksStream({required this.onEdited});
-  final VoidCallback onEdited;
+  final void Function(Map<String, dynamic> task, bool done) onEdited;
 
   @override
   Widget build(BuildContext context) {
@@ -460,7 +492,7 @@ class _TodayTasksStream extends StatelessWidget {
           return DateTime.parse(sa).compareTo(DateTime.parse(sb));
         });
 
-  // no-op: global reminder service handles timing
+        // no-op: global reminder service handles timing
 
         if (tasks.isEmpty) {
           return Padding(
@@ -492,7 +524,7 @@ class _TaskTile extends StatefulWidget {
   const _TaskTile({super.key, required this.task, required this.onEdited});
 
   final Map<String, dynamic> task;
-  final VoidCallback onEdited;
+  final void Function(Map<String, dynamic> task, bool done) onEdited;
 
   @override
   State<_TaskTile> createState() => _TaskTileState();
@@ -545,11 +577,14 @@ class _TaskTileState extends State<_TaskTile> {
       widget.task['status'] = value ? 'done' : 'todo';
       widget.task['is_done'] = value;
       widget.task['done'] = value;
+      // Inform parent so it can refresh streak
+      if (mounted) widget.onEdited(widget.task, value);
     } catch (e) {
       if (mounted) {
         setState(() => _done = prev);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to update task: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update task: $e')));
       }
     }
   }
@@ -730,7 +765,9 @@ class _TaskTileState extends State<_TaskTile> {
                                       EditTaskScreen(task: widget.task),
                                 ),
                               );
-                              if (changed == true) widget.onEdited();
+                              if (changed == true) {
+                                widget.onEdited(widget.task, _done);
+                              }
                             },
                           ),
                         ],
