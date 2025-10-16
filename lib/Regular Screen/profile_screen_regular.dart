@@ -22,6 +22,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _currentIndex = 4;
   String? _avatarUrl;
   String? _fullName;
+  String? _phone;
+  String? _birthday;
 
   @override
   void initState() {
@@ -34,7 +36,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final client = Supabase.instance.client;
       final authUser = client.auth.currentUser;
 
-      final data = await ProfileService.fetchProfile(client);
+  final data = await ProfileService.fetchProfile(client);
       if (!mounted) return;
 
       final fullname = (data?['fullname'] as String?)?.trim();
@@ -54,6 +56,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _avatarUrl = (raw == null || raw.trim().isEmpty)
             ? null
             : '$raw?v=${DateTime.now().millisecondsSinceEpoch}';
+        _phone = ProfileService.readPhoneFrom(data);
+        _birthday = ProfileService.readBirthdayFrom(data);
       });
     } catch (_) {
       // ignore
@@ -130,6 +134,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   letterSpacing: 0.5,
                 ),
               ),
+
+              if ((_birthday ?? '').isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _birthday!,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+
+              if ((_phone ?? '').isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _phone!,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 25),
 

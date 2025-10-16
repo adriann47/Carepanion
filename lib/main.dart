@@ -23,6 +23,7 @@ import 'services/reminder_service.dart';
 import 'services/emergency_service.dart';
 import 'services/notification_prefs.dart';
 import 'services/notification_service.dart';
+import 'services/guardian_request_service.dart';
 import 'Regular Screen/tasks_screen_regular.dart';
 
 Future<void> main() async {
@@ -104,6 +105,11 @@ void _setupGlobalAuthListener() {
           (route) => false,
         );
       }
+      // Start guardian request listener for signed-in users
+      GuardianRequestService().start();
+    } else if (data.event == AuthChangeEvent.signedOut) {
+      // Stop guardian request listener on sign out
+      GuardianRequestService().stop();
     }
   });
 }
@@ -118,6 +124,10 @@ class CarePanionApp extends StatelessWidget {
     ReminderService.start();
     // Start emergency listener for guardian users
     EmergencyService.start();
+    // Start guardian request listener if user is already signed in
+    if (Supabase.instance.client.auth.currentUser != null) {
+      GuardianRequestService().start();
+    }
 
     // If the app was launched from a notification, show the reminder popup.
     // We purposely do this after starting services so navKey is available.
@@ -168,3 +178,4 @@ class CarePanionApp extends StatelessWidget {
     );
   }
 }
+

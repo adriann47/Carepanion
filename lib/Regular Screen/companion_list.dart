@@ -40,25 +40,74 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
         event: PostgresChangeEvent.insert,
         schema: 'public',
         table: 'assisted_guardians',
-        callback: (payload) {
-          final newRec = payload.newRecord as Map<String, dynamic>?;
-          if (newRec?['guardian_id']?.toString() == gid) {
-            final assistedId = newRec?['assisted_id']?.toString();
-            if (assistedId != null && assistedId.isNotEmpty) {
-              // Fetch the assisted profile and append to the list if not present
-              ProfileService.fetchProfile(client, userId: assistedId).then((p) {
-                if (!mounted || p == null) return;
-                final already = _assisteds.any((e) => e['id'] == p['id']);
-                if (!already) {
-                  setState(() => _assisteds = [..._assisteds, p]);
+        callback: (payload) async {
+          try {
+            final newRec = payload.newRecord as Map<String, dynamic>?;
+            // Debug log: print payload (helps in dev builds)
+            // ignore: avoid_print
+            print('assisted_guardians INSERT payload: $newRec');
+
+            if (newRec?['guardian_id']?.toString() == gid) {
+              final assistedId = newRec?['assisted_id']?.toString();
+              if (assistedId != null && assistedId.isNotEmpty) {
+                // Show a short snackbar so the guardian sees something even if the dialog fails
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('New companion request received')),
+                  );
                 }
-              }).catchError((_) {
-                // fallback to full reload if direct fetch fails
+
+                // Prompt guardian to accept or reject the request
+                final prof = await ProfileService.fetchProfile(client, userId: assistedId);
+                if (!mounted) return;
+                final name = (prof?['fullname'] ?? prof?['name'] ?? 'Assisted') as String;
+                // showDialog must be called from the UI thread
+                if (mounted) {
+                  try {
+                    await showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Companion request'),
+                        content: Text('$name requested you as guardian. Accept?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.of(ctx).pop();
+                              // mark as rejected
+                              await client.from('assisted_guardians').update({'status': 'rejected'}).eq('assisted_id', assistedId).eq('guardian_id', gid);
+                              _loadAssisteds();
+                            },
+                            child: const Text('Reject'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () async {
+                              Navigator.of(ctx).pop();
+                              // mark as accepted
+                              await client.from('assisted_guardians').update({'status': 'accepted'}).eq('assisted_id', assistedId).eq('guardian_id', gid);
+                              // update profile to set guardian_id for the assisted user
+                              await client.from('profile').update({'guardian_id': gid}).eq('id', assistedId);
+                              _loadAssisteds();
+                            },
+                            child: const Text('Accept'),
+                          ),
+                        ],
+                      ),
+                    );
+                  } catch (ex) {
+                    // ignore: avoid_print
+                    print('Error showing companion request dialog: $ex');
+                    // fallback: ensure assisteds list refreshed
+                    _loadAssisteds();
+                  }
+                }
+              } else {
                 _loadAssisteds();
-              });
-            } else {
-              _loadAssisteds();
+              }
             }
+          } catch (e) {
+            // ignore: avoid_print
+            print('Error handling assisted_guardians insert payload: $e');
+            _loadAssisteds();
           }
         },
       )

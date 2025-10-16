@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:softeng/data/feedback_service.dart';
 import 'package:softeng/Regular Screen/notification_screen.dart';
 import 'account_regular.dart';
 import 'notification_regular.dart';
@@ -62,9 +64,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: "REPORT A BUG",
           textController: controller,
           hint: "ENTER CONCERN..",
-          onSubmit: () {
-            print("Bug reported: ${controller.text}");
-            Navigator.pop(context);
+          onSubmit: () async {
+            final user = Supabase.instance.client.auth.currentUser;
+            final text = controller.text.trim();
+            if (text.isEmpty) {
+              ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('Please enter a description')));
+              return;
+            }
+            // show loading
+            showDialog(barrierDismissible: false, context: context, builder: (_) => const Center(child: CircularProgressIndicator()));
+            try {
+              await FeedbackService.submitFeedback(
+                userId: user?.id ?? '',
+                subject: 'Bug report',
+                message: text,
+              );
+              Navigator.pop(context); // remove loading
+              Navigator.pop(context); // close the form dialog
+              ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('Bug report submitted. Thank you!')));
+            } catch (e) {
+              Navigator.pop(context); // remove loading
+              ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text('Failed to submit bug: $e')));
+            }
           },
         );
       },
@@ -84,9 +105,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
               textController: controller,
               hint: "ENTER FEEDBACK...",
               extraWidget: _buildStars(setDialogState),
-              onSubmit: () {
-                print("Feedback: ${controller.text}, Stars: $_selectedStars");
-                Navigator.pop(context);
+              onSubmit: () async {
+                final user = Supabase.instance.client.auth.currentUser;
+                final text = controller.text.trim();
+                if (text.isEmpty) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('Please enter feedback')));
+                  return;
+                }
+                // show loading
+                showDialog(barrierDismissible: false, context: context, builder: (_) => const Center(child: CircularProgressIndicator()));
+                try {
+                  await FeedbackService.submitFeedback(
+                    userId: user?.id ?? '',
+                    subject: 'User feedback',
+                    message: text,
+                    stars: _selectedStars,
+                  );
+                  Navigator.pop(context); // remove loading
+                  Navigator.pop(context); // close the form dialog
+                  ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('Feedback submitted. Thank you!')));
+                } catch (e) {
+                  Navigator.pop(context); // remove loading
+                  ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text('Failed to submit feedback: $e')));
+                }
               },
             );
           },

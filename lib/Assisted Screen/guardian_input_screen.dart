@@ -28,24 +28,109 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter guardian ID')));
       return;
     }
-    // Let the backend (profile table lookup) determine validity of the provided id.
+    // Create a guardian request (assisted_guardians row with status 'pending')
     setState(() => _isLoading = true);
+    final supabase = Supabase.instance.client;
     try {
-      final supabase = Supabase.instance.client;
-      // Use ProfileService helper to link guardian by public id
-      final ok = await ProfileService.linkGuardianByPublicId(supabase, guardianPublicId: val);
-      if (!ok) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian not found or failed to link')));
-        return;
-      }
+      await ProfileService.requestGuardianByPublicId(supabase, guardianPublicId: val);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian linked successfully')));
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TasksScreen()));
+      // Show a blocking waiting dialog while we poll for guardian response
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          backgroundColor: Colors.white,
+          child: SingleChildScrollView(
+            child: Container(
+              width: 320,
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'WAITING FOR GUARDIAN',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.nunito(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      color: const Color(0xFF4A4A4A),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFC68A),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: const Color(0xFFCA5000), width: 1.6),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          offset: const Offset(0, 4),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          'REQUEST SENT',
+                          style: GoogleFonts.nunito(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF5A2F00),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'A request has been sent to your guardian. Waiting for confirmation...',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF2B2B2B),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFCA5000)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final status = await ProfileService.waitForGuardianResponse(supabase, timeout: const Duration(minutes: 5));
+      // Close waiting dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (status == 'accepted') {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian accepted.')));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TasksScreen()));
+        return;
+      } else if (status == 'rejected') {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian rejected your request.')));
+        return;
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No response from guardian (timeout).')));
+        return;
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to link guardian: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to request guardian: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

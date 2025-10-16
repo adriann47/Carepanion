@@ -85,27 +85,43 @@ class ProfileService {
           if (pub != null) insertPayload['public_id'] = pub;
         }
 
-        await client.from(table).insert(insertPayload);
-        return;
+        // Retry insert up to 3 times
+        bool inserted = false;
+        for (int attempt = 0; attempt < 3 && !inserted; attempt++) {
+          try {
+            await client.from(table).insert(insertPayload);
+            inserted = true;
+          } catch (e) {
+            if (attempt == 2) {
+              if (kDebugMode) {
+                print('ProfileService.ensureProfileExists insert failed: $e');
+              }
+            } else {
+              await Future.delayed(const Duration(milliseconds: 500));
+            }
+          }
+        }
+        if (!inserted) return; // Skip if insert failed
       }
 
       // 3) Row exists — only patch missing fields. Never overwrite an existing fullname here.
+      final existingMap = existing as Map<String, dynamic>;
       final updatePayload = <String, dynamic>{};
 
       // Set email if currently null and we have one
-      final dynamic existingEmail = existing['email'];
+      final dynamic existingEmail = existingMap['email'];
       if ((existingEmail == null || existingEmail.toString().trim().isEmpty) && email != null) {
         updatePayload['email'] = email;
       }
 
       // Set role if currently null and we have one
-      final dynamic existingRole = existing['role'];
+      final dynamic existingRole = existingMap['role'];
       if ((existingRole == null || existingRole.toString().trim().isEmpty) && effectiveRole != null) {
         updatePayload['role'] = effectiveRole;
       }
 
       // Ensure Regular users have public_id; don't touch if it already exists
-      final dynamic existingPublicId = existing['public_id'];
+      final dynamic existingPublicId = existingMap['public_id'];
       if ((effectiveRole ?? existingRole?.toString() ?? '').toLowerCase() == 'regular') {
         if (existingPublicId == null || existingPublicId.toString().trim().isEmpty) {
           final pub = await _generateUniquePublicId(client, table);
@@ -169,6 +185,91 @@ class ProfileService {
     }
   }
 
+  /// Instead of directly linking, create a guardian request row in
+  /// `assisted_guardians` with status 'pending'. Returns true if the
+  /// request was created.
+  /// Create a guardian request row in `assisted_guardians` with status 'pending'.
+  /// Throws an exception with a helpful message on failure.
+  static Future<void> requestGuardianByPublicId(
+    SupabaseClient client, {
+    required String guardianPublicId,
+  }) async {
+    final table = await _resolveTable(client);
+
+    // Try to locate guardian by multiple likely columns (public_id, share_code)
+    Map<String, dynamic>? guardian;
+    try {
+      guardian = await client
+          .from(table)
+          .select('id')
+          .or('public_id.eq.$guardianPublicId,share_code.eq.$guardianPublicId')
+          .maybeSingle();
+    } catch (e) {
+      throw Exception('Failed to query profile table: $e');
+    }
+
+    if (guardian == null) throw Exception('Guardian not found for id $guardianPublicId');
+    final guardianId = guardian['id'] as String;
+    final user = client.auth.currentUser;
+    if (user == null) throw Exception('Not authenticated');
+
+    // Prevent duplicate pending requests to same guardian
+    try {
+      final exists = await client
+          .from('assisted_guardians')
+          .select('id')
+          .eq('assisted_id', user.id)
+          .eq('guardian_id', guardianId)
+          .eq('status', 'pending')
+          .limit(1)
+          .maybeSingle();
+      if (exists != null) return; // already pending
+    } catch (e) {
+      throw Exception('Failed to check existing requests: $e');
+    }
+
+    // Insert request row
+    try {
+      await client.from('assisted_guardians').insert({
+        'assisted_id': user.id,
+        'guardian_id': guardianId,
+        'status': 'pending',
+      });
+    } catch (e) {
+      throw Exception('Failed to create guardian request (assisted_guardians table may be missing): $e');
+    }
+  }
+
+  /// Poll for guardian response for the currently authenticated user.
+  /// Returns 'accepted'|'rejected'|'timeout'.
+  static Future<String> waitForGuardianResponse(
+    SupabaseClient client, {
+    Duration timeout = const Duration(minutes: 5),
+    Duration pollInterval = const Duration(seconds: 3),
+  }) async {
+    final user = client.auth.currentUser;
+    if (user == null) return 'timeout';
+
+    final end = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(end)) {
+      try {
+        final row = await client
+            .from('assisted_guardians')
+            .select('status')
+            .eq('assisted_id', user.id)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        if (row != null && row['status'] != null) {
+          final status = row['status'] as String;
+          if (status == 'accepted' || status == 'rejected') return status;
+        }
+      } catch (_) {}
+      await Future.delayed(pollInterval);
+    }
+    return 'timeout';
+  }
+
   /// Fetch all assisted users for a given guardian ID.
   static Future<List<Map<String, dynamic>>> fetchAssistedsForGuardian(
     SupabaseClient client, {
@@ -224,6 +325,7 @@ class ProfileService {
     String? fullName,
     String? role,
     String? birthday,
+    String? phone,
   }) async {
     final table = await _resolveTable(client);
     final payload = <String, dynamic>{'id': id};
@@ -231,7 +333,25 @@ class ProfileService {
     if (fullName != null) payload['fullname'] = fullName;
     if (role != null) payload['role'] = role;
     if (birthday != null) payload['birthday'] = birthday;
-    await client.from(table).upsert(payload);
+    if (phone != null) payload['phone'] = phone;
+  
+    // Retry up to 3 times in case of RLS timing issues
+    for (int attempt = 0; attempt < 3; attempt++) {
+      try {
+        await client.from(table).upsert(payload);
+        return; // Success, exit
+      } catch (e) {
+        if (attempt == 2) {
+          // Last attempt failed, log and ignore
+          if (kDebugMode) {
+            print('ProfileService.upsertProfile failed after 3 attempts: $e');
+          }
+        } else {
+          // Wait before retry
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
+    }
   }
 
   /// Fetch the profile row for the supplied [id] or the current auth user.
@@ -323,6 +443,66 @@ class ProfileService {
       if (r == null) return null;
       final s = r.toString().trim();
       return s.isEmpty ? null : s;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Robustly set a phone/mobile field for the given user id, trying common column names.
+  /// Tries 'phone', then 'mobile', then 'mobile_number'. Returns true on success.
+  static Future<bool> setPhone(
+    SupabaseClient client, {
+    required String id,
+    required String phone,
+  }) async {
+    final table = await _resolveTable(client);
+    final List<String> columns = ['phone', 'mobile', 'mobile_number'];
+    for (final col in columns) {
+      try {
+        await client.from(table).update({col: phone}).eq('id', id);
+        return true;
+      } catch (_) {
+        continue;
+      }
+    }
+    // If update failed (row might not exist), try insert/upsert with each column
+    for (final col in columns) {
+      try {
+        await client.from(table).upsert({'id': id, col: phone});
+        return true;
+      } catch (_) {
+        continue;
+      }
+    }
+    return false;
+  }
+
+  /// Helper to read a phone/mobile value from a profile map using common keys.
+  static String? readPhoneFrom(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    final keys = ['phone', 'mobile', 'mobile_number'];
+    for (final k in keys) {
+      final v = data[k];
+      if (v != null) {
+        final s = v.toString().trim();
+        if (s.isNotEmpty) return s;
+      }
+    }
+    return null;
+  }
+
+  /// Read common birthday fields and return a readable string like "January 2, 1990" or null.
+  static String? readBirthdayFrom(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    final raw = (data['birthday'] ?? '').toString().trim();
+    if (raw.isEmpty) return null;
+    try {
+      final dt = DateTime.parse(raw);
+      final months = [
+        '', 'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      return '${months[dt.month]} ${dt.day}, ${dt.year}';
     } catch (_) {
       return null;
     }

@@ -12,8 +12,8 @@ import 'package:softeng/services/task_service.dart';
 // import 'package:softeng/services/notification_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
-// Removed local TTS usage; global ReminderService handles any speech if needed.
 
+// ====================== MAIN SCREEN ======================
 class TasksScreenRegular extends StatefulWidget {
   const TasksScreenRegular({super.key});
 
@@ -29,7 +29,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   String? _fullName;
   String? _email;
   RealtimeChannel? _profileChannel;
-  // Local per-screen timer removed; popups handled by global ReminderService
   List<Map<String, dynamic>> _completedNotifications = [];
   int _streak = 0;
 
@@ -41,8 +40,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     _refreshStreak();
     // Popups are handled globally by ReminderService; no local timer here.
   }
-
-  // Removed local timer; see ReminderService for global checks
 
   @override
   void dispose() {
@@ -72,34 +69,26 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     try {
       final client = Supabase.instance.client;
       final authUser = client.auth.currentUser;
-
       final data = await ProfileService.fetchProfile(client);
       if (!mounted) return;
 
       setState(() {
-        // Prefer a short public_id (8-digit) stored in profile for display.
         final publicId = data?['public_id'] as String?;
         _userId = (publicId != null && publicId.trim().isNotEmpty)
             ? publicId
             : (authUser?.id ?? '—');
-
         _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
-
         final name = (data?['fullname'] as String?)?.trim();
-        if (name != null && name.isNotEmpty) {
-          _fullName = name;
-        } else {
-          _fullName = _friendlyFromEmail(_email ?? '—');
-        }
+        _fullName = (name != null && name.isNotEmpty)
+            ? name
+            : _friendlyFromEmail(_email ?? '—');
 
         final raw = data?['avatar_url'] as String?;
         _avatarUrl = (raw == null || raw.trim().isEmpty)
             ? null
             : '$raw?v=${DateTime.now().millisecondsSinceEpoch}';
       });
-    } catch (_) {
-      // ignore silently
-    }
+    } catch (_) {}
   }
 
   void _subscribeProfileChanges() {
@@ -135,13 +124,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         .subscribe();
   }
 
-  // No local popup logic; handled by global ReminderService
-
-  // Local add-notification removed; rely on DB changes and NotificationScreen input
-
   void _onTabTapped(int index) async {
     setState(() => _currentIndex = index);
-
     if (index == 1) {
       Navigator.pushReplacement(
         context,
@@ -153,7 +137,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         MaterialPageRoute(builder: (_) => const CompanionListScreen()),
       );
     } else if (index == 3) {
-      // Await result and update notifications if returned
       final result = await Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -162,9 +145,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         ),
       );
       if (result is List<Map<String, dynamic>>) {
-        setState(() {
-          _completedNotifications = result;
-        });
+        setState(() => _completedNotifications = result);
       }
     } else if (index == 4) {
       Navigator.pushReplacement(
@@ -180,7 +161,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
       fontSize: 22,
       fontWeight: FontWeight.w800,
       color: const Color(0xFF2D2D2D),
-      letterSpacing: 0.3,
     );
 
     return Scaffold(
@@ -193,23 +173,19 @@ class _TasksScreenState extends State<TasksScreenRegular> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- USER CARD (updated) ---
               _UserHeaderCard(
                 avatarUrl: _avatarUrl,
                 userId: _userId ?? '—',
                 fullName: _fullName ?? '—',
                 email: _email ?? '—',
               ),
-
               const SizedBox(height: 18),
 
               // --- STREAK CARD ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   border: Border.all(color: Colors.orange.shade200),
@@ -224,11 +200,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.emoji_events,
-                      color: Colors.orange,
-                      size: 30,
-                    ),
+                    const Icon(Icons.emoji_events,
+                        color: Colors.orange, size: 30),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -238,8 +211,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                             _streak <= 0
                                 ? "NO STREAK YET"
                                 : (_streak == 1
-                                      ? "1 DAY STREAK!"
-                                      : "$_streak DAYS STREAK!"),
+                                    ? "1 DAY STREAK!"
+                                    : "$_streak DAYS STREAK!"),
                             style: GoogleFonts.nunito(
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
@@ -250,9 +223,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                           Text(
                             "Thanks for showing up today! Consistency is the key to forming strong habits.",
                             style: GoogleFonts.nunito(
-                              fontSize: 12,
-                              color: const Color(0xFF4A4A4A),
-                            ),
+                                fontSize: 12,
+                                color: const Color(0xFF4A4A4A)),
                           ),
                         ],
                       ),
@@ -260,17 +232,14 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 22),
 
-              // --- TODAY'S TASK TITLE ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text("TODAY’S TASK", style: titleStyle),
               ),
               const SizedBox(height: 14),
 
-              // --- TASK LIST (from Supabase, realtime) ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: _TodayTasksStream(
@@ -305,21 +274,12 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(
-            Icons.calendar_today,
-            'Menu',
-            isSelected: _currentIndex == 1,
-          ),
-          _navItem(
-            Icons.family_restroom,
-            'Companion',
-            isSelected: _currentIndex == 2,
-          ),
-          _navItem(
-            Icons.notifications,
-            'Notifications',
-            isSelected: _currentIndex == 3,
-          ),
+          _navItem(Icons.calendar_today, 'Menu',
+              isSelected: _currentIndex == 1),
+          _navItem(Icons.family_restroom, 'Companion',
+              isSelected: _currentIndex == 2),
+          _navItem(Icons.notifications, 'Notifications',
+              isSelected: _currentIndex == 3),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -343,18 +303,15 @@ class _TasksScreenState extends State<TasksScreenRegular> {
           color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
         ),
         child: Center(
-          child: Icon(
-            icon,
-            size: 28,
-            color: isSelected ? Colors.pink : Colors.black87,
-          ),
+          child: Icon(icon,
+              size: 28, color: isSelected ? Colors.pink : Colors.black87),
         ),
       ),
     );
   }
 }
 
-// ===================== User header card =====================
+// ===================== User header card (guardian-style, adjusted) =====================
 class _UserHeaderCard extends StatelessWidget {
   const _UserHeaderCard({
     required this.avatarUrl,
@@ -370,69 +327,147 @@ class _UserHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Colors matched to your screenshot
+    const bg = Color(0xFFFFB04A);     // warm orange
+    const stroke = Color(0xFFE88926); // darker outline
+    const plusTint = Color(0x22E88926); // subtle plus texture
+
     return Container(
+      // Match the width of the card below (same 20px side margins)
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.orange.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
+      child: Stack(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: Colors.orange.shade100,
-            backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
-                ? NetworkImage(avatarUrl!)
-                : null,
-            child: (avatarUrl == null || avatarUrl!.isEmpty)
-                ? const Icon(Icons.person, color: Colors.orange)
-                : null,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // pill container
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: stroke, width: 2.0), // slightly thinner
+              boxShadow: [
+                BoxShadow(
+                  color: stroke.withOpacity(0.18),
+                  blurRadius: 10,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
               children: [
-                Text(
-                  fullName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.nunito(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                    color: const Color(0xFF2D2D2D),
+                // avatar with THIN circular outline only (no frame)
+                Container(
+                  width: 84,
+                  height: 84,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: stroke, width: 1.5),
                   ),
+                  clipBehavior: Clip.antiAlias,
+                  child: (avatarUrl != null && avatarUrl!.isNotEmpty)
+                      ? Image.network(
+                          avatarUrl!,
+                          fit: BoxFit.cover,
+                        )
+                      : const Center(
+                          child: Icon(Icons.person,
+                              size: 44, color: Color(0xFF8E4A1E))),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  email,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.nunito(
-                    fontSize: 13,
-                    color: const Color(0xFF4A4A4A),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'ID: $userId',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.nunito(
-                    fontSize: 12,
-                    color: Colors.black54,
+                const SizedBox(width: 14),
+
+                // text block (smaller sizes so everything fits)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // small label line
+                        Text(
+                          'USER CARD:',
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,         // smaller
+                            height: 1.0,
+                            letterSpacing: 0.4,
+                            color: const Color(0xFF3B2717),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+
+                        // name (smaller but still standout)
+                        Text(
+                          fullName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 20,        // reduced from 26
+                            height: 1.05,
+                            letterSpacing: 0.1,
+                            color: const Color(0xFF23160E),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+
+                        // EMAIL line
+                        _line('EMAIL:', email, fontSize: 13),
+                        const SizedBox(height: 2),
+
+                        // NUMBER/ID line
+                        _line('USER ID:', userId, fontSize: 13),
+                      ],
+                    ),
                   ),
                 ),
               ],
+            ),
+          ),
+
+          // subtle background plus icons (texture)
+          Positioned(
+            right: 20,
+            top: 8,
+            child: Icon(Icons.add, size: 36, color: plusTint),
+          ),
+          const Positioned(
+            right: 30,
+            top: 18,
+            child: Icon(Icons.add, size: 20, color: plusTint),
+          ),
+          const Positioned(
+            right: 52,
+            bottom: 10,
+            child: Icon(Icons.add, size: 30, color: plusTint),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _line(String label, String value, {double fontSize = 13}) {
+    return RichText(
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: '$label ',
+            style: GoogleFonts.nunito(
+              fontWeight: FontWeight.w800,
+              fontSize: fontSize,
+              height: 1.05,
+              color: const Color(0xFF3B2717),
+            ),
+          ),
+          TextSpan(
+            text: value,
+            style: GoogleFonts.nunito(
+              fontWeight: FontWeight.w700,
+              fontSize: fontSize,
+              height: 1.05,
+              color: const Color(0xFF3B2717),
             ),
           ),
         ],
@@ -442,7 +477,6 @@ class _UserHeaderCard extends StatelessWidget {
 }
 
 // ===================== Today stream =====================
-
 class _TodayTasksStream extends StatelessWidget {
   const _TodayTasksStream({required this.onEdited});
   final void Function(Map<String, dynamic> task, bool done) onEdited;
@@ -451,11 +485,6 @@ class _TodayTasksStream extends StatelessWidget {
   Widget build(BuildContext context) {
     final supabase = Supabase.instance.client;
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-    // Important: Do not filter by due_date on the server for realtime.
-    // Delete events may not include non-PK columns for filtering unless REPLICA IDENTITY FULL is set.
-    // Stream rows for the current user (or all rows if unauthenticated) and filter client-side
-    // to ensure deletes are reflected immediately.
     final uid = supabase.auth.currentUser?.id;
     final baseStream = supabase.from('tasks').stream(primaryKey: ['id']);
     final stream = uid != null ? baseStream.eq('user_id', uid) : baseStream;
@@ -493,7 +522,6 @@ class _TodayTasksStream extends StatelessWidget {
         });
 
         // no-op: global reminder service handles timing
-
         if (tasks.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
@@ -518,8 +546,7 @@ class _TodayTasksStream extends StatelessWidget {
   }
 }
 
-// ===================== Tile (title + category; persistent checkbox) =====================
-
+// ===================== Task Tile =====================
 class _TaskTile extends StatefulWidget {
   const _TaskTile({super.key, required this.task, required this.onEdited});
 

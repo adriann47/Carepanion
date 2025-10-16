@@ -58,7 +58,7 @@ class ReminderService {
     }
     final nowStr = DateFormat('HH:mm:ss').format(now);
 
-    // Cache guardian full name for the current user (assisted) if available
+    // Determine role once per user and cache guardian full name for assisted
     if (_guardianCacheForUserId != user.id || _guardianFullNameCache == null) {
       try {
         final me = await ProfileService.fetchProfile(client);
@@ -208,6 +208,13 @@ class ReminderService {
         // Column may not exist or RLS may block read; fall back to cached guardian
       }
 
+      // Resolve role to hide Guardian line for Regular users
+      bool isRegularUser = false;
+      try {
+        final role = await ProfileService.getCurrentUserRole(client);
+        isRegularUser = ((role ?? '').toLowerCase() == 'regular');
+      } catch (_) {}
+
       // Show dialog immediately using the current overlay context
       // ignore: use_build_context_synchronously
       await showDialog(
@@ -216,6 +223,7 @@ class ReminderService {
         builder: (dialogCtx) => _ReminderDialog(
           task: r as Map<String, dynamic>,
           guardianFullName: popupGuardianName,
+          isRegularUser: isRegularUser,
           onSkip: () async {
             try {
               await client
