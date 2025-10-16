@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:softeng/Regular%20Screen/tasks_screen_regular.dart'; // ✅ New Regular User screen
+import 'package:softeng/Regular%20Screen/tasks_screen_regular.dart'; // âœ… New Regular User screen
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/profile_service.dart';
 import '../Assisted Screen/guardian_input_screen.dart';
@@ -80,7 +80,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             ),
           ),
 
-          // ✅ Custom styled checkbox
+          // âœ… Custom styled checkbox
           GestureDetector(
             onTap: () => onChanged(!value),
             child: Container(
@@ -109,7 +109,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFFFAF3),
 
-      // ✅ Content scrollable
+      // âœ… Content scrollable
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.only(bottom: 80), // avoids overlap
@@ -125,7 +125,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                "Select the role that best fits how you’ll use Carepanion.",
+                "Select the role that best fits how youâ€™ll use Carepanion.",
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 14,
@@ -172,7 +172,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
         ),
       ),
 
-      // ✅ Button fixed at bottom
+      // âœ… Button fixed at bottom
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(20),
         child: ElevatedButton(
@@ -188,11 +188,19 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
               ? () async {
                   final supabase = Supabase.instance.client;
                   final role = assistedUser ? 'assisted' : 'regular';
-                  // Persist role selection to profile
-                  await ProfileService.ensureProfileExists(
-                    supabase,
-                    role: role,
-                  );
+                  // Persist role selection to profile immediately
+                  try {
+                    final user = supabase.auth.currentUser;
+                    if (user != null) {
+                      // Ensure row exists, then force-update role
+                      await ProfileService.ensureProfileExists(supabase, role: role);
+                      await ProfileService.upsertProfile(
+                        supabase,
+                        id: user.id,
+                        role: role,
+                      );
+                    }
+                  } catch (_) {}
 
                   if (assistedUser) {
                     Navigator.push(
@@ -206,7 +214,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => const TasksScreenRegular(),
-                      ), // ✅ Regular User
+                      ), // âœ… Regular User
                     );
                   }
                 }
@@ -223,3 +231,5 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     );
   }
 }
+
+

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:softeng/data/profile_service.dart';
 import 'package:softeng/services/task_service.dart';
@@ -8,6 +8,7 @@ import 'calendar_screen.dart';
 import 'navbar_assisted.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:softeng/services/streak_service.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -34,6 +35,8 @@ class _TasksScreen extends State<TasksScreen> {
     _loadTodayTasks();
     _subscribeProfileChanges();
     _refreshStreak();
+    // Listen for global streak updates (e.g., from popup DONE)
+    StreakService.current.addListener(_onStreakUpdate);
   }
 
   Future<void> _loadProfile() async {
@@ -56,7 +59,7 @@ class _TasksScreen extends State<TasksScreen> {
           final email = authUser?.email ?? (data?['email'] as String?) ?? '';
           _fullName = _friendlyFromEmail(email);
         }
-        _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
+        _email = authUser?.email ?? (data?['email'] as String?) ?? 'â€”';
       });
 
       // Linked guardian (best effort)
@@ -118,8 +121,14 @@ class _TasksScreen extends State<TasksScreen> {
 
   @override
   void dispose() {
+    StreakService.current.removeListener(_onStreakUpdate);
     _profileChannel?.unsubscribe();
     super.dispose();
+  }
+
+  void _onStreakUpdate() {
+    if (!mounted) return;
+    setState(() => _streak = StreakService.current.value);
   }
 
   Future<void> _loadTodayTasks() async {
@@ -144,6 +153,8 @@ class _TasksScreen extends State<TasksScreen> {
       final s = await TaskService.computeCurrentStreak();
       if (!mounted) return;
       setState(() => _streak = s);
+      // Broadcast so other screens/popups can reflect immediately
+      try { StreakService.current.value = s; } catch (_) {}
     } catch (_) {}
   }
 
@@ -188,78 +199,30 @@ class _TasksScreen extends State<TasksScreen> {
               // --- USER ID CARD (smaller profile picture, slightly smaller text) ---
               _UserHeaderCardAssisted(
                 avatarUrl: _avatarUrl,
-                fullName: _fullName ?? '—',
-                email: _email ?? '—',
+                fullName: _fullName ?? 'â€”',
+                email: _email ?? 'â€”',
                 numberOrId:
                     _guardianFullName != null && _guardianFullName!.isNotEmpty
-                        ? _guardianFullName!
-                        : '—',
+                    ? _guardianFullName!
+                    : 'â€”',
               ),
               const SizedBox(height: 18),
 
               // --- LARGER STREAK CARD ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18), // Increased padding
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.orange.shade200, width: 2.5), // Thicker border
-                  borderRadius: BorderRadius.circular(20), // Larger radius
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.orange.withOpacity(0.12), // More prominent shadow
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.emoji_events,
-                        color: Colors.orange, size: 42), // Larger icon
-                    const SizedBox(width: 16), // More spacing
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("3 DAYS STREAK!",
-                              style: GoogleFonts.nunito(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 18, // Larger font
-                                  color: const Color(0xFF2D2D2D))),
-                          const SizedBox(height: 6), // More spacing
-                          Text(
-                            "Thanks for showing up today! Consistency is the key to forming strong habits.",
-                            style: GoogleFonts.nunito(
-                                fontSize: 15, // Larger font
-                                color: const Color(0xFF4A4A4A),
-                                height: 1.3), // Better line height
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24), // Increased spacing
-
-              const SizedBox(height: 18),
-
-              // --- STREAK CARD ---
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
+                  horizontal: 20,
+                  vertical: 18,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.orange.shade200, width: 2.5),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.orange.withOpacity(0.08),
-                      blurRadius: 12,
+                      color: Colors.orange.withOpacity(0.12),
+                      blurRadius: 14,
                       offset: const Offset(0, 6),
                     ),
                   ],
@@ -269,9 +232,9 @@ class _TasksScreen extends State<TasksScreen> {
                     const Icon(
                       Icons.emoji_events,
                       color: Colors.orange,
-                      size: 30,
+                      size: 42,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,18 +245,19 @@ class _TasksScreen extends State<TasksScreen> {
                                 : (_streak == 1
                                       ? '1 DAY STREAK!'
                                       : '$_streak DAYS STREAK!'),
-                            style: const TextStyle(
+                            style: GoogleFonts.nunito(
                               fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: Color(0xFF2D2D2D),
+                              fontSize: 18,
+                              color: const Color(0xFF2D2D2D),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          const Text(
+                          const SizedBox(height: 6),
+                          Text(
                             'Thanks for showing up today! Consistency is the key to forming strong habits.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF4A4A4A),
+                            style: GoogleFonts.nunito(
+                              fontSize: 15,
+                              color: const Color(0xFF4A4A4A),
+                              height: 1.3,
                             ),
                           ),
                         ],
@@ -303,21 +267,7 @@ class _TasksScreen extends State<TasksScreen> {
                 ),
               ),
 
-              const SizedBox(height: 30),
-              const Divider(thickness: 1),
-
-              /// --- TODAY'S TASK TITLE ---
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Text(
-                  "TODAY’S TASK",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
+              const SizedBox(height: 24),
 
               /// --- TASK LIST ---
               // --- TODAY'S TASK TITLE ---
@@ -356,35 +306,50 @@ class _TasksScreen extends State<TasksScreen> {
                           }
                           // Determine which guardian set the task
                           // 1) Use created_by_name if present
-                          String guardian = (t['created_by_name'] ?? '').toString().trim();
-if (guardian.isEmpty) {
-  final createdBy = t['created_by']?.toString();
-  if (createdBy != null && createdBy.isNotEmpty) {
-    ProfileService.fetchProfile(
-      Supabase.instance.client,
-      userId: createdBy,
-    ).then((p) {
-      if (!mounted || p == null) return;
-      final name = (p['fullname'] ?? '').toString().trim();
-      if (name.isNotEmpty) {
-        setState(() {
-          _tasks[i]['created_by_name'] = name;
-        });
-      }
-    }).catchError((_) {});
-  }
-}
-if (guardian.isEmpty) {
-  guardian = (_guardianFullName ?? (t['guardian_name'] ?? t['created_by_name'] ?? '')).toString().trim();
-}
+                          String guardian = (t['created_by_name'] ?? '')
+                              .toString()
+                              .trim();
+                          if (guardian.isEmpty) {
+                            final createdBy = t['created_by']?.toString();
+                            if (createdBy != null && createdBy.isNotEmpty) {
+                              ProfileService.fetchProfile(
+                                    Supabase.instance.client,
+                                    userId: createdBy,
+                                  )
+                                  .then((p) {
+                                    if (!mounted || p == null) return;
+                                    final name = (p['fullname'] ?? '')
+                                        .toString()
+                                        .trim();
+                                    if (name.isNotEmpty) {
+                                      setState(() {
+                                        _tasks[i]['created_by_name'] = name;
+                                      });
+                                    }
+                                  })
+                                  .catchError((_) {});
+                            }
+                          }
+                          if (guardian.isEmpty) {
+                            guardian =
+                                (_guardianFullName ??
+                                        (t['guardian_name'] ??
+                                            t['created_by_name'] ??
+                                            ''))
+                                    .toString()
+                                    .trim();
+                          }
 
-String fmt(dynamic iso) {
+                          String fmt(dynamic iso) {
                             if (iso == null) return '';
                             try {
-                              final dt = DateTime.parse(iso.toString()).toLocal();
+                              final dt = DateTime.parse(
+                                iso.toString(),
+                              ).toLocal();
                               return TimeOfDay(
-                                      hour: dt.hour, minute: dt.minute)
-                                  .format(context);
+                                hour: dt.hour,
+                                minute: dt.minute,
+                              ).format(context);
                             } catch (_) {
                               return '';
                             }
@@ -395,8 +360,8 @@ String fmt(dynamic iso) {
                           final time = s.isEmpty && e.isEmpty
                               ? 'All day'
                               : (s.isNotEmpty && e.isNotEmpty
-                                  ? '$s - $e'
-                                  : (s + e));
+                                    ? '$s - $e'
+                                    : (s + e));
 
                           final taskId = (t['id'] is int)
                               ? t['id'] as int
@@ -411,12 +376,21 @@ String fmt(dynamic iso) {
                             title: title,
                             time: time,
                             note: note,
-                            guardian: guardian.isNotEmpty ? guardian : 'Unknown',
+                            guardian: guardian.isNotEmpty
+                                ? guardian
+                                : 'Unknown',
                             checked: checked,
                             onChanged: (val) async {
                               final newVal = val ?? false;
                               if (i < _taskDone.length) {
-                                setState(() => _taskDone[i] = newVal);
+                                                                setState(() {
+                                  _taskDone[i] = newVal;
+                                  // Optimistically activate streak immediately for today's tasks
+                                  if (newVal && _streak == 0) {
+                                    _streak = 1;
+                                    try { StreakService.current.value = _streak; } catch (_) {}
+                                  }
+                                });
                               }
                               if (taskId != null) {
                                 try {
@@ -429,13 +403,18 @@ String fmt(dynamic iso) {
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content:
-                                            Text('Failed to update task status'),
+                                        content: Text(
+                                          'Failed to update task status',
+                                        ),
                                       ),
                                     );
                                   }
                                 }
                                 await _loadTodayTasks();
+                                await _refreshStreak();
+                                Future.delayed(const Duration(milliseconds: 400), () {
+                                  if (mounted) _refreshStreak();
+                                });
                               }
                             },
                           );
@@ -479,7 +458,10 @@ class _UserHeaderCardAssisted extends StatelessWidget {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16), // Slightly reduced
+            padding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 16,
+            ), // Slightly reduced
             decoration: BoxDecoration(
               color: bg,
               borderRadius: BorderRadius.circular(26), // Slightly smaller
@@ -500,14 +482,20 @@ class _UserHeaderCardAssisted extends StatelessWidget {
                   height: 80,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: stroke, width: 1.5), // Thinner border
+                    border: Border.all(
+                      color: stroke,
+                      width: 1.5,
+                    ), // Thinner border
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: (avatarUrl != null && avatarUrl!.isNotEmpty)
                       ? Image.network(avatarUrl!, fit: BoxFit.cover)
                       : Center(
-                          child: Icon(Icons.person,
-                              size: 42, color: const Color(0xFF8E4A1E)), // Smaller icon
+                          child: Icon(
+                            Icons.person,
+                            size: 42,
+                            color: const Color(0xFF8E4A1E),
+                          ), // Smaller icon
                         ),
                 ),
                 const SizedBox(width: 16), // Slightly reduced
@@ -520,7 +508,7 @@ class _UserHeaderCardAssisted extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'USER ID:',
+                          'NAME: ',
                           style: GoogleFonts.nunito(
                             fontWeight: FontWeight.w800,
                             fontSize: 15, // Slightly reduced from 16
@@ -543,9 +531,12 @@ class _UserHeaderCardAssisted extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 6), // Slightly reduced
-                        _kv('EMAIL:', email, size: 15), // Slightly reduced from 16
+                        _kv(
+                          'EMAIL:',
+                          email,
+                          size: 15,
+                        ), // Slightly reduced from 16
                         const SizedBox(height: 3), // Slightly reduced
-                        _kv('NUMBER:', numberOrId, size: 15), // Slightly reduced from 16
                       ],
                     ),
                   ),
@@ -640,11 +631,17 @@ class _AssistedTaskTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFFF77CA0),
-                    border: Border.all(color: Colors.white, width: 2.0), // Slightly thinner
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 2.0,
+                    ), // Slightly thinner
                   ),
                 ),
                 Expanded(
-                  child: Container(width: 2.5, color: Colors.grey.shade300), // Slightly thinner
+                  child: Container(
+                    width: 2.5,
+                    color: Colors.grey.shade300,
+                  ), // Slightly thinner
                 ),
               ],
             ),
@@ -652,7 +649,12 @@ class _AssistedTaskTile extends StatelessWidget {
 
             Expanded(
               child: Container(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 20), // Slightly reduced
+                padding: const EdgeInsets.fromLTRB(
+                  18,
+                  16,
+                  18,
+                  20,
+                ), // Slightly reduced
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFFD8F1FF), Color(0xFFBEE6FF)],
@@ -662,7 +664,9 @@ class _AssistedTaskTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(18), // Slightly smaller
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.07), // Slightly less prominent
+                      color: Colors.black.withOpacity(
+                        0.07,
+                      ), // Slightly less prominent
                       blurRadius: 12,
                       offset: const Offset(0, 6),
                     ),
@@ -681,10 +685,14 @@ class _AssistedTaskTile extends StatelessWidget {
                             onChanged: onChanged,
                             materialTapTargetSize:
                                 MaterialTapTargetSize.shrinkWrap,
-                            visualDensity:
-                                const VisualDensity(horizontal: -4, vertical: -4),
+                            visualDensity: const VisualDensity(
+                              horizontal: -4,
+                              vertical: -4,
+                            ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4), // Back to original
+                              borderRadius: BorderRadius.circular(
+                                4,
+                              ), // Back to original
                             ),
                           ),
                         ),
@@ -707,7 +715,11 @@ class _AssistedTaskTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 10), // Slightly reduced
 
-                    _infoLine(label: 'TIME', value: time, size: 16), // Slightly reduced from 17
+                    _infoLine(
+                      label: 'TIME',
+                      value: time,
+                      size: 16,
+                    ), // Slightly reduced from 17
                     if (note.isNotEmpty)
                       _infoLine(label: 'NOTE', value: note, size: 16),
                     _infoLine(label: 'GUARDIAN', value: guardian, size: 16),
@@ -721,7 +733,11 @@ class _AssistedTaskTile extends StatelessWidget {
     );
   }
 
-  Widget _infoLine({required String label, required String value, double size = 16}) {
+  Widget _infoLine({
+    required String label,
+    required String value,
+    double size = 16,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 5), // Slightly reduced
       child: Row(

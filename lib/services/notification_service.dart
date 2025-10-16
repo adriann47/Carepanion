@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+﻿import 'dart:io' show Platform;
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -161,22 +161,23 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
-    if (!NotificationPreferences.pushEnabled.value) return;
     final tzTime = tz.TZDateTime.from(whenLocal, tz.local);
-    // Schedule a visual local notification as fallback
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tzTime,
-      _details(),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: payload,
-    );
+// Schedule a visual local notification as fallback (respects push toggle)
+if (NotificationPreferences.pushEnabled.value) {
+  await _plugin.zonedSchedule(
+    id,
+    title,
+    body,
+    tzTime,
+    _details(),
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    uiLocalNotificationDateInterpretation:
+        UILocalNotificationDateInterpretation.absoluteTime,
+    payload: payload,
+  );
+}
 
-    // Also schedule a native exact alarm that starts the full-screen Activity
+// Also schedule a native exact alarm that starts the full-screen Activity
     try {
       final epoch = whenLocal.toUtc().millisecondsSinceEpoch;
       await _native.invokeMethod('scheduleAlarm', {
@@ -205,3 +206,6 @@ void notificationTapBackground(NotificationResponse response) async {
     }
   } catch (_) {}
 }
+
+
+

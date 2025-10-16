@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -133,7 +133,7 @@ class ReminderService {
       } catch (_) {
         continue;
       }
-      final match = dt.isAfter(now.subtract(const Duration(seconds: 1))) && dt.isBefore(now.add(const Duration(seconds: 1)));
+      final match = DateFormat('HH:mm:ss').format(dt) == nowStr;
       if (!match) continue;
 
       _alerted.add(key);
@@ -233,7 +233,7 @@ class ReminderService {
             try {
               await client
                   .from('tasks')
-                  .update({'status': 'skip'})
+                  .update({'status': 'skipped'})
                   .eq('id', id);
               // Cancel scheduled notification if any
               final sa = r['start_at'];
@@ -337,7 +337,7 @@ class ReminderService {
           try {
             await client
                 .from('tasks')
-                .update({'status': 'skip'})
+                .update({'status': 'skipped'})
                 .eq('id', taskId);
             final sa = r!['start_at'];
             if (sa != null) {
@@ -392,7 +392,7 @@ class ReminderService {
             final dt = DateTime.parse(startAt.toString()).toLocal();
             if (dt.isBefore(DateTime.now())) return;
             final status = (rec['status'] ?? '').toString();
-            if (status == 'done' || status == 'skip' || status == 'skipped') return;
+            if (status == 'done' || status == 'skipped') return;
             await NotificationService.scheduleAt(
               id: _notifIdFor(dt),
               whenLocal: dt,
@@ -421,7 +421,7 @@ class ReminderService {
             }
 
             final status = (newRec['status'] ?? '').toString();
-            if (status == 'done' || status == 'skip' || status == 'skipped') return;
+            if (status == 'done' || status == 'skipped') return;
             if (newRec['due_date']?.toString() != today) return;
             final startAt = newRec['start_at'];
             if (startAt == null) return;
