@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Your screens
@@ -20,6 +21,8 @@ import 'data/profile_service.dart';
 import 'services/navigation.dart';
 import 'services/reminder_service.dart';
 import 'services/emergency_service.dart';
+import 'services/notification_prefs.dart';
+import 'services/notification_service.dart';
 import 'services/guardian_request_service.dart';
 import 'Regular Screen/tasks_screen_regular.dart';
 
@@ -35,6 +38,44 @@ Future<void> main() async {
 
   // Pin profile table name to match your schema
   ProfileService.setPreferredTable('profile');
+
+  // Load persisted notification preferences and initialize local notifications
+  await NotificationPreferences.init();
+  await NotificationService.init();
+
+  // Listen for native reminder payloads via MethodChannel (for full-screen Activity forwarding)
+  const channel = MethodChannel('carepanion.reminder');
+  channel.setMethodCallHandler((call) async {
+    if (call.method == 'showReminder' && call.arguments is String) {
+      final taskId = call.arguments as String;
+      // Debug log so we can see when native forwards a reminder
+      // (appears in Flutter logs)
+      // ignore: avoid_print
+      print('MethodChannel showReminder received: $taskId');
+      if (taskId.isNotEmpty) {
+        await ReminderService.showPopupForTaskId(taskId);
+      }
+    }
+  });
+
+  // Also ask native layer for any saved reminder payload (fallback for cold-start)
+  try {
+    final saved = await channel.invokeMethod<String>('popSavedReminder');
+    if (saved != null && saved.isNotEmpty) {
+      // Try to extract task_id and show popup
+      final idMatch = RegExp('"task_id"\s*:\s*"([^"]+)"').firstMatch(saved);
+      if (idMatch != null) {
+        final taskId = idMatch.group(1);
+        if (taskId != null && taskId.isNotEmpty) {
+          // ignore: avoid_print
+          print('Native popSavedReminder returned taskId=$taskId');
+          await ReminderService.showPopupForTaskId(taskId);
+        }
+      }
+    }
+  } catch (e) {
+    // ignore errors — best-effort
+  }
 
   // Start global auth listener so OAuth redirects (especially on web) land back in-app
   _setupGlobalAuthListener();
@@ -54,10 +95,9 @@ void _setupGlobalAuthListener() {
   _authSub = supa.auth.onAuthStateChange.listen((data) async {
     if (data.event == AuthChangeEvent.signedIn) {
       final user = supa.auth.currentUser;
-      final provider = (user?.appMetadata != null
-              ? user!.appMetadata['provider']
-              : '')
-          ?.toString();
+      final provider =
+          (user?.appMetadata != null ? user!.appMetadata['provider'] : '')
+              ?.toString();
       // If signed in via Google, take the user to GoogleRegistration
       if (provider == 'google') {
         _navKey.currentState?.pushNamedAndRemoveUntil(
@@ -82,12 +122,36 @@ class CarePanionApp extends StatelessWidget {
     // Start global reminder service once MaterialApp builds
     // (safe to call multiple times - it restarts its timer)
     ReminderService.start();
-  // Start emergency listener for guardian users
-  EmergencyService.start();
-  // Start guardian request listener if user is already signed in
-  if (Supabase.instance.client.auth.currentUser != null) {
-    GuardianRequestService().start();
-  }
+    // Start emergency listener for guardian users
+    EmergencyService.start();
+    // Start guardian request listener if user is already signed in
+    if (Supabase.instance.client.auth.currentUser != null) {
+      GuardianRequestService().start();
+    }
+
+    // If the app was launched from a notification, show the reminder popup.
+    // We purposely do this after starting services so navKey is available.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final payload = await NotificationService.getInitialPayload();
+        if (payload != null && payload.isNotEmpty) {
+          try {
+            final data = Uri.decodeFull(payload);
+            // payload is JSON like {"task_id":"..."}
+            final m = data;
+            // Delegate to ReminderService which will fetch task and show dialog
+            // Ignore errors — best-effort
+            final idMatch = RegExp('"task_id"\s*:\s*"([^"]+)"').firstMatch(m);
+            if (idMatch != null) {
+              final taskId = idMatch.group(1);
+              if (taskId != null && taskId.isNotEmpty) {
+                await ReminderService.showPopupForTaskId(taskId);
+              }
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+    });
 
     return MaterialApp(
       navigatorKey: _navKey,
@@ -100,8 +164,8 @@ class CarePanionApp extends StatelessWidget {
         "/signin": (context) => const SignInScreen(),
         "/register_email": (context) => const RegistrationEmailScreen(),
         "/register_phone": (context) => const RegistrationPhoneScreen(),
-    "/verify_email": (context) => const VerifyEmailScreen(),
-    "/google_registration": (context) => GoogleRegistration(),
+        "/verify_email": (context) => const VerifyEmailScreen(),
+        "/google_registration": (context) => GoogleRegistration(),
         "/role_selection": (context) => const RoleSelectionScreen(),
         "/guardian_input": (context) => const GuardianInputScreen(),
         "/tasks": (context) => const TasksScreen(),
@@ -114,3 +178,4 @@ class CarePanionApp extends StatelessWidget {
     );
   }
 }
+

@@ -201,7 +201,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // (No bottom nav handlers required on this page)
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;

@@ -66,7 +66,13 @@ class _AccountPageState extends State<AccountPage> {
                   if (mounted) {
                     setState(() => mobile = newVal);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(ok ? 'Mobile updated' : 'Saved locally; server column missing')),
+                      SnackBar(
+                        content: Text(
+                          ok
+                              ? 'Mobile updated'
+                              : 'Saved locally; server column missing',
+                        ),
+                      ),
                     );
                   }
                 }
@@ -105,7 +111,9 @@ class _AccountPageState extends State<AccountPage> {
     if (user == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be signed in to change password.')),
+        const SnackBar(
+          content: Text('You must be signed in to change password.'),
+        ),
       );
       return;
     }
@@ -116,7 +124,11 @@ class _AccountPageState extends State<AccountPage> {
       if ((provider ?? '').toLowerCase() == 'google') {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Password change isn't available for Google sign-in accounts.")),
+          const SnackBar(
+            content: Text(
+              "Password change isn't available for Google sign-in accounts.",
+            ),
+          ),
         );
         return;
       }
@@ -150,9 +162,9 @@ class _AccountPageState extends State<AccountPage> {
     }
     if (!RegExp(r'[0-9]').hasMatch(newPass)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Must contain 1 number')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Must contain 1 number')));
       return;
     }
     if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(newPass)) {
@@ -178,15 +190,17 @@ class _AccountPageState extends State<AccountPage> {
           final friendly = msg.contains('invalid')
               ? 'Current password is incorrect.'
               : 'Failed to verify current password.';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(friendly)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(friendly)));
           return;
         }
       }
 
       // Update password
-      final res = await client.auth.updateUser(UserAttributes(password: newPass));
+      final res = await client.auth.updateUser(
+        UserAttributes(password: newPass),
+      );
       if (res.user == null) {
         throw Exception('Password update failed.');
       }
@@ -205,11 +219,15 @@ class _AccountPageState extends State<AccountPage> {
         }
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Password updated. Signed out of all devices.')),
+          const SnackBar(
+            content: Text('Password updated. Signed out of all devices.'),
+          ),
         );
         await Future.delayed(const Duration(milliseconds: 300));
         if (mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/signin', (route) => false);
         }
         return;
       } else {
@@ -220,14 +238,12 @@ class _AccountPageState extends State<AccountPage> {
     } on AuthException catch (e) {
       if (!mounted) return;
       final msg = e.message;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update password: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update password: $e')));
     } finally {
       if (mounted) setState(() => _savingPassword = false);
     }
@@ -247,7 +263,9 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _refreshGuardians() async {
     setState(() => _loadingGuardians = true);
     try {
-      final rows = await MultiGuardianService.listGuardians(Supabase.instance.client);
+      final rows = await MultiGuardianService.listGuardians(
+        Supabase.instance.client,
+      );
       if (!mounted) return;
       setState(() => guardians = rows);
     } catch (_) {
@@ -265,8 +283,7 @@ class _AccountPageState extends State<AccountPage> {
 
     // Subscribe to assisted_guardians insert/delete for this assisted user
     _agChannel?.unsubscribe();
-    _agChannel = client
-        .channel('public:assisted_guardians:$uid')
+    _agChannel = client.channel('public:assisted_guardians:$uid')
       ..onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
@@ -293,8 +310,7 @@ class _AccountPageState extends State<AccountPage> {
 
     // Subscribe to legacy profile guardian_id updates for current assisted
     _profileChannel?.unsubscribe();
-    _profileChannel = client
-        .channel('public:profile_guardian:$uid')
+    _profileChannel = client.channel('public:profile_guardian:$uid')
       ..onPostgresChanges(
         event: PostgresChangeEvent.update,
         schema: 'public',
@@ -356,7 +372,11 @@ class _AccountPageState extends State<AccountPage> {
                   await _refreshGuardians();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to link guardian. Ensure table and code are correct.')),
+                    const SnackBar(
+                      content: Text(
+                        'Failed to link guardian. Ensure table and code are correct.',
+                      ),
+                    ),
                   );
                 }
               } catch (e) {
@@ -488,8 +508,10 @@ class _AccountPageState extends State<AccountPage> {
           filled: true,
           fillColor: const Color(0x66B3E5FC),
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 14,
+          ),
           suffixIcon: IconButton(
             tooltip: obscure ? 'Show password' : 'Hide password',
             icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
@@ -499,8 +521,6 @@ class _AccountPageState extends State<AccountPage> {
       ),
     );
   }
-
-  
 
   Widget _buildGuardianRow(Map<String, dynamic> guardian) {
     final name = (guardian['fullname'] ?? '').toString().trim();
@@ -563,9 +583,9 @@ class _AccountPageState extends State<AccountPage> {
                 }
               } catch (e) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed: $e')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Failed: $e')));
               }
             },
           ),
@@ -587,7 +607,6 @@ class _AccountPageState extends State<AccountPage> {
           // Header
           Container(
             width: double.infinity,
-            height: h * 0.18,
             decoration: const BoxDecoration(
               color: Color(0xFFF7A9AC),
               borderRadius: BorderRadius.only(
@@ -595,16 +614,22 @@ class _AccountPageState extends State<AccountPage> {
                 bottomRight: Radius.circular(28),
               ),
             ),
-            child: SafeArea(
-              child: Padding(
-                padding:
-                    EdgeInsets.symmetric(horizontal: w * 0.05, vertical: h * 0.02),
+            child: Padding(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 8,
+                left: w * 0.05,
+                right: w * 0.05,
+                bottom: 16,
+              ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back, color: Color(0xFF3D3D3D)),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Color(0xFF3D3D3D),
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -619,13 +644,16 @@ class _AccountPageState extends State<AccountPage> {
                 ),
               ),
             ),
-          ),
 
           // Content
           Expanded(
             child: SingleChildScrollView(
-              padding:
-                  EdgeInsets.symmetric(horizontal: w * 0.08, vertical: h * 0.025),
+              padding: EdgeInsets.symmetric(
+                horizontal: w * 0.08,
+                vertical: h * 0.02,
+              ).copyWith(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -633,11 +661,15 @@ class _AccountPageState extends State<AccountPage> {
                   _buildReadOnlyRow("Email", email),
 
                   // MOBILE: editable (empty by default)
-                  _buildEditableRow("Mobile Number", mobile.isEmpty ? '—' : mobile, () {
-                    _editField("Mobile Number", mobile, (val) async {
-                      setState(() => mobile = val);
-                    });
-                  }),
+                  _buildEditableRow(
+                    "Mobile Number",
+                    mobile.isEmpty ? '' : mobile,
+                    () {
+                      _editField("Mobile Number", mobile, (val) async {
+                        setState(() => mobile = val);
+                      });
+                    },
+                  ),
 
                   SizedBox(height: h * 0.03),
 
@@ -657,7 +689,8 @@ class _AccountPageState extends State<AccountPage> {
                     "CURRENT PASSWORD",
                     _currentPass,
                     obscure: _obscureCurrent,
-                    onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                    onToggle: () =>
+                        setState(() => _obscureCurrent = !_obscureCurrent),
                   ),
                   _buildPasswordField(
                     "NEW PASSWORD",
@@ -669,7 +702,8 @@ class _AccountPageState extends State<AccountPage> {
                     "CONFIRM NEW PASSWORD",
                     _confirmPass,
                     obscure: _obscureConfirm,
-                    onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    onToggle: () =>
+                        setState(() => _obscureConfirm = !_obscureConfirm),
                   ),
 
                   // Sign out everywhere option
@@ -680,7 +714,10 @@ class _AccountPageState extends State<AccountPage> {
                     controlAffinity: ListTileControlAffinity.leading,
                     title: Text(
                       'Sign out of all devices after saving',
-                      style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.nunito(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
 
@@ -690,7 +727,9 @@ class _AccountPageState extends State<AccountPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0x99B3E5FC),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 40, vertical: 12),
+                          horizontal: 40,
+                          vertical: 12,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -737,10 +776,12 @@ class _AccountPageState extends State<AccountPage> {
                   const SizedBox(height: 14),
 
                   if (_loadingGuardians)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CircularProgressIndicator(),
-                    )),
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    ),
                   ...guardians.map((g) => _buildGuardianRow(g)),
 
                   GestureDetector(
@@ -748,7 +789,9 @@ class _AccountPageState extends State<AccountPage> {
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFB3E5FC),
                         borderRadius: BorderRadius.circular(28),
@@ -777,5 +820,6 @@ class _AccountPageState extends State<AccountPage> {
       ),
     );
   }
-
 }
+
+

@@ -1,0 +1,35 @@
+  static Future<void> scheduleAt({
+    required int id,
+    required DateTime whenLocal,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    if (!NotificationPreferences.pushEnabled.value) return;
+    final tzTime = tz.TZDateTime.from(whenLocal, tz.local);
+    // Schedule a visual local notification as fallback
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      tzTime,
+      _details(),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      payload: payload,
+    );
+
+    // Also schedule a native exact alarm that starts the full-screen Activity
+    try {
+      final epoch = whenLocal.toUtc().millisecondsSinceEpoch;
+      await _native.invokeMethod('scheduleAlarm', {
+        'when': epoch,
+        'id': id,
+        'payload': payload ?? '',
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('NotificationService: native scheduleAlarm failed: $e');
+      }

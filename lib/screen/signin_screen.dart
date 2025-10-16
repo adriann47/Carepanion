@@ -217,11 +217,13 @@ if (msg.contains('invalid login credentials')) {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Scaffold(
       backgroundColor: const Color(0xFFFDF8F0),
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 24),
           child: Form(
             key: _formKey,
             child: Column(
@@ -378,11 +380,7 @@ if (msg.contains('invalid login credentials')) {
                   ),
                 ),
                 const SizedBox(height: 30),
-
-               
-                
-
-                const Spacer(flex: 2),
+                const SizedBox(height: 8),
               ],
             ),
           ),

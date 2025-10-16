@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
@@ -200,7 +200,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('SMS not available'),
         content: const Text(
-          'Your Supabase project has Phone/SMS auth disabled or not configured. Enable a provider (Twilio/MessageBird) in Supabase → Authentication → Providers → Phone to send SMS codes.\n\nIf you prefer, you can use an email code instead.',
+          'Your Supabase project has Phone/SMS auth disabled or not configured. Enable a provider (Twilio or MessageBird) in Supabase Authentication > Providers > Phone to send SMS codes.\n\nIf you prefer, you can use an email code instead.',
         ),
         actions: [
           TextButton(
@@ -303,17 +303,22 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    const primaryTextColor = Color(0xFFCA5000); // All text except button
-    return Scaffold(
-      backgroundColor: const Color(0xFFFDF8F0),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
+Widget build(BuildContext context) {
+  const primaryTextColor = Color(0xFFCA5000); // All text except button
+  return Scaffold(
+    resizeToAvoidBottomInset: true,
+    backgroundColor: const Color(0xFFFDF8F0),
+    body: SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
         child: Column(
           children: [
             const SizedBox(height: 80),
-
-            // Verify your Email Address (bold, multi-line)
             Text(
               _useSms ? "Verify your Phone Number" : "Verify your Email",
               textAlign: TextAlign.center,
@@ -324,8 +329,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               ),
             ),
             const SizedBox(height: 10),
-
-            // Verify message
             Text(
               _useSms
                   ? "We sent a 6-digit code to your phone via SMS.\nEnter the code below to continue."
@@ -333,12 +336,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(color: primaryTextColor),
             ),
-            const SizedBox(height: 100), // Space below this text
+            const SizedBox(height: 100),
             const SizedBox(height: 30),
-
             const SizedBox(height: 20),
-
-            // OTP section
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -354,7 +354,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 6.0),
                 child: Text(
-                  'DEV code: $_localOtp',
+                  'DEV code: ',
                   style: GoogleFonts.nunito(
                     color: Colors.grey.shade700,
                     fontSize: 12,
@@ -362,7 +362,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   ),
                 ),
               ),
-            // Intentionally hide the email from UI per request; still used internally for resend/verify
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: List.generate(6, (index) {
@@ -437,10 +436,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 10),
-
-            // Resend text with "Resend" underlined
             Center(
               child: GestureDetector(
                 onTap: () async {
@@ -454,7 +450,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                       const TextSpan(text: "Didn't receive any code? "),
                       TextSpan(
                         text: _cooldown > 0
-                            ? 'Resend in ${_cooldown}s (rate limited)'
+                            ? 'Resend in s (rate limited)'
                             : 'Resend',
                         style: const TextStyle(
                           decoration: TextDecoration.underline,
@@ -470,6 +466,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
 }
+}
+
+
+

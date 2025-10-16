@@ -177,13 +177,16 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAF6EF),
+      resizeToAvoidBottomInset: true,
       body: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
         child: Column(
           children: [
             // Header
             Container(
               width: double.infinity,
-              height: 320,
               decoration: const BoxDecoration(
                 color: Color(0xFFFFA8A8),
                 borderRadius: BorderRadius.only(

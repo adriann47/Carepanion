@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:softeng/services/notification_prefs.dart';
 
 class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
@@ -9,8 +10,38 @@ class NotificationPage extends StatefulWidget {
 
 class _NotificationPageState extends State<NotificationPage> {
   bool pushNotification = true;
-  bool audioAlerts = false;
-  bool vibration = false; // ✅ renamed from hapticFeedback
+  bool audioAlerts = true;
+  bool vibration = true; // ✅ renamed from hapticFeedback
+
+  @override
+  void initState() {
+    super.initState();
+    // Load initial values from preferences
+    pushNotification = NotificationPreferences.pushEnabled.value;
+    audioAlerts = NotificationPreferences.ttsEnabled.value;
+    vibration = NotificationPreferences.vibrationEnabled.value;
+    // Listen for external changes to keep UI in sync
+    NotificationPreferences.pushEnabled.addListener(_syncFromPrefs);
+    NotificationPreferences.ttsEnabled.addListener(_syncFromPrefs);
+    NotificationPreferences.vibrationEnabled.addListener(_syncFromPrefs);
+  }
+
+  @override
+  void dispose() {
+    NotificationPreferences.pushEnabled.removeListener(_syncFromPrefs);
+    NotificationPreferences.ttsEnabled.removeListener(_syncFromPrefs);
+    NotificationPreferences.vibrationEnabled.removeListener(_syncFromPrefs);
+    super.dispose();
+  }
+
+  void _syncFromPrefs() {
+    if (!mounted) return;
+    setState(() {
+      pushNotification = NotificationPreferences.pushEnabled.value;
+      audioAlerts = NotificationPreferences.ttsEnabled.value;
+      vibration = NotificationPreferences.vibrationEnabled.value;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,10 +106,9 @@ class _NotificationPageState extends State<NotificationPage> {
             _buildToggleTile(
               title: "PUSH NOTIFICATION",
               value: pushNotification,
-              onChanged: (val) {
-                setState(() {
-                  pushNotification = val;
-                });
+              onChanged: (val) async {
+                setState(() => pushNotification = val);
+                await NotificationPreferences.setPush(val);
               },
               activeColor: const Color(0xFFF7A9AC),
             ),
@@ -89,10 +119,9 @@ class _NotificationPageState extends State<NotificationPage> {
             _buildToggleTile(
               title: "AUDIO ALERTS",
               value: audioAlerts,
-              onChanged: (val) {
-                setState(() {
-                  audioAlerts = val;
-                });
+              onChanged: (val) async {
+                setState(() => audioAlerts = val);
+                await NotificationPreferences.setTts(val);
               },
               activeColor: const Color(0xFFF7A9AC),
             ),
@@ -103,10 +132,9 @@ class _NotificationPageState extends State<NotificationPage> {
             _buildToggleTile(
               title: "VIBRATION",
               value: vibration,
-              onChanged: (val) {
-                setState(() {
-                  vibration = val;
-                });
+              onChanged: (val) async {
+                setState(() => vibration = val);
+                await NotificationPreferences.setVibration(val);
               },
               activeColor: const Color(0xFFF7A9AC),
             ),
