@@ -28,24 +28,51 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter guardian ID')));
       return;
     }
-    // Let the backend (profile table lookup) determine validity of the provided id.
+    // Create a guardian request (assisted_guardians row with status 'pending')
     setState(() => _isLoading = true);
+    final supabase = Supabase.instance.client;
     try {
-      final supabase = Supabase.instance.client;
-      // Use ProfileService helper to link guardian by public id
-      final ok = await ProfileService.linkGuardianByPublicId(supabase, guardianPublicId: val);
-      if (!ok) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian not found or failed to link')));
-        return;
-      }
+      await ProfileService.requestGuardianByPublicId(supabase, guardianPublicId: val);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian linked successfully')));
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TasksScreen()));
+      // Show a blocking waiting dialog while we poll for guardian response
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Waiting for guardian'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text('A request has been sent to your guardian. Waiting for confirmation...'),
+              SizedBox(height: 20),
+              CircularProgressIndicator(),
+            ],
+          ),
+        ),
+      );
+
+      final status = await ProfileService.waitForGuardianResponse(supabase, timeout: const Duration(minutes: 5));
+      // Close waiting dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (status == 'accepted') {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian accepted.')));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TasksScreen()));
+        return;
+      } else if (status == 'rejected') {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian rejected your request.')));
+        return;
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No response from guardian (timeout).')));
+        return;
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to link guardian: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to request guardian: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

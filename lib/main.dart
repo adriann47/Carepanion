@@ -20,6 +20,7 @@ import 'data/profile_service.dart';
 import 'services/navigation.dart';
 import 'services/reminder_service.dart';
 import 'services/emergency_service.dart';
+import 'services/guardian_request_service.dart';
 import 'Regular Screen/tasks_screen_regular.dart';
 
 Future<void> main() async {
@@ -78,6 +79,8 @@ class CarePanionApp extends StatelessWidget {
     ReminderService.start();
   // Start emergency listener for guardian users
   EmergencyService.start();
+  // Start guardian request listener so guardians get accept/reject popups
+  GuardianRequestService().start();
 
     return MaterialApp(
       navigatorKey: _navKey,
