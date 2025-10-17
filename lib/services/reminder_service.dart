@@ -10,6 +10,7 @@ import '../data/profile_service.dart';
 import 'notification_prefs.dart';
 import 'notification_service.dart';
 import 'streak_service.dart';
+import 'guardian_notification_service.dart';
 
 class ReminderService {
   ReminderService._();
@@ -29,6 +30,10 @@ class ReminderService {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     _setupRealtime();
+    // Try to sync any locally queued task outcome notifications
+    // (offline submissions) as soon as service starts.
+    // ignore: discarded_futures
+    GuardianNotificationService.syncQueuedOutcomes();
   }
 
   static bool get isRunning => _timer != null;
@@ -243,6 +248,16 @@ class ReminderService {
                   await NotificationService.cancel(_notifIdFor(dt));
                 } catch (_) {}
               }
+              try {
+                await GuardianNotificationService.recordTaskOutcome(
+                  taskId: id,
+                  assistedId: (r['user_id'] ?? '').toString(),
+                  title: (r['title'] ?? 'Task').toString(),
+                  scheduledAt: sa != null ? DateTime.tryParse(sa.toString()) : null,
+                  action: 'skipped',
+                  actionAt: DateTime.now().toUtc(),
+                );
+              } catch (_) {}
             } catch (_) {}
           },
           onDone: () async {
@@ -261,6 +276,16 @@ class ReminderService {
               }
               // Recompute global streak immediately
               try { await StreakService.refresh(); } catch (_) {}
+              try {
+                await GuardianNotificationService.recordTaskOutcome(
+                  taskId: id,
+                  assistedId: (r['user_id'] ?? '').toString(),
+                  title: (r['title'] ?? 'Task').toString(),
+                  scheduledAt: sa != null ? DateTime.tryParse(sa.toString()) : null,
+                  action: 'done',
+                  actionAt: DateTime.now().toUtc(),
+                );
+              } catch (_) {}
             } catch (_) {}
           },
         ),
@@ -292,6 +317,14 @@ class ReminderService {
     final navigatorState = navKey.currentState;
     final ctx = navigatorState?.overlay?.context;
     if (navigatorState == null || ctx == null) return;
+
+    // Guard: if a popup is already active or this task was already alerted today, do not show again
+    if (_popupActive) return;
+    final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final dupKey = '${taskId}_$todayKey';
+    if (_alerted.contains(dupKey)) return;
+    _alerted.add(dupKey);
+    _popupActive = true;
 
     String? popupGuardianName;
     try {
@@ -346,6 +379,16 @@ class ReminderService {
                 await NotificationService.cancel(_notifIdFor(dt));
               } catch (_) {}
             }
+            try {
+              await GuardianNotificationService.recordTaskOutcome(
+                taskId: taskId.toString(),
+                assistedId: (r!['user_id'] ?? '').toString(),
+                title: (r!['title'] ?? 'Task').toString(),
+                scheduledAt: sa != null ? DateTime.tryParse(sa.toString()) : null,
+                action: 'skipped',
+                actionAt: DateTime.now().toUtc(),
+              );
+            } catch (_) {}
           } catch (_) {}
         },
         onDone: () async {
@@ -362,10 +405,21 @@ class ReminderService {
               } catch (_) {}
             }
             try { await StreakService.refresh(); } catch (_) {}
+            try {
+              await GuardianNotificationService.recordTaskOutcome(
+                taskId: taskId.toString(),
+                assistedId: (r!['user_id'] ?? '').toString(),
+                title: (r!['title'] ?? 'Task').toString(),
+                scheduledAt: sa != null ? DateTime.tryParse(sa.toString()) : null,
+                action: 'done',
+                actionAt: DateTime.now().toUtc(),
+              );
+            } catch (_) {}
           } catch (_) {}
         },
       ),
     );
+    _popupActive = false;
   }
 
   static void _setupRealtime() {

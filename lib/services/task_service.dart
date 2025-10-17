@@ -330,4 +330,72 @@ class TaskService {
     }
     return streak;
   }
+
+  /// Compute guardian streak: consecutive days up to today where at least
+  /// one assisted linked to the guardian completed a task.
+  static Future<int> computeGuardianStreak({
+    String? guardianId,
+    int lookbackDays = 90,
+  }) async {
+    final gid = guardianId ?? _uid;
+    if (gid == null) return 0;
+    final today = DateTime.now();
+    final since = today.subtract(Duration(days: lookbackDays));
+    final sinceStr = _toDateString(since);
+
+    List assistedIds = [];
+    try {
+      final List rows = await _client
+          .from('assisted_guardians')
+          .select('assisted_id,status')
+          .eq('guardian_id', gid);
+      for (final r in rows) {
+        final status = (r['status'] ?? 'accepted').toString();
+        if (status == 'accepted' || status.isEmpty) {
+          final aid = (r['assisted_id'] ?? '').toString();
+          if (aid.isNotEmpty) assistedIds.add(aid);
+        }
+      }
+    } catch (_) {
+      return 0;
+    }
+    if (assistedIds.isEmpty) return 0;
+
+    List list = [];
+    try {
+      list = await _client
+          .from('tasks')
+          .select('due_date,status,is_done,done,user_id')
+          .inFilter('user_id', assistedIds)
+          .gte('due_date', sinceStr)
+          .limit(5000);
+    } catch (_) {
+      return 0;
+    }
+
+    final Set<String> completedDays = {};
+    for (final row in list) {
+      final status = (row['status'] ?? '').toString().toLowerCase();
+      final isDoneRaw = row['is_done'] ?? row['done'];
+      final isDone = status == 'done' ||
+          (isDoneRaw is bool && isDoneRaw) ||
+          (isDoneRaw is String && (isDoneRaw == 'true' || isDoneRaw == '1')) ||
+          (isDoneRaw is num && isDoneRaw != 0);
+      if (!isDone) continue;
+      final due = row['due_date']?.toString();
+      if (due != null && due.isNotEmpty) {
+        completedDays.add(due);
+      }
+    }
+
+    int streak = 0;
+    DateTime d = DateTime(today.year, today.month, today.day);
+    while (true) {
+      final key = _toDateString(d);
+      if (!completedDays.contains(key)) break;
+      streak++;
+      d = d.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
 }

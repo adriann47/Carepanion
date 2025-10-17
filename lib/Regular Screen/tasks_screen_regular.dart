@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:softeng/data/profile_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:softeng/services/task_service.dart';
-// import 'package:softeng/services/notification_service.dart';
+import 'package:softeng/services/guardian_notification_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 
@@ -29,6 +29,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   String? _fullName;
   String? _email;
   RealtimeChannel? _profileChannel;
+  RealtimeChannel? _tasksUpdatesChannel;
   List<Map<String, dynamic>> _completedNotifications = [];
   int _streak = 0;
 
@@ -38,18 +39,21 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     _loadProfile();
     _subscribeProfileChanges();
     _refreshStreak();
+    _subscribeAssistedTaskCompletions();
+    _subscribeNotificationsForStreak();
     // Popups are handled globally by ReminderService; no local timer here.
   }
 
   @override
   void dispose() {
     _profileChannel?.unsubscribe();
+    _tasksUpdatesChannel?.unsubscribe();
     super.dispose();
   }
 
   Future<void> _refreshStreak() async {
     try {
-      final s = await TaskService.computeCurrentStreak();
+      final s = await TaskService.computeGuardianStreak();
       if (!mounted) return;
       setState(() => _streak = s);
     } catch (_) {}
@@ -76,12 +80,12 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         final publicId = data?['public_id'] as String?;
         _userId = (publicId != null && publicId.trim().isNotEmpty)
             ? publicId
-            : (authUser?.id ?? '—');
-        _email = authUser?.email ?? (data?['email'] as String?) ?? '—';
+            : (authUser?.id ?? 'Unknown');
+        _email = authUser?.email ?? (data?['email'] as String?) ?? 'Unknown';
         final name = (data?['fullname'] as String?)?.trim();
         _fullName = (name != null && name.isNotEmpty)
             ? name
-            : _friendlyFromEmail(_email ?? '—');
+            : _friendlyFromEmail(_email ?? 'Unknown');
 
         final raw = data?['avatar_url'] as String?;
         _avatarUrl = (raw == null || raw.trim().isEmpty)
@@ -124,6 +128,93 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         .subscribe();
   }
 
+  void _subscribeNotificationsForStreak() {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return;
+    // Reuse tasks updates channel slot if free, else create a secondary channel
+    final ch = client.channel('public:task_notifications:guardian:${user.id}')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'task_notifications',
+        callback: (payload) {
+          final rec = payload.newRecord;
+          if (rec['guardian_id']?.toString() != user.id) return;
+          final action = (rec['action'] ?? '').toString();
+          if (action == 'done') {
+            _refreshStreak();
+          }
+        },
+      )
+      ..subscribe();
+    // Track so we can clean up
+    _tasksUpdatesChannel ??= ch;
+  }
+
+  void _subscribeAssistedTaskCompletions() {
+    final client = Supabase.instance.client;
+    final current = client.auth.currentUser;
+    if (current == null) return;
+    if (_tasksUpdatesChannel != null) return;
+
+    _tasksUpdatesChannel = client
+        .channel('public:tasks:creator:${current.id}')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'tasks',
+        callback: (payload) async {
+          try {
+            final oldRec = payload.oldRecord;
+            final newRec = payload.newRecord;
+            if (newRec == null) return;
+
+            final createdBy = (newRec['created_by'] ?? '').toString();
+            if (createdBy != current.id) return;
+
+            final prevStatus = (oldRec['status'] ?? '').toString();
+            final nextStatus = (newRec['status'] ?? '').toString();
+            final becameDone = nextStatus == 'done' && prevStatus != 'done';
+            final becameSkip = (nextStatus == 'skip' || nextStatus == 'skipped') &&
+                (prevStatus != 'skip' && prevStatus != 'skipped');
+            if (!becameDone && !becameSkip) return;
+
+            final assistedId = (newRec['user_id'] ?? '').toString();
+            String assistedName = '';
+            String? avatarUrl;
+            try {
+              final prof = await ProfileService.fetchProfile(client, userId: assistedId);
+              if (prof != null) {
+                final n = (prof['fullname'] ?? '').toString().trim();
+                if (n.isNotEmpty) assistedName = n;
+                final raw = (prof['avatar_url'] ?? '').toString().trim();
+                if (raw.isNotEmpty) {
+                  avatarUrl = '$raw?v=${DateTime.now().millisecondsSinceEpoch}';
+                }
+              }
+            } catch (_) {}
+            if (assistedName.isEmpty) assistedName = 'Assisted User';
+
+            final title = (newRec['title'] ?? 'Task').toString();
+            final startAt = (newRec['start_at'] ?? '').toString();
+            final notif = <String, dynamic>{
+              'user': assistedName,
+              'title': title,
+              'time': startAt.isNotEmpty ? startAt : DateTime.now().toUtc().toIso8601String(),
+              'isDone': becameDone,
+              if (avatarUrl != null) 'avatarUrl': avatarUrl,
+            };
+            if (!mounted) return;
+            setState(() {
+              _completedNotifications = [notif, ..._completedNotifications].take(50).toList();
+            });
+          } catch (_) {}
+        },
+      )
+      ..subscribe();
+  }
+
   void _onTabTapped(int index) async {
     setState(() => _currentIndex = index);
     if (index == 1) {
@@ -137,16 +228,12 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         MaterialPageRoute(builder: (_) => const CompanionListScreen()),
       );
     } else if (index == 3) {
-      final result = await Navigator.pushReplacement(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              NotificationScreen(notifications: _completedNotifications),
+          builder: (_) => const NotificationScreen(),
         ),
       );
-      if (result is List<Map<String, dynamic>>) {
-        setState(() => _completedNotifications = result);
-      }
     } else if (index == 4) {
       Navigator.pushReplacement(
         context,
@@ -165,7 +252,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFEF9F4),
-      // No debug FAB
       floatingActionButton: null,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -175,9 +261,9 @@ class _TasksScreenState extends State<TasksScreenRegular> {
             children: [
               _UserHeaderCard(
                 avatarUrl: _avatarUrl,
-                userId: _userId ?? '—',
-                fullName: _fullName ?? '—',
-                email: _email ?? '—',
+                userId: _userId ?? 'Unknown',
+                fullName: _fullName ?? 'Unknown',
+                email: _email ?? 'Unknown',
               ),
               const SizedBox(height: 18),
 
@@ -236,7 +322,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text("TODAY’S TASK", style: titleStyle),
+                child: Text("TODAY'S TASK", style: titleStyle),
               ),
               const SizedBox(height: 14),
 
@@ -245,7 +331,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                 child: _TodayTasksStream(
                   onEdited: (task, done) async {
                     setState(() {
-                      // Optimistically activate streak immediately for today's tasks
                       if (done && _streak == 0) {
                         _streak = 1;
                       }
@@ -286,8 +371,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     );
   }
 
-  // Debug helper removed.
-
   static BottomNavigationBarItem _navItem(
     IconData icon,
     String label, {
@@ -327,24 +410,21 @@ class _UserHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Colors matched to your screenshot
-    const bg = Color(0xFFFFB04A);     // warm orange
-    const stroke = Color(0xFFE88926); // darker outline
-    const plusTint = Color(0x22E88926); // subtle plus texture
+    const bg = Color(0xFFFFB04A);
+    const stroke = Color(0xFFE88926);
+    const plusTint = Color(0x22E88926);
 
     return Container(
-      // Match the width of the card below (same 20px side margins)
       margin: const EdgeInsets.symmetric(horizontal: 20),
       child: Stack(
         children: [
-          // pill container
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: bg,
               borderRadius: BorderRadius.circular(26),
-              border: Border.all(color: stroke, width: 2.0), // slightly thinner
+              border: Border.all(color: stroke, width: 2.0),
               boxShadow: [
                 BoxShadow(
                   color: stroke.withOpacity(0.18),
@@ -355,7 +435,6 @@ class _UserHeaderCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                // avatar with THIN circular outline only (no frame)
                 Container(
                   width: 84,
                   height: 84,
@@ -375,7 +454,6 @@ class _UserHeaderCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 14),
 
-                // text block (smaller sizes so everything fits)
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(right: 6),
@@ -383,12 +461,11 @@ class _UserHeaderCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // small label line
                         Text(
                           'USER CARD:',
                           style: GoogleFonts.nunito(
                             fontWeight: FontWeight.w800,
-                            fontSize: 12,         // smaller
+                            fontSize: 12,
                             height: 1.0,
                             letterSpacing: 0.4,
                             color: const Color(0xFF3B2717),
@@ -396,14 +473,13 @@ class _UserHeaderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
 
-                        // name (smaller but still standout)
                         Text(
                           fullName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.nunito(
                             fontWeight: FontWeight.w900,
-                            fontSize: 20,        // reduced from 26
+                            fontSize: 20,
                             height: 1.05,
                             letterSpacing: 0.1,
                             color: const Color(0xFF23160E),
@@ -411,11 +487,9 @@ class _UserHeaderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
 
-                        // EMAIL line
                         _line('EMAIL:', email, fontSize: 13),
                         const SizedBox(height: 2),
 
-                        // NUMBER/ID line
                         _line('USER ID:', userId, fontSize: 13),
                       ],
                     ),
@@ -425,7 +499,6 @@ class _UserHeaderCard extends StatelessWidget {
             ),
           ),
 
-          // subtle background plus icons (texture)
           Positioned(
             right: 20,
             top: 8,
@@ -506,12 +579,10 @@ class _TodayTasksStream extends StatelessWidget {
           );
         }
 
-        // Filter today's tasks client-side
         var tasks = (snapshot.data ?? const [])
             .where((row) => (row['due_date']?.toString() ?? '') == today)
             .toList();
 
-        // Sort by start_at ascending
         tasks.sort((a, b) {
           final sa = a['start_at']?.toString();
           final sb = b['start_at']?.toString();
@@ -521,7 +592,6 @@ class _TodayTasksStream extends StatelessWidget {
           return DateTime.parse(sa).compareTo(DateTime.parse(sb));
         });
 
-        // no-op: global reminder service handles timing
         if (tasks.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
@@ -604,8 +674,27 @@ class _TaskTileState extends State<_TaskTile> {
       widget.task['status'] = value ? 'done' : 'todo';
       widget.task['is_done'] = value;
       widget.task['done'] = value;
-      // Inform parent so it can refresh streak
       if (mounted) widget.onEdited(widget.task, value);
+
+      // Record an outcome notification for regular users as well (to own page)
+      try {
+        if (value) {
+          final assistedId = (widget.task['user_id'] ?? supabase.auth.currentUser?.id ?? '').toString();
+          final sa = widget.task['start_at'];
+          DateTime? scheduled;
+          if (sa != null) {
+            try { scheduled = DateTime.parse(sa.toString()); } catch (_) {}
+          }
+          await GuardianNotificationService.recordTaskOutcome(
+            taskId: id.toString(),
+            assistedId: assistedId,
+            title: (widget.task['title'] ?? 'Task').toString(),
+            scheduledAt: scheduled,
+            action: 'done',
+            actionAt: DateTime.now().toUtc(),
+          );
+        }
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         setState(() => _done = prev);

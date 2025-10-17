@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'tasks_screen_regular.dart'; // For Home (example)
-import 'calendar_screen_regular.dart'; // For Menu (example)
-import 'companion_list.dart'; // For Companions tab (example)
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'tasks_screen_regular.dart';
+import 'calendar_screen_regular.dart';
+import 'companion_list.dart';
 import 'profile_screen_regular.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:softeng/services/guardian_notification_service.dart';
 
 class NotificationScreen extends StatefulWidget {
-  const NotificationScreen({super.key, required this.notifications});
-  final List<Map<String, dynamic>> notifications;
+  const NotificationScreen({super.key, this.notifications});
+  final List<Map<String, dynamic>>? notifications;
 
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();
@@ -34,16 +37,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         MaterialPageRoute(builder: (context) => const CompanionListScreen()),
       );
     } else if (index == 3) {
-      // Fix: Pass notifications from parent via ModalRoute
-      final notifications = ModalRoute.of(context)?.settings.arguments as List<Map<String, dynamic>>?;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => NotificationScreen(
-            notifications: notifications ?? [],
-          ),
-        ),
-      );
+      // Already on notifications
     } else if (index == 4) {
       Navigator.push(
         context,
@@ -54,110 +48,65 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final supabase = Supabase.instance.client;
+    final uid = supabase.auth.currentUser?.id;
+    final baseStream = supabase.from('task_notifications').stream(primaryKey: ['id']);
+    final stream = uid != null ? baseStream.eq('guardian_id', uid) : baseStream;
+
+    final titleTextStyle = GoogleFonts.nunito(
+      color: Colors.pink,
+      fontSize: 26,
+      fontWeight: FontWeight.w800,
+    );
     return Scaffold(
       backgroundColor: const Color(0xFFFDF7F2),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: false, // ✅ Removes the back button
+        automaticallyImplyLeading: false,
+        actions: [
+          if (uid != null)
+            TextButton(
+              onPressed: () async {
+                await GuardianNotificationService.markAllReadForGuardian(uid);
+              },
+              child: const Text('Mark all read'),
+            ),
+        ],
       ),
 
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                "NOTIFICATIONS",
-                style: TextStyle(
-                  color: Colors.pink,
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              if (widget.notifications.isEmpty)
-                const Text("No notifications yet."),
-              for (final notif in widget.notifications)
-                Container(
-                  width: double.infinity,
-                  height: 110,
-                  margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.lightBlue[100],
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SizedBox(width: 10),
-                      notif['avatarUrl'] != null
-                        ? CircleAvatar(
-                            radius: 36,
-                            backgroundImage: NetworkImage(notif['avatarUrl']),
-                          )
-                        : CircleAvatar(
-                            radius: 36,
-                            child: Icon(
-                              notif['isDone'] ? Icons.check_circle : Icons.cancel,
-                              color: notif['isDone'] ? Colors.green : Colors.red,
-                              size: 36,
-                            ),
-                            backgroundColor: Colors.white,
-                          ),
-                      const SizedBox(width: 30),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              notif['user'] ?? '',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  notif['isDone'] ? Icons.check_circle : Icons.cancel,
-                                  color: notif['isDone'] ? Colors.green : Colors.red,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  notif['title'] ?? '',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              notif['time'] != null
-                                ? TimeOfDay.fromDateTime(DateTime.parse(notif['time']).toLocal()).format(context)
-                                : '',
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text('NOTIFICATIONS', style: titleTextStyle),
+            const SizedBox(height: 16),
+            Expanded(
+              child: widget.notifications != null
+                  ? _ListView(notifications: widget.notifications!)
+                  : StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: stream,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        final items = (snapshot.data ?? const [])
+                            .map((e) => Map<String, dynamic>.from(e))
+                            .toList();
+                        items.sort((a, b) {
+                          final ta = DateTime.tryParse((a['action_at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+                          final tb = DateTime.tryParse((b['action_at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+                          return tb.compareTo(ta);
+                        });
+                        if (items.isEmpty) {
+                          return const Center(child: Text('No notifications yet.'));
+                        }
+                        return _ListView(notifications: items);
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
 
@@ -205,3 +154,68 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 }
+
+class _ListView extends StatelessWidget {
+  const _ListView({required this.notifications});
+  final List<Map<String, dynamic>> notifications;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      itemCount: notifications.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (ctx, i) {
+        final n = notifications[i];
+        final isDone = (n['action'] ?? '') == 'done' || (n['isDone'] == true);
+        final title = (n['title'] ?? 'Task').toString();
+        final at = DateTime.tryParse((n['action_at'] ?? n['time'] ?? '').toString())?.toLocal();
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.lightBlue[100],
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.25),
+                blurRadius: 6,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: Colors.white,
+                child: Icon(
+                  isDone ? Icons.check_circle : Icons.cancel,
+                  color: isDone ? Colors.green : Colors.red,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Text(
+                      at != null ? TimeOfDay.fromDateTime(at).format(ctx) : '',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+
+
+
+

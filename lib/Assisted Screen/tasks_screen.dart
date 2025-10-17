@@ -9,6 +9,7 @@ import 'navbar_assisted.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:softeng/services/streak_service.dart';
+import 'package:softeng/services/guardian_notification_service.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -396,6 +397,25 @@ class _TasksScreen extends State<TasksScreen> {
                                 try {
                                   if (newVal) {
                                     await TaskService.markDone(taskId);
+                                    // Persist outcome for guardians notification page
+                                    try {
+                                      final assistedId = Supabase.instance.client.auth.currentUser?.id ?? (t['user_id']?.toString() ?? '');
+                                      final sa = t['start_at'];
+                                      DateTime? scheduled;
+                                      if (sa != null) {
+                                        try { scheduled = DateTime.parse(sa.toString()); } catch (_) {}
+                                      }
+                                      await GuardianNotificationService.recordTaskOutcome(
+                                        taskId: taskId.toString(),
+                                        assistedId: assistedId,
+                                        title: title,
+                                        scheduledAt: scheduled,
+                                        action: 'done',
+                                        actionAt: DateTime.now().toUtc(),
+                                      );
+                                    } catch (_) {}
+                                    // Refresh global streak so it persists across app restarts
+                                    try { await StreakService.refresh(); } catch (_) {}
                                   } else {
                                     await TaskService.markTodo(taskId);
                                   }
