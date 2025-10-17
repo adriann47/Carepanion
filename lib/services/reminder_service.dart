@@ -10,11 +10,8 @@ import '../data/profile_service.dart';
 import 'notification_prefs.dart';
 import 'notification_service.dart';
 import 'streak_service.dart';
-<<<<<<< Updated upstream
-import 'guardian_notification_service.dart';
-=======
 import 'rl_service.dart';
->>>>>>> Stashed changes
+import 'guardian_notification_service.dart';
 
 class ReminderService {
   ReminderService._();
@@ -351,14 +348,15 @@ class ReminderService {
 
       // Show dialog immediately using the current overlay context
       // ignore: use_build_context_synchronously
-            await showDialog(
+      await showDialog(
         context: ctx,
         barrierDismissible: false,
         builder: (dialogCtx) => _ReminderDialog(
           task: task,
           guardianFullName: popupGuardianName,
           showGuardian: !isRegularUser,
-          onSnooze: (_) async {}, // No-op snooze function
+          snoozeOptions: snoozeOptions,
+          onSnooze: handleSnooze,
           onSkip: () async {
             try {
               await client.from('tasks').update({'status': 'skip'}).eq('id', id);
@@ -369,18 +367,6 @@ class ReminderService {
                   await NotificationService.cancel(_notifIdFor(notifAt));
                 } catch (_) {}
               }
-<<<<<<< Updated upstream
-              try {
-                await GuardianNotificationService.recordTaskOutcome(
-                  taskId: id,
-                  assistedId: (r['user_id'] ?? '').toString(),
-                  title: (r['title'] ?? 'Task').toString(),
-                  scheduledAt: sa != null ? DateTime.tryParse(sa.toString()) : null,
-                  action: 'skipped',
-                  actionAt: DateTime.now().toUtc(),
-                );
-              } catch (_) {}
-=======
               final nowTs = DateTime.now();
               unawaited(
                 ReinforcementLearningService.markReminderDecisionResult(
@@ -407,7 +393,17 @@ class ReminderService {
                   ),
                 );
               }
->>>>>>> Stashed changes
+              try {
+                await GuardianNotificationService.recordTaskOutcome(
+                  taskId: id,
+                  assistedId: (task['user_id'] ?? '').toString(),
+                  title: (task['title'] ?? 'Task').toString(),
+                  scheduledAt:
+                      sa != null ? DateTime.tryParse(sa.toString()) : null,
+                  action: 'skipped',
+                  actionAt: nowTs.toUtc(),
+                );
+              } catch (_) {}
             } catch (_) {}
           },
           onDone: () async {
@@ -420,19 +416,6 @@ class ReminderService {
                   await NotificationService.cancel(_notifIdFor(notifAt));
                 } catch (_) {}
               }
-<<<<<<< Updated upstream
-              // Recompute global streak immediately
-              try { await StreakService.refresh(); } catch (_) {}
-              try {
-                await GuardianNotificationService.recordTaskOutcome(
-                  taskId: id,
-                  assistedId: (r['user_id'] ?? '').toString(),
-                  title: (r['title'] ?? 'Task').toString(),
-                  scheduledAt: sa != null ? DateTime.tryParse(sa.toString()) : null,
-                  action: 'done',
-                  actionAt: DateTime.now().toUtc(),
-                );
-=======
               final nowTs = DateTime.now();
               unawaited(
                 ReinforcementLearningService.markReminderDecisionResult(
@@ -461,7 +444,17 @@ class ReminderService {
               }
               try {
                 await StreakService.refresh();
->>>>>>> Stashed changes
+              } catch (_) {}
+              try {
+                await GuardianNotificationService.recordTaskOutcome(
+                  taskId: id,
+                  assistedId: (task['user_id'] ?? '').toString(),
+                  title: (task['title'] ?? 'Task').toString(),
+                  scheduledAt:
+                      sa != null ? DateTime.tryParse(sa.toString()) : null,
+                  action: 'done',
+                  actionAt: nowTs.toUtc(),
+                );
               } catch (_) {}
             } catch (_) {}
           },
@@ -553,7 +546,8 @@ class ReminderService {
         task: r!,
         guardianFullName: popupGuardianName,
         showGuardian: !regularRole,
-        onSnooze: (_) async {}, // No-op snooze function
+        snoozeOptions: const [],
+        onSnooze: (_) async {},
         onSkip: () async {
           try {
             await client
@@ -567,25 +561,15 @@ class ReminderService {
                 await NotificationService.cancel(_notifIdFor(dt));
               } catch (_) {}
             }
-<<<<<<< Updated upstream
-            try {
-              await GuardianNotificationService.recordTaskOutcome(
-                taskId: taskId.toString(),
-                assistedId: (r!['user_id'] ?? '').toString(),
-                title: (r!['title'] ?? 'Task').toString(),
-                scheduledAt: sa != null ? DateTime.tryParse(sa.toString()) : null,
-                action: 'skipped',
-                actionAt: DateTime.now().toUtc(),
-              );
-            } catch (_) {}
-=======
             final nowTs = DateTime.now();
+            final latency =
+                triggerTime != null ? nowTs.difference(triggerTime!) : null;
             unawaited(
               ReinforcementLearningService.logReminderOutcome(
                 taskId: taskId,
                 status: 'skip',
                 completedAt: nowTs,
-                latency: triggerTime != null ? nowTs.difference(triggerTime) : null,
+                latency: latency,
               ),
             );
             final taskIdInt = int.tryParse(taskId);
@@ -597,7 +581,17 @@ class ReminderService {
                 ),
               );
             }
->>>>>>> Stashed changes
+            try {
+              await GuardianNotificationService.recordTaskOutcome(
+                taskId: taskId,
+                assistedId: (r!['user_id'] ?? '').toString(),
+                title: (r!['title'] ?? 'Task').toString(),
+                scheduledAt:
+                    sa != null ? DateTime.tryParse(sa.toString()) : null,
+                action: 'skipped',
+                actionAt: nowTs.toUtc(),
+              );
+            } catch (_) {}
           } catch (_) {}
         },
         onDone: () async {
@@ -614,12 +608,14 @@ class ReminderService {
               } catch (_) {}
             }
             final nowTs = DateTime.now();
+            final latency =
+                triggerTime != null ? nowTs.difference(triggerTime!) : null;
             unawaited(
               ReinforcementLearningService.logReminderOutcome(
                 taskId: taskId,
                 status: 'done',
                 completedAt: nowTs,
-                latency: triggerTime != null ? nowTs.difference(triggerTime) : null,
+                latency: latency,
               ),
             );
             final taskIdInt = int.tryParse(taskId);
@@ -631,15 +627,18 @@ class ReminderService {
                 ),
               );
             }
-            try { await StreakService.refresh(); } catch (_) {}
+            try {
+              await StreakService.refresh();
+            } catch (_) {}
             try {
               await GuardianNotificationService.recordTaskOutcome(
-                taskId: taskId.toString(),
+                taskId: taskId,
                 assistedId: (r!['user_id'] ?? '').toString(),
                 title: (r!['title'] ?? 'Task').toString(),
-                scheduledAt: sa != null ? DateTime.tryParse(sa.toString()) : null,
+                scheduledAt:
+                    sa != null ? DateTime.tryParse(sa.toString()) : null,
                 action: 'done',
-                actionAt: DateTime.now().toUtc(),
+                actionAt: nowTs.toUtc(),
               );
             } catch (_) {}
           } catch (_) {}
@@ -942,6 +941,4 @@ class _ReminderDialog extends StatelessWidget {
     );
   }
 }
-
-
 
