@@ -89,7 +89,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
-  void _startCooldown([int seconds = 65]) {
+  void _startCooldown([int seconds = 60]) {
     _cooldownTimer?.cancel();
     setState(() => _cooldown = seconds);
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -104,15 +104,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   Future<void> _sendOtp() async {
-    // Additional safety check to prevent sending during cooldown
-    if (_cooldown > 0) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please wait ${_cooldown} seconds before requesting another OTP.')),
-      );
-      return;
-    }
-
     if (_devLocalOtp) {
       setState(() => _isSending = true);
       try {
@@ -162,30 +153,14 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString().toLowerCase();
-      
-      // Handle rate limiting specifically
-      if (msg.contains('can only request this after') || msg.contains('rate limit')) {
-        // Extract the wait time from the error message if possible
-        final secondsMatch = RegExp(r'(\d+)\s*seconds?').firstMatch(msg);
-        if (secondsMatch != null) {
-          final waitSeconds = int.tryParse(secondsMatch.group(1) ?? '60') ?? 60;
-          _startCooldown(waitSeconds + 5); // Add 5 seconds buffer
-        } else {
-          _startCooldown(65); // Default fallback
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Rate limit exceeded. Please wait before requesting another OTP.')),
-        );
+      final msg = e.toString();
+      // If SMS provider isn't configured in Supabase, offer an email fallback (when available)
+      if (_useSms && msg.toLowerCase().contains('phone_provider_disabled')) {
+        await _handleSmsProviderDisabled();
       } else {
-        // If SMS provider isn't configured in Supabase, offer an email fallback (when available)
-        if (_useSms && msg.contains('phone_provider_disabled')) {
-          await _handleSmsProviderDisabled();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to send OTP: $e')),
-          );
-        }
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to send OTP: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -200,7 +175,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('SMS not available'),
         content: const Text(
-          'Your Supabase project has Phone/SMS auth disabled or not configured. Enable a provider (Twilio or MessageBird) in Supabase Authentication > Providers > Phone to send SMS codes.\n\nIf you prefer, you can use an email code instead.',
+          'Your Supabase project has Phone/SMS auth disabled or not configured. Enable a provider (Twilio/MessageBird) in Supabase → Authentication → Providers → Phone to send SMS codes.\n\nIf you prefer, you can use an email code instead.',
         ),
         actions: [
           TextButton(
@@ -303,22 +278,17 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   @override
-Widget build(BuildContext context) {
-  const primaryTextColor = Color(0xFFCA5000); // All text except button
-  return Scaffold(
-    resizeToAvoidBottomInset: true,
-    backgroundColor: const Color(0xFFFDF8F0),
-    body: SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        ),
+  Widget build(BuildContext context) {
+    const primaryTextColor = Color(0xFFCA5000); // All text except button
+    return Scaffold(
+      backgroundColor: const Color(0xFFFDF8F0),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             const SizedBox(height: 80),
+
+            // Verify your Email Address (bold, multi-line)
             Text(
               _useSms ? "Verify your Phone Number" : "Verify your Email",
               textAlign: TextAlign.center,
@@ -329,6 +299,8 @@ Widget build(BuildContext context) {
               ),
             ),
             const SizedBox(height: 10),
+
+            // Verify message
             Text(
               _useSms
                   ? "We sent a 6-digit code to your phone via SMS.\nEnter the code below to continue."
@@ -336,9 +308,12 @@ Widget build(BuildContext context) {
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(color: primaryTextColor),
             ),
-            const SizedBox(height: 100),
+            const SizedBox(height: 100), // Space below this text
             const SizedBox(height: 30),
+
             const SizedBox(height: 20),
+
+            // OTP section
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -354,7 +329,7 @@ Widget build(BuildContext context) {
               Padding(
                 padding: const EdgeInsets.only(bottom: 6.0),
                 child: Text(
-                  'DEV code: ',
+                  'DEV code: $_localOtp',
                   style: GoogleFonts.nunito(
                     color: Colors.grey.shade700,
                     fontSize: 12,
@@ -362,6 +337,7 @@ Widget build(BuildContext context) {
                   ),
                 ),
               ),
+            // Intentionally hide the email from UI per request; still used internally for resend/verify
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: List.generate(6, (index) {
@@ -436,7 +412,10 @@ Widget build(BuildContext context) {
                 ),
               ),
             ),
+
             const SizedBox(height: 10),
+
+            // Resend text with "Resend" underlined
             Center(
               child: GestureDetector(
                 onTap: () async {
@@ -450,7 +429,7 @@ Widget build(BuildContext context) {
                       const TextSpan(text: "Didn't receive any code? "),
                       TextSpan(
                         text: _cooldown > 0
-                            ? 'Resend in s (rate limited)'
+                            ? 'Resend in ${_cooldown}s'
                             : 'Resend',
                         style: const TextStyle(
                           decoration: TextDecoration.underline,
@@ -466,10 +445,6 @@ Widget build(BuildContext context) {
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
-}
-
-
-

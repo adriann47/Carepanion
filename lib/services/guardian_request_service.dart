@@ -78,7 +78,7 @@ class GuardianRequestService {
                           // Orange user id pill
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
                             decoration: BoxDecoration(
                               color: const Color(0xFFFFC68A),
                               borderRadius: BorderRadius.circular(28),

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,7 +10,11 @@ import '../data/profile_service.dart';
 import 'notification_prefs.dart';
 import 'notification_service.dart';
 import 'streak_service.dart';
+<<<<<<< Updated upstream
 import 'guardian_notification_service.dart';
+=======
+import 'rl_service.dart';
+>>>>>>> Stashed changes
 
 class ReminderService {
   ReminderService._();
@@ -19,6 +23,7 @@ class ReminderService {
   static bool _popupActive = false;
   static String? _today; // yyyy-MM-dd
   static final Set<String> _alerted = {};
+  static final Map<String, DateTime> _deferUntil = {};
   static String? _guardianFullNameCache;
   static String? _guardianCacheForUserId;
   static bool _scheduledForToday = false;
@@ -125,26 +130,103 @@ class ReminderService {
       _scheduledForToday = true;
     }
 
-    for (final r in rows) {
-      final id = r['id'].toString();
+    for (final raw in rows) {
+      if (raw is! Map) continue;
+      final task = Map<String, dynamic>.from(raw as Map);
+      final id = task['id'].toString();
       final key = '${id}_$today';
-      if (_alerted.contains(key)) continue;
 
-      final startAt = r['start_at'];
+      final startAt = task['start_at'];
       if (startAt == null) continue;
-      DateTime dt;
+      DateTime startLocal;
       try {
-        dt = DateTime.parse(startAt.toString()).toLocal();
+        startLocal = DateTime.parse(startAt.toString()).toLocal();
       } catch (_) {
         continue;
       }
-      final match = dt.isAfter(now.subtract(const Duration(seconds: 1))) && dt.isBefore(now.add(const Duration(seconds: 1)));
-      if (!match) continue;
 
+      final triggerTime = _deferUntil[id] ?? startLocal;
+      final bool inWindow = triggerTime.isAfter(
+            now.subtract(const Duration(seconds: 1)),
+          ) &&
+          triggerTime.isBefore(
+            now.add(const Duration(seconds: 1)),
+          );
+      if (!inWindow) continue;
+
+      DateTime dueDate;
+      try {
+        final dueRaw = task['due_date']?.toString();
+        dueDate = dueRaw != null && dueRaw.isNotEmpty
+            ? DateTime.parse(dueRaw)
+            : DateTime(now.year, now.month, now.day);
+      } catch (_) {
+        dueDate = DateTime(now.year, now.month, now.day);
+      }
+
+      final Map<String, dynamic> contextPayload = {
+        'day_of_week': DateFormat('EEEE').format(now),
+        'hour': triggerTime.hour,
+        'minute': triggerTime.minute,
+        'push_enabled': NotificationPreferences.pushEnabled.value,
+        'tts_enabled': NotificationPreferences.ttsEnabled.value,
+        'vibration_enabled': NotificationPreferences.vibrationEnabled.value,
+        'guardian_cached': _guardianFullNameCache != null,
+        'deferred_from_start_seconds':
+            triggerTime.difference(startLocal).inSeconds,
+      };
+
+      final decision =
+          await ReinforcementLearningService.chooseReminderAction(
+        taskRow: task,
+        dueDate: dueDate,
+        startAtLocal: triggerTime,
+        context: contextPayload,
+      );
+
+      if (decision.action == ReminderAction.deferShort ||
+          decision.action == ReminderAction.deferLong) {
+        final waitFor = decision.deferDuration ??
+            (decision.action == ReminderAction.deferShort
+                ? const Duration(minutes: 10)
+                : const Duration(minutes: 30));
+        _deferUntil[id] = DateTime.now().add(waitFor);
+        unawaited(
+          ReinforcementLearningService.markReminderDecisionResult(
+            decision.eventId,
+            result: 'deferred',
+            extra: {
+              'delay_seconds': waitFor.inSeconds,
+            },
+          ),
+        );
+        continue;
+      }
+
+      _deferUntil.remove(id);
+
+      if (decision.action == ReminderAction.escalateGuardian) {
+        _alerted.add(key);
+        unawaited(
+          ReinforcementLearningService.escalateReminder(
+            taskRow: task,
+            metadata: {
+              ...contextPayload,
+              'reason': 'policy_escalation',
+            },
+            decisionEventId: decision.eventId,
+          ),
+        );
+        continue;
+      }
+
+      if (_alerted.contains(key)) continue;
       _alerted.add(key);
 
-      final title = (r['title'] ?? 'Task').toString();
-      final note = (r['description'] ?? '').toString();
+      final title = (task['title'] ?? 'Task').toString();
+      final note = (task['description'] ?? '').toString();
+      final List<SnoozeOption> snoozeOptions = decision.recommendedSnoozes;
+
       // Speak if enabled (log errors so we can diagnose when speech fails)
       try {
         if (!kIsWeb && NotificationPreferences.ttsEnabled.value) {
@@ -152,7 +234,7 @@ class ReminderService {
             // Indicate in logs that we are about to speak
             // ignore: avoid_print
             print(
-              'ReminderService: speaking TTS for task id=${r['id']} title="$title"',
+              'ReminderService: speaking TTS for task id=${task['id']} title="$title"',
             );
           }
           try {
@@ -161,16 +243,45 @@ class ReminderService {
           await _tts.speak('Reminder: $title. ${note.isNotEmpty ? note : ""}');
           if (kDebugMode) {
             // ignore: avoid_print
-            print('ReminderService: TTS complete for task id=${r['id']}');
+            print('ReminderService: TTS complete for task id=${task['id']}');
           }
         }
       } catch (e, st) {
         if (kDebugMode) {
           // ignore: avoid_print
-          print('ReminderService: TTS failed for task id=${r['id']}: $e');
+          print('ReminderService: TTS failed for task id=${task['id']}: $e');
           // ignore: avoid_print
           print(st);
         }
+      }
+
+      Future<void> handleSnooze(SnoozeOption option) async {
+        final nextTrigger = DateTime.now().add(option.duration);
+        _deferUntil[id] = nextTrigger;
+        _alerted.remove(key);
+        try {
+          await NotificationService.cancel(_notifIdFor(triggerTime));
+        } catch (_) {}
+        try {
+          await NotificationService.scheduleAt(
+            id: _notifIdFor(nextTrigger),
+            whenLocal: nextTrigger,
+            title: 'Task Reminder: $title',
+            body: note.isNotEmpty ? note : "It's time to do this task.",
+            payload: '{"task_id":"$id"}',
+          );
+        } catch (_) {}
+        unawaited(
+          ReinforcementLearningService.markReminderDecisionResult(
+            decision.eventId,
+            result: 'snoozed',
+            extra: {
+              'seconds': option.duration.inSeconds,
+              if (option.label != null && option.label!.isNotEmpty)
+                'label': option.label,
+            },
+          ),
+        );
       }
 
       // If app is not in foreground or we can't get a context, show a push notification instead of popup
@@ -178,16 +289,30 @@ class ReminderService {
       final ctx = navigatorState?.overlay?.context;
       if (navigatorState == null || ctx == null) {
         await NotificationService.showNow(
-          id: _notifIdFor(dt),
+          id: _notifIdFor(triggerTime),
           title: 'Task Reminder: $title',
           body: note.isNotEmpty ? note : 'It\'s time to do this task.',
           payload: '{"task_id":"$id"}',
+        );
+        unawaited(
+          ReinforcementLearningService.markReminderDecisionResult(
+            decision.eventId,
+            result: 'notification_only',
+            extra: contextPayload,
+          ),
         );
         continue;
       }
 
       // Popup path
       _popupActive = true;
+      unawaited(
+        ReinforcementLearningService.markReminderDecisionResult(
+          decision.eventId,
+          result: 'popup_presented',
+          extra: contextPayload,
+        ),
+      );
 
       // Try to resolve the creator name for the popup (created_by_name > created_by profile > cached guardian)
       String? popupGuardianName = _guardianFullNameCache;
@@ -226,28 +351,25 @@ class ReminderService {
 
       // Show dialog immediately using the current overlay context
       // ignore: use_build_context_synchronously
-      await showDialog(
+            await showDialog(
         context: ctx,
         barrierDismissible: false,
         builder: (dialogCtx) => _ReminderDialog(
-          task: r as Map<String, dynamic>,
+          task: task,
           guardianFullName: popupGuardianName,
           showGuardian: !isRegularUser,
-
+          onSnooze: (_) async {}, // No-op snooze function
           onSkip: () async {
             try {
-              await client
-                  .from('tasks')
-                  .update({'status': 'skip'})
-                  .eq('id', id);
-              // Cancel scheduled notification if any
-              final sa = r['start_at'];
+              await client.from('tasks').update({'status': 'skip'}).eq('id', id);
+              final sa = task['start_at'];
               if (sa != null) {
                 try {
-                  final dt = DateTime.parse(sa.toString()).toLocal();
-                  await NotificationService.cancel(_notifIdFor(dt));
+                  final notifAt = DateTime.parse(sa.toString()).toLocal();
+                  await NotificationService.cancel(_notifIdFor(notifAt));
                 } catch (_) {}
               }
+<<<<<<< Updated upstream
               try {
                 await GuardianNotificationService.recordTaskOutcome(
                   taskId: id,
@@ -258,22 +380,47 @@ class ReminderService {
                   actionAt: DateTime.now().toUtc(),
                 );
               } catch (_) {}
+=======
+              final nowTs = DateTime.now();
+              unawaited(
+                ReinforcementLearningService.markReminderDecisionResult(
+                  decision.eventId,
+                  result: 'skipped',
+                ),
+              );
+              unawaited(
+                ReinforcementLearningService.logReminderOutcome(
+                  taskId: id,
+                  status: 'skip',
+                  completedAt: nowTs,
+                  latency: nowTs.difference(triggerTime),
+                  decisionEventId: decision.eventId,
+                ),
+              );
+              final taskIdInt = int.tryParse(id);
+              if (taskIdInt != null) {
+                unawaited(
+                  ReinforcementLearningService.recordTaskStatusChange(
+                    taskId: taskIdInt,
+                    status: 'skip',
+                    decisionEventId: decision.eventId,
+                  ),
+                );
+              }
+>>>>>>> Stashed changes
             } catch (_) {}
           },
           onDone: () async {
             try {
-              await client
-                  .from('tasks')
-                  .update({'status': 'done'})
-                  .eq('id', id);
-              // Cancel scheduled notification if any
-              final sa = r['start_at'];
+              await client.from('tasks').update({'status': 'done'}).eq('id', id);
+              final sa = task['start_at'];
               if (sa != null) {
                 try {
-                  final dt = DateTime.parse(sa.toString()).toLocal();
-                  await NotificationService.cancel(_notifIdFor(dt));
+                  final notifAt = DateTime.parse(sa.toString()).toLocal();
+                  await NotificationService.cancel(_notifIdFor(notifAt));
                 } catch (_) {}
               }
+<<<<<<< Updated upstream
               // Recompute global streak immediately
               try { await StreakService.refresh(); } catch (_) {}
               try {
@@ -285,6 +432,36 @@ class ReminderService {
                   action: 'done',
                   actionAt: DateTime.now().toUtc(),
                 );
+=======
+              final nowTs = DateTime.now();
+              unawaited(
+                ReinforcementLearningService.markReminderDecisionResult(
+                  decision.eventId,
+                  result: 'completed_done',
+                ),
+              );
+              unawaited(
+                ReinforcementLearningService.logReminderOutcome(
+                  taskId: id,
+                  status: 'done',
+                  completedAt: nowTs,
+                  latency: nowTs.difference(triggerTime),
+                  decisionEventId: decision.eventId,
+                ),
+              );
+              final taskIdInt = int.tryParse(id);
+              if (taskIdInt != null) {
+                unawaited(
+                  ReinforcementLearningService.recordTaskStatusChange(
+                    taskId: taskIdInt,
+                    status: 'done',
+                    decisionEventId: decision.eventId,
+                  ),
+                );
+              }
+              try {
+                await StreakService.refresh();
+>>>>>>> Stashed changes
               } catch (_) {}
             } catch (_) {}
           },
@@ -351,6 +528,16 @@ class ReminderService {
       }
     } catch (_) {}
 
+    DateTime? triggerTime;
+    final startAt = r!['start_at'];
+    if (startAt != null) {
+      try {
+        triggerTime = DateTime.parse(startAt.toString()).toLocal();
+      } catch (_) {
+        triggerTime = null;
+      }
+    }
+
     // Determine if guardian line should be shown for this user
     bool regularRole = false;
     try {
@@ -366,6 +553,7 @@ class ReminderService {
         task: r!,
         guardianFullName: popupGuardianName,
         showGuardian: !regularRole,
+        onSnooze: (_) async {}, // No-op snooze function
         onSkip: () async {
           try {
             await client
@@ -379,6 +567,7 @@ class ReminderService {
                 await NotificationService.cancel(_notifIdFor(dt));
               } catch (_) {}
             }
+<<<<<<< Updated upstream
             try {
               await GuardianNotificationService.recordTaskOutcome(
                 taskId: taskId.toString(),
@@ -389,6 +578,26 @@ class ReminderService {
                 actionAt: DateTime.now().toUtc(),
               );
             } catch (_) {}
+=======
+            final nowTs = DateTime.now();
+            unawaited(
+              ReinforcementLearningService.logReminderOutcome(
+                taskId: taskId,
+                status: 'skip',
+                completedAt: nowTs,
+                latency: triggerTime != null ? nowTs.difference(triggerTime) : null,
+              ),
+            );
+            final taskIdInt = int.tryParse(taskId);
+            if (taskIdInt != null) {
+              unawaited(
+                ReinforcementLearningService.recordTaskStatusChange(
+                  taskId: taskIdInt,
+                  status: 'skip',
+                ),
+              );
+            }
+>>>>>>> Stashed changes
           } catch (_) {}
         },
         onDone: () async {
@@ -403,6 +612,24 @@ class ReminderService {
                 final dt = DateTime.parse(sa.toString()).toLocal();
                 await NotificationService.cancel(_notifIdFor(dt));
               } catch (_) {}
+            }
+            final nowTs = DateTime.now();
+            unawaited(
+              ReinforcementLearningService.logReminderOutcome(
+                taskId: taskId,
+                status: 'done',
+                completedAt: nowTs,
+                latency: triggerTime != null ? nowTs.difference(triggerTime) : null,
+              ),
+            );
+            final taskIdInt = int.tryParse(taskId);
+            if (taskIdInt != null) {
+              unawaited(
+                ReinforcementLearningService.recordTaskStatusChange(
+                  taskId: taskIdInt,
+                  status: 'done',
+                ),
+              );
             }
             try { await StreakService.refresh(); } catch (_) {}
             try {
@@ -517,12 +744,16 @@ class _ReminderDialog extends StatelessWidget {
     required this.task,
     required this.onSkip,
     required this.onDone,
+    required this.onSnooze,
+    this.snoozeOptions,
     this.guardianFullName,
     this.showGuardian = true,
   });
   final Map<String, dynamic> task;
   final VoidCallback onSkip;
   final VoidCallback onDone;
+  final Future<void> Function(SnoozeOption option) onSnooze;
+  final List<SnoozeOption>? snoozeOptions;
   final String? guardianFullName;
   final bool showGuardian;
 
@@ -553,6 +784,19 @@ class _ReminderDialog extends StatelessWidget {
 
     final s = fmt(task['start_at']);
     final e = fmt(task['end_at']);
+
+    String snoozeLabel(SnoozeOption option) {
+      final custom = option.label;
+      if (custom != null && custom.trim().isNotEmpty) {
+        return custom.trim();
+      }
+      final minutes = option.duration.inMinutes;
+      if (minutes >= 1) {
+        return minutes == 1 ? '1 min' : '$minutes min';
+      }
+      final seconds = option.duration.inSeconds;
+      return '${seconds}s';
+    }
     final time = s.isEmpty && e.isEmpty
         ? 'All day'
         : (s.isNotEmpty && e.isNotEmpty ? '$s - $e' : (s + e));
@@ -658,6 +902,38 @@ class _ReminderDialog extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (snoozeOptions != null && snoozeOptions!.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'SMART SNOOZE',
+                      style: GoogleFonts.nunito(
+                        color: const Color(0xFF2D2D2D),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: snoozeOptions!.map((option) {
+                      final label = snoozeLabel(option);
+                      return ActionChip(
+                        label: Text(label),
+                        backgroundColor:
+                            option.isPreferred ? const Color(0xFFE2F5F6) : const Color(0xFFF2F4F7),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          onSnooze(option);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
             ),
           ),
@@ -666,5 +942,6 @@ class _ReminderDialog extends StatelessWidget {
     );
   }
 }
+
 
 

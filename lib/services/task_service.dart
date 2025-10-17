@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:softeng/data/profile_service.dart';
+import 'package:softeng/services/rl_service.dart';
 
 /// Task service for interacting with Supabase `tasks` table.
 ///
@@ -82,8 +85,13 @@ class TaskService {
         'created_by_name': creatorName.trim(),
     }..removeWhere((key, value) => value == null);
 
+    Map<String, dynamic>? insertedRow;
     try {
-      await _client.from('tasks').insert(data);
+      insertedRow = await _client
+          .from('tasks')
+          .insert(data)
+          .select('id')
+          .maybeSingle();
     } catch (e) {
       final msg = e.toString().toLowerCase();
       // Fallback if optional columns don't exist in DB
@@ -104,10 +112,33 @@ class TaskService {
         modified = true;
       }
       if (modified) {
-        await _client.from('tasks').insert(fallback);
+        insertedRow = await _client
+            .from('tasks')
+            .insert(fallback)
+            .select('id')
+            .maybeSingle();
+        final createdId = _extractId(insertedRow);
+        if (createdId != null) {
+          unawaited(
+            ReinforcementLearningService.recordTaskStatusChange(
+              taskId: createdId,
+              status: 'created',
+            ),
+          );
+        }
         return;
       }
       rethrow;
+    }
+
+    final createdId = _extractId(insertedRow);
+    if (createdId != null) {
+      unawaited(
+        ReinforcementLearningService.recordTaskStatusChange(
+          taskId: createdId,
+          status: 'created',
+        ),
+      );
     }
   }
 
@@ -215,6 +246,15 @@ class TaskService {
         return;
       }
       rethrow;
+    }
+
+    if (status != null) {
+      unawaited(
+        ReinforcementLearningService.recordTaskStatusChange(
+          taskId: id,
+          status: status,
+        ),
+      );
     }
   }
 
@@ -398,4 +438,15 @@ class TaskService {
     }
     return streak;
   }
+}
+
+int? _extractId(Map<String, dynamic>? row) {
+  if (row == null) return null;
+  final raw = row['id'];
+  if (raw is int) return raw;
+  if (raw is num) return raw.toInt();
+  if (raw is String) {
+    return int.tryParse(raw);
+  }
+  return null;
 }

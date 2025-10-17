@@ -85,43 +85,27 @@ class ProfileService {
           if (pub != null) insertPayload['public_id'] = pub;
         }
 
-        // Retry insert up to 3 times
-        bool inserted = false;
-        for (int attempt = 0; attempt < 3 && !inserted; attempt++) {
-          try {
-            await client.from(table).insert(insertPayload);
-            inserted = true;
-          } catch (e) {
-            if (attempt == 2) {
-              if (kDebugMode) {
-                print('ProfileService.ensureProfileExists insert failed: $e');
-              }
-            } else {
-              await Future.delayed(const Duration(milliseconds: 500));
-            }
-          }
-        }
-        if (!inserted) return; // Skip if insert failed
+        await client.from(table).insert(insertPayload);
+        return;
       }
 
       // 3) Row exists — only patch missing fields. Never overwrite an existing fullname here.
-      final existingMap = existing as Map<String, dynamic>;
       final updatePayload = <String, dynamic>{};
 
       // Set email if currently null and we have one
-      final dynamic existingEmail = existingMap['email'];
+      final dynamic existingEmail = existing['email'];
       if ((existingEmail == null || existingEmail.toString().trim().isEmpty) && email != null) {
         updatePayload['email'] = email;
       }
 
       // Set role if currently null and we have one
-      final dynamic existingRole = existingMap['role'];
+      final dynamic existingRole = existing['role'];
       if ((existingRole == null || existingRole.toString().trim().isEmpty) && effectiveRole != null) {
         updatePayload['role'] = effectiveRole;
       }
 
       // Ensure Regular users have public_id; don't touch if it already exists
-      final dynamic existingPublicId = existingMap['public_id'];
+      final dynamic existingPublicId = existing['public_id'];
       if ((effectiveRole ?? existingRole?.toString() ?? '').toLowerCase() == 'regular') {
         if (existingPublicId == null || existingPublicId.toString().trim().isEmpty) {
           final pub = await _generateUniquePublicId(client, table);
@@ -333,26 +317,33 @@ class ProfileService {
     if (fullName != null) payload['fullname'] = fullName;
     if (role != null) payload['role'] = role;
     if (birthday != null) payload['birthday'] = birthday;
-    if (phone != null) payload['phone'] = phone;
   
-    // Retry up to 3 times in case of RLS timing issues
-    for (int attempt = 0; attempt < 3; attempt++) {
-      try {
-        await client.from(table).upsert(payload);
-        return; // Success, exit
-      } catch (e) {
-        if (attempt == 2) {
-          // Last attempt failed, log and ignore
-          if (kDebugMode) {
-            print('ProfileService.upsertProfile failed after 3 attempts: $e');
-          }
-        } else {
-          // Wait before retry
-          await Future.delayed(const Duration(milliseconds: 500));
-        }
+  try {
+      await client.from(table).upsert(payload);
+    } catch (e) {
+      // Don't let DB policy failures block client flows like registration.
+      // Log the error for debugging in dev mode and continue.
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('ProfileService.upsertProfile failed: $e');
       }
+
+    if (phone != null) payload['phone'] = phone; // best-effort; may fail if column missing
+    try {
+      await client.from(table).upsert(payload);
+    } catch (_) {
+      // If 'phone' column doesn't exist, ignore; callers can use setPhone for robust writes
+      await client.from(table).upsert({
+        'id': id,
+        if (email != null) 'email': email,
+        if (fullName != null) 'fullname': fullName,
+        if (role != null) 'role': role,
+        if (birthday != null) 'birthday': birthday,
+      });
+
     }
-  }
+}
+}
 
   /// Fetch the profile row for the supplied [id] or the current auth user.
   static Future<Map<String, dynamic>?> fetchProfile(
