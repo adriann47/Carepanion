@@ -115,6 +115,14 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
       if (mounted) Navigator.of(context).pop();
 
       if (status == 'accepted') {
+        // Link the guardian now that request is accepted
+        try {
+          await ProfileService.linkGuardianByPublicId(supabase, guardianPublicId: val);
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to link guardian: $e')));
+          return;
+        }
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian accepted.')));
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TasksScreen()));
