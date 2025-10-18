@@ -17,9 +17,13 @@ class GuardianNotificationService {
     required String action, // 'done' | 'skipped'
     DateTime? actionAt,
   }) async {
+    print('GuardianNotificationService.recordTaskOutcome called: taskId=$taskId, assistedId=$assistedId, action=$action');
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      print('GuardianNotificationService: No authenticated user');
+      return;
+    }
 
     final act = (action.toLowerCase() == 'skip') ? 'skipped' : action.toLowerCase();
     final when = (actionAt ?? DateTime.now().toUtc());
@@ -30,27 +34,35 @@ class GuardianNotificationService {
     List<String> guardianIds = [];
     try {
       final role = (await ProfileService.getCurrentUserRole(client))?.toLowerCase();
+      print('GuardianNotificationService: Current user role = $role');
       if (role == 'regular') {
         guardianIds = [user.id];
+        print('GuardianNotificationService: Regular user, adding self as guardian: ${user.id}');
       } else {
+        print('GuardianNotificationService: Assisted user, querying assisted_guardians table for assistedId: $assistedId');
         final List rows = await client
             .from('assisted_guardians')
             .select('guardian_id,status')
             .eq('assisted_id', assistedId);
+        print('GuardianNotificationService: Found ${rows.length} guardian relationships');
         for (final r in rows) {
           final gid = (r['guardian_id'] ?? '').toString();
           final status = (r['status'] ?? 'accepted').toString();
+          print('GuardianNotificationService: Guardian $gid with status $status');
           if (gid.isEmpty) continue;
           if (status == 'accepted' || status.isEmpty) {
             guardianIds.add(gid);
+            print('GuardianNotificationService: Added guardian $gid to notification targets');
           }
         }
         // If no guardians found, fall back to creator seeing their own page if they are the assisted
         if (guardianIds.isEmpty) {
           guardianIds = [user.id];
+          print('GuardianNotificationService: No guardians found, falling back to user: ${user.id}');
         }
       }
-    } catch (_) {
+    } catch (e) {
+      print('GuardianNotificationService: Error determining guardians: $e');
       // If fetching guardians fails, queue locally to retry later
       await _enqueue(taskId: taskId, assistedId: assistedId, title: title, scheduledIso: scheduledIso, act: act, whenIso: whenIso);
       return;
@@ -60,6 +72,7 @@ class GuardianNotificationService {
     print('recordTaskOutcome: user=${user.id}, assisted=$assistedId, action=$action, guardians=$guardianIds');
     // Fan-out inserts (idempotent)
     for (final gid in guardianIds.toSet()) {
+      print('GuardianNotificationService: Attempting to create notification for guardian $gid');
       try {
         final exist = await client
             .from('task_notifications')
@@ -69,8 +82,12 @@ class GuardianNotificationService {
             .eq('action_at', whenIso)
             .limit(1)
             .maybeSingle();
-        if (exist != null) continue;
+        if (exist != null) {
+          print('GuardianNotificationService: Notification already exists for guardian $gid, skipping');
+          continue;
+        }
         
+        print('GuardianNotificationService: Inserting notification for guardian $gid');
         await client.from('task_notifications').upsert({
           'task_id': taskId,
           'assisted_id': assistedId,
@@ -82,7 +99,9 @@ class GuardianNotificationService {
           'action_at': whenIso,
           'is_read': false,
         });
+        print('GuardianNotificationService: Successfully created notification for guardian $gid');
       } catch (e) {
+        print('GuardianNotificationService: Failed to create notification for guardian $gid: $e');
         if (kDebugMode) {
           // ignore: avoid_print
           print('GuardianNotificationService insert failed, queuing: $e');

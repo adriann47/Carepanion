@@ -130,3 +130,24 @@ create index if not exists idx_tasks_status on public.tasks(status);
 create index if not exists idx_assisted_guardians_guardian_id on public.assisted_guardians(guardian_id);
 create index if not exists idx_assisted_guardians_assisted_id on public.assisted_guardians(assisted_id);
 create index if not exists idx_assisted_guardians_status on public.assisted_guardians(status);
+
+-- Enable real-time for the tasks table (safe to run multiple times)
+do $$
+begin
+  -- Check if already in publication
+  if exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+    and tablename = 'tasks'
+  ) then
+    -- Already enabled
+    null;
+  else
+    -- Add to publication
+    alter publication supabase_realtime add table public.tasks;
+  end if;
+exception
+  when others then
+    -- Handle any errors (publication might not exist, etc.)
+    null;
+end $$;

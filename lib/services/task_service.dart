@@ -46,6 +46,7 @@ class TaskService {
     String? category,
     String? forUserId,
   }) async {
+    print('TaskService.createTask: Creating task for user ${forUserId ?? _uid}');
     final startAt = _combineDateAndTime(dueDate, startTime)?.toUtc();
     final endAt = _combineDateAndTime(dueDate, endTime)?.toUtc();
 
@@ -176,8 +177,9 @@ class TaskService {
     final Map<String, dynamic> data = {};
     if (title != null) data['title'] = title;
     if (description != null) data['description'] = description;
-    if (category != null)
+    if (category != null) {
       data['category'] = category.trim().isEmpty ? null : category;
+    }
     if (status != null) data['status'] = status;
     if (dueDate != null) data['due_date'] = _toDateString(dueDate);
 
@@ -264,7 +266,9 @@ class TaskService {
     required String status,
     String? forUserId,
   }) async {
+    print('TaskService.setTaskStatus: Setting task $id to status $status');
     await updateTask(id: id, status: status, forUserId: forUserId);
+    print('TaskService.setTaskStatus: Task status updated successfully');
   }
 
   static Future<void> markDone(int id, {String? forUserId}) =>
