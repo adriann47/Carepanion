@@ -56,6 +56,8 @@ class GuardianNotificationService {
       return;
     }
 
+    //print debug terminal to test if data is correct
+    print('recordTaskOutcome: user=${user.id}, assisted=$assistedId, action=$action, guardians=$guardianIds');
     // Fan-out inserts (idempotent)
     for (final gid in guardianIds.toSet()) {
       try {
@@ -68,11 +70,12 @@ class GuardianNotificationService {
             .limit(1)
             .maybeSingle();
         if (exist != null) continue;
-
-        await client.from('task_notifications').insert({
+        
+        await client.from('task_notifications').upsert({
           'task_id': taskId,
           'assisted_id': assistedId,
           'guardian_id': gid,
+          'user_id': user.id,
           'title': title,
           if (scheduledIso != null) 'scheduled_at': scheduledIso,
           'action': act,
@@ -84,7 +87,7 @@ class GuardianNotificationService {
           // ignore: avoid_print
           print('GuardianNotificationService insert failed, queuing: $e');
         }
-        await _enqueue(taskId: taskId, assistedId: assistedId, title: title, scheduledIso: scheduledIso, act: act, whenIso: whenIso, guardianId: gid);
+        await _enqueue(taskId: taskId, assistedId: assistedId,title: title, scheduledIso: scheduledIso, act: act, whenIso: whenIso, guardianId: gid);
       }
     }
   }
@@ -101,6 +104,7 @@ class GuardianNotificationService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getStringList(_queueKey) ?? <String>[];
+      final userId = Supabase.instance.client.auth.currentUser?.id;
       final item = jsonEncode({
         'task_id': taskId,
         'assisted_id': assistedId,
@@ -109,6 +113,7 @@ class GuardianNotificationService {
         'action': act,
         'action_at': whenIso,
         if (guardianId != null) 'guardian_id': guardianId,
+        if (userId != null) 'user_id': userId,
       });
       raw.add(item);
       await prefs.setStringList(_queueKey, raw);
@@ -181,10 +186,11 @@ class GuardianNotificationService {
               .limit(1)
               .maybeSingle();
           if (exist != null) continue;
-          await client.from('task_notifications').insert({
+          await client.from('task_notifications').upsert({
             'task_id': taskId,
             'assisted_id': assistedId,
             'guardian_id': t,
+            'user_id': (m['user_id'] ?? Supabase.instance.client.auth.currentUser?.id),
             'title': title,
             if (scheduledIso != null) 'scheduled_at': scheduledIso,
             'action': act,
@@ -214,4 +220,3 @@ class GuardianNotificationService {
     } catch (_) {}
   }
 }
-

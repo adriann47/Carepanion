@@ -10,7 +10,6 @@ import 'package:softeng/data/profile_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:softeng/services/task_service.dart';
 import 'package:softeng/services/guardian_notification_service.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:async';
 // NOTE: Removed StreakService import – we now source the streak solely from user_streaks
 // import 'package:softeng/services/streak_service.dart';
@@ -76,7 +75,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
           .eq('user_id', user.id)
           .limit(1);
 
-      final value = (rows is List && rows.isNotEmpty)
+      final value = rows.isNotEmpty
           ? int.tryParse(rows.first['current_streak'].toString()) ?? 0
           : 0;
 
@@ -120,6 +119,23 @@ class _TasksScreenState extends State<TasksScreenRegular> {
 
   Future<void> _refreshStreak() async {
     await _fetchStreakFromDb();
+  }
+
+  String _formatTime(String isoString) {
+    try {
+      final dt = DateTime.parse(isoString).toLocal();
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+
+      if (diff.inMinutes < 1) return 'Just now';
+      if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+      if (diff.inDays < 1) return '${diff.inHours}h ago';
+      if (diff.inDays < 7) return '${diff.inDays}d ago';
+
+      return DateFormat('MMM d').format(dt);
+    } catch (_) {
+      return 'Recently';
+    }
   }
 
   // ---------- PROFILE ----------
@@ -233,7 +249,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
           try {
             final oldRec = payload.oldRecord;
             final newRec = payload.newRecord;
-            if (newRec == null) return;
 
             final createdBy = (newRec['created_by'] ?? '').toString();
             if (createdBy != current.id) return;
@@ -284,8 +299,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
       )
       ..subscribe();
   }
-
-  // ---------- NAV ----------
   void _onTabTapped(int index) async {
     setState(() => _currentIndex = index);
     if (index == 1) {
@@ -428,6 +441,96 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                   },
                 ),
               ),
+
+              // --- RECENT ACTIVITY ---
+              if (_completedNotifications.isNotEmpty) ...[
+                const SizedBox(height: 32),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    "RECENT ACTIVITY",
+                    style: GoogleFonts.nunito(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF2D2D2D),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: _completedNotifications.take(5).map((notif) {
+                      final user = notif['user'] as String? ?? 'Unknown';
+                      final title = notif['title'] as String? ?? 'Task';
+                      final time = notif['time'] as String? ?? '';
+                      final isDone = notif['isDone'] as bool? ?? false;
+                      final avatarUrl = notif['avatarUrl'] as String?;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                                  ? NetworkImage(avatarUrl)
+                                  : null,
+                              child: avatarUrl == null || avatarUrl.isEmpty
+                                  ? const Icon(Icons.person, size: 20, color: Colors.grey)
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$user completed "$title"',
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF2D2D2D),
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    time.isNotEmpty ? _formatTime(time) : 'Just now',
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 12,
+                                      color: const Color(0xFF6B7280),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              isDone ? Icons.check_circle : Icons.skip_next,
+                              color: isDone ? Colors.green : Colors.orange,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
