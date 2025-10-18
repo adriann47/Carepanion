@@ -26,6 +26,7 @@ class _TasksScreen extends State<TasksScreen> with WidgetsBindingObserver {
   String? _guardianFullName;
   List<Map<String, dynamic>> _tasks = [];
   RealtimeChannel? _profileChannel;
+  RealtimeChannel? _taskChannel;
   int _streak = 0;
 
   @override
@@ -123,14 +124,49 @@ class _TasksScreen extends State<TasksScreen> with WidgetsBindingObserver {
   }
 
   void _subscribeTaskChanges() {
-    // Using StreamBuilder approach instead of channels for better reliability
-    // Tasks will be loaded via _loadTodayTasks() which is called when needed
+    // Listen for task status changes to update the UI immediately
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return;
+
+    _taskChannel = client.channel('public:tasks')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'tasks',
+        callback: (payload) async {
+          try {
+            final newRec = payload.newRecord;
+            if (newRec['user_id']?.toString() != user.id) return;
+
+            final taskId = newRec['id']?.toString();
+            if (taskId == null) return;
+
+            // Find the task in our local list and update its status
+            final taskIndex = _tasks.indexWhere((t) => t['id']?.toString() == taskId);
+            if (taskIndex != -1) {
+              final updatedTask = Map<String, dynamic>.from(_tasks[taskIndex]);
+              updatedTask['status'] = newRec['status'];
+              updatedTask['is_done'] = newRec['is_done'] ?? newRec['done'];
+
+              if (mounted) {
+                setState(() {
+                  _tasks[taskIndex] = updatedTask;
+                  _taskDone[taskIndex] = _deriveDone(updatedTask);
+                });
+              }
+            }
+          } catch (_) {}
+        },
+      )
+      ..subscribe();
   }
 
   @override
   void dispose() {
     StreakService.current.removeListener(_onStreakUpdate);
     _profileChannel?.unsubscribe();
+    _taskChannel?.unsubscribe();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -172,6 +208,15 @@ class _TasksScreen extends State<TasksScreen> with WidgetsBindingObserver {
       await StreakService.refresh();
       if (mounted) setState(() => _streak = StreakService.current.value);
     } catch (_) {}
+  }
+
+  bool _deriveDone(Map<String, dynamic> t) {
+    final status = (t['status'] ?? '').toString().toLowerCase();
+    if (status == 'done') return true;
+    final raw = t['is_done'] ?? t['done'] ?? false;
+    return raw is bool
+        ? raw
+        : (raw.toString() == 'true' || raw.toString() == '1');
   }
 
   // ignore: unused_element
