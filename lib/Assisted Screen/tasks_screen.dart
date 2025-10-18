@@ -151,11 +151,8 @@ class _TasksScreen extends State<TasksScreen> {
 
   Future<void> _refreshStreak() async {
     try {
-      final s = await TaskService.computeCurrentStreak();
-      if (!mounted) return;
-      setState(() => _streak = s);
-      // Broadcast so other screens/popups can reflect immediately
-      try { StreakService.current.value = s; } catch (_) {}
+      await StreakService.refresh();
+      if (mounted) setState(() => _streak = StreakService.current.value);
     } catch (_) {}
   }
 
@@ -384,14 +381,7 @@ class _TasksScreen extends State<TasksScreen> {
                             onChanged: (val) async {
                               final newVal = val ?? false;
                               if (i < _taskDone.length) {
-                                                                setState(() {
-                                  _taskDone[i] = newVal;
-                                  // Optimistically activate streak immediately for today's tasks
-                                  if (newVal && _streak == 0) {
-                                    _streak = 1;
-                                    try { StreakService.current.value = _streak; } catch (_) {}
-                                  }
-                                });
+                                setState(() => _taskDone[i] = newVal);
                               }
                               if (taskId != null) {
                                 try {
@@ -418,6 +408,7 @@ class _TasksScreen extends State<TasksScreen> {
                                     try { await StreakService.refresh(); } catch (_) {}
                                   } else {
                                     await TaskService.markTodo(taskId);
+                                    try { await StreakService.refresh(); } catch (_) {}
                                   }
                                 } catch (_) {
                                   if (mounted) {
@@ -432,9 +423,6 @@ class _TasksScreen extends State<TasksScreen> {
                                 }
                                 await _loadTodayTasks();
                                 await _refreshStreak();
-                                Future.delayed(const Duration(milliseconds: 400), () {
-                                  if (mounted) _refreshStreak();
-                                });
                               }
                             },
                           );
