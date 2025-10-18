@@ -45,7 +45,7 @@ class GuardianRequestService {
             final name = (prof?['fullname'] ?? prof?['name'] ?? 'Assisted').toString();
 
             // Show an interrupting dialog using global nav key
-            final ctx = navKey.currentState?.overlay?.context;
+            final ctx = navKey.currentState?.context;
             if (ctx == null) return;
 
             // Ensure dialog is shown on UI thread
