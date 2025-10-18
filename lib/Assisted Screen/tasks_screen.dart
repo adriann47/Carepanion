@@ -6,7 +6,6 @@ import 'profile_screen.dart';
 import 'emergency_screen.dart';
 import 'calendar_screen.dart';
 import 'navbar_assisted.dart';
-import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:softeng/services/streak_service.dart';
 import 'package:softeng/services/guardian_notification_service.dart';
@@ -18,7 +17,7 @@ class TasksScreen extends StatefulWidget {
   State<TasksScreen> createState() => _TasksScreen();
 }
 
-class _TasksScreen extends State<TasksScreen> {
+class _TasksScreen extends State<TasksScreen> with WidgetsBindingObserver {
   int _currentIndex = 0; // Home tab
   final List<bool> _taskDone = []; // tracked per loaded task
   String? _avatarUrl;
@@ -35,9 +34,12 @@ class _TasksScreen extends State<TasksScreen> {
     _loadProfile();
     _loadTodayTasks();
     _subscribeProfileChanges();
+    _subscribeTaskChanges();
     _refreshStreak();
     // Listen for global streak updates (e.g., from popup DONE)
     StreakService.current.addListener(_onStreakUpdate);
+    // Listen for app lifecycle changes to refresh tasks when app comes back into focus
+    WidgetsBinding.instance.addObserver(this);
   }
 
   Future<void> _loadProfile() async {
@@ -120,11 +122,27 @@ class _TasksScreen extends State<TasksScreen> {
         .subscribe();
   }
 
+  void _subscribeTaskChanges() {
+    // Using StreamBuilder approach instead of channels for better reliability
+    // Tasks will be loaded via _loadTodayTasks() which is called when needed
+  }
+
   @override
   void dispose() {
     StreakService.current.removeListener(_onStreakUpdate);
     _profileChannel?.unsubscribe();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Refresh tasks when app comes back into focus (resumed)
+    if (state == AppLifecycleState.resumed) {
+      _loadTodayTasks();
+      _refreshStreak();
+    }
   }
 
   void _onStreakUpdate() {
@@ -294,14 +312,6 @@ class _TasksScreen extends State<TasksScreen> {
                           final t = _tasks[i];
                           final title = (t['title'] ?? '') as String;
                           final note = (t['description'] ?? '') as String;
-                          final startAt = t['start_at']?.toString();
-                          String timeStr = '';
-                          if (startAt != null) {
-                            try {
-                              final dt = DateTime.parse(startAt).toLocal();
-                              timeStr = DateFormat('h:mm a').format(dt);
-                            } catch (_) {}
-                          }
                           // Determine which guardian set the task
                           // 1) Use created_by_name if present
                           String guardian = (t['created_by_name'] ?? '')

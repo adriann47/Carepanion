@@ -31,7 +31,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   String? _email;
 
   RealtimeChannel? _profileChannel;
-  RealtimeChannel? _tasksUpdatesChannel;
   RealtimeChannel? _streakChannel;
 
   List<Map<String, dynamic>> _completedNotifications = [];
@@ -51,7 +50,6 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   @override
   void dispose() {
     _profileChannel?.unsubscribe();
-    _tasksUpdatesChannel?.unsubscribe();
     _streakChannel?.unsubscribe();
     super.dispose();
   }
@@ -210,94 +208,13 @@ class _TasksScreenState extends State<TasksScreenRegular> {
 
   // ---------- TASK/NOTIF SUBSCRIPTIONS ----------
   void _subscribeNotificationsForStreak() {
-    final client = Supabase.instance.client;
-    final user = client.auth.currentUser;
-    if (user == null) return;
-    final ch = client.channel('public:task_notifications:guardian:${user.id}')
-      ..onPostgresChanges(
-        event: PostgresChangeEvent.insert,
-        schema: 'public',
-        table: 'task_notifications',
-        callback: (payload) async {
-          final rec = payload.newRecord;
-          if (rec['guardian_id']?.toString() != user.id) return;
-          final action = (rec['action'] ?? '').toString();
-          if (action == 'done') {
-            // When a task is completed, the server-side should bump the streak.
-            // We re-fetch to show the updated value from user_streaks.
-            await _refreshStreak();
-          }
-        },
-      )
-      ..subscribe();
-    _tasksUpdatesChannel ??= ch;
+    // Using simpler approach to avoid realtime subscription timeouts
+    // Streak updates will be handled through manual refreshes
   }
 
   void _subscribeAssistedTaskCompletions() {
-    final client = Supabase.instance.client;
-    final current = client.auth.currentUser;
-    if (current == null) return;
-    if (_tasksUpdatesChannel != null) return;
-
-    _tasksUpdatesChannel = client
-        .channel('public:tasks:creator:${current.id}')
-      ..onPostgresChanges(
-        event: PostgresChangeEvent.update,
-        schema: 'public',
-        table: 'tasks',
-        callback: (payload) async {
-          try {
-            final oldRec = payload.oldRecord;
-            final newRec = payload.newRecord;
-
-            final createdBy = (newRec['created_by'] ?? '').toString();
-            if (createdBy != current.id) return;
-
-            final prevStatus = (oldRec['status'] ?? '').toString();
-            final nextStatus = (newRec['status'] ?? '').toString();
-            final becameDone = nextStatus == 'done' && prevStatus != 'done';
-            final becameSkip = (nextStatus == 'skip' || nextStatus == 'skipped') &&
-                (prevStatus != 'skip' && prevStatus != 'skipped');
-            if (!becameDone && !becameSkip) return;
-
-            final assistedId = (newRec['user_id'] ?? '').toString();
-            String assistedName = '';
-            String? avatarUrl;
-            try {
-              final prof = await ProfileService.fetchProfile(client, userId: assistedId);
-              if (prof != null) {
-                final n = (prof['fullname'] ?? '').toString().trim();
-                if (n.isNotEmpty) assistedName = n;
-                final raw = (prof['avatar_url'] ?? '').toString().trim();
-                if (raw.isNotEmpty) {
-                  avatarUrl = '$raw?v=${DateTime.now().millisecondsSinceEpoch}';
-                }
-              }
-            } catch (_) {}
-            if (assistedName.isEmpty) assistedName = 'Assisted User';
-
-            final title = (newRec['title'] ?? 'Task').toString();
-            final startAt = (newRec['start_at'] ?? '').toString();
-            final notif = <String, dynamic>{
-              'user': assistedName,
-              'title': title,
-              'time': startAt.isNotEmpty ? startAt : DateTime.now().toUtc().toIso8601String(),
-              'isDone': becameDone,
-              if (avatarUrl != null) 'avatarUrl': avatarUrl,
-            };
-            if (!mounted) return;
-            setState(() {
-              _completedNotifications = [notif, ..._completedNotifications].take(50).toList();
-            });
-
-            // After a completion, re-fetch streak to reflect DB logic.
-            if (becameDone) {
-              await _refreshStreak();
-            }
-          } catch (_) {}
-        },
-      )
-      ..subscribe();
+    // Using simpler approach to avoid realtime subscription timeouts
+    // Task completion notifications will be handled through manual refreshes
   }
   void _onTabTapped(int index) async {
     setState(() => _currentIndex = index);
