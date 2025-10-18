@@ -651,17 +651,66 @@ class _UserHeaderCard extends StatelessWidget {
 }
 
 // ===================== Today stream =====================
-class _TodayTasksStream extends StatelessWidget {
+class _TodayTasksStream extends StatefulWidget {
   const _TodayTasksStream({required this.onEdited});
   final void Function(Map<String, dynamic> task, bool done) onEdited;
 
   @override
+  State<_TodayTasksStream> createState() => _TodayTasksStreamState();
+}
+
+class _TodayTasksStreamState extends State<_TodayTasksStream> {
+  List<String> _assistedUserIds = [];
+  bool _loadingAssisted = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAssistedUsers();
+  }
+
+  Future<void> _loadAssistedUsers() async {
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) {
+        if (mounted) setState(() => _loadingAssisted = false);
+        return;
+      }
+
+      final assisted = await ProfileService.fetchAssistedsForGuardian(client, guardianUserId: user.id);
+      final ids = assisted.map((p) => p['id'] as String).toList();
+      // Include the guardian's own tasks as well
+      ids.add(user.id);
+
+      if (mounted) {
+        setState(() {
+          _assistedUserIds = ids;
+          _loadingAssisted = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingAssisted = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_loadingAssisted) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final supabase = Supabase.instance.client;
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final uid = supabase.auth.currentUser?.id;
     final baseStream = supabase.from('tasks').stream(primaryKey: ['id']);
-    final stream = uid != null ? baseStream.eq('user_id', uid) : baseStream;
+
+    // Fetch tasks for all assisted users (including guardian)
+    final stream = _assistedUserIds.isNotEmpty
+        ? baseStream.inFilter('user_id', _assistedUserIds)
+        : baseStream;
 
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: stream,
@@ -709,7 +758,7 @@ class _TodayTasksStream extends StatelessWidget {
         return Column(
           children: [
             for (final t in tasks)
-              _TaskTile(key: ValueKey(t['id']), task: t, onEdited: onEdited),
+              _TaskTile(key: ValueKey(t['id']), task: t, onEdited: widget.onEdited),
           ],
         );
       },
@@ -965,10 +1014,14 @@ class _TaskTileState extends State<_TaskTile> {
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: () async {
+                              final taskUserId = widget.task['user_id'] as String?;
                               final changed = await Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => EditTaskScreen(task: widget.task),
+                                  builder: (_) => EditTaskScreen(
+                                    task: widget.task,
+                                    forUserId: taskUserId,
+                                  ),
                                 ),
                               );
                               if (changed == true) {
