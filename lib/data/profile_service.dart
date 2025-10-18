@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -230,52 +229,13 @@ class ProfileService {
   static Future<String> waitForGuardianResponse(
     SupabaseClient client, {
     Duration timeout = const Duration(minutes: 5),
-    Duration pollInterval = const Duration(seconds: 1),
+    Duration pollInterval = const Duration(seconds: 3),
   }) async {
     final user = client.auth.currentUser;
     if (user == null) return 'timeout';
 
-    final completer = Completer<String>();
     final end = DateTime.now().add(timeout);
-
-    // Set up realtime listener for updates
-    final channel = client.channel('assisted_response_${user.id}');
-    channel.onPostgresChanges(
-      event: PostgresChangeEvent.update,
-      schema: 'public',
-      table: 'assisted_guardians',
-      filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'assisted_id', value: user.id),
-      callback: (payload) async {
-        try {
-          final newRec = payload.newRecord as Map<String, dynamic>?;
-          if (newRec != null) {
-            final status = newRec['status'] as String?;
-            if (status == 'accepted' || status == 'rejected') {
-              if (!completer.isCompleted) {
-                completer.complete(status);
-                client.removeChannel(channel);
-              }
-            }
-          }
-        } catch (_) {}
-      },
-    );
-    channel.subscribe();
-
-    // Fallback polling in case realtime fails
-    Timer.periodic(pollInterval, (timer) async {
-      if (completer.isCompleted) {
-        timer.cancel();
-        return;
-      }
-      if (DateTime.now().isAfter(end)) {
-        if (!completer.isCompleted) {
-          completer.complete('timeout');
-          client.removeChannel(channel);
-        }
-        timer.cancel();
-        return;
-      }
+    while (DateTime.now().isBefore(end)) {
       try {
         final row = await client
             .from('assisted_guardians')
@@ -286,21 +246,12 @@ class ProfileService {
             .maybeSingle();
         if (row != null && row['status'] != null) {
           final status = row['status'] as String;
-          if (status == 'accepted' || status == 'rejected') {
-            if (!completer.isCompleted) {
-              completer.complete(status);
-              client.removeChannel(channel);
-              timer.cancel();
-            }
-          }
+          if (status == 'accepted' || status == 'rejected') return status;
         }
       } catch (_) {}
-    });
-
-    return completer.future.timeout(timeout, onTimeout: () {
-      client.removeChannel(channel);
-      return 'timeout';
-    });
+      await Future.delayed(pollInterval);
+    }
+    return 'timeout';
   }
 
   /// Fetch all assisted users for a given guardian ID.

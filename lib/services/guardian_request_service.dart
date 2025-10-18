@@ -32,12 +32,9 @@ class GuardianRequestService {
         table: 'assisted_guardians',
         callback: (payload) async {
           try {
-            // Debug: print payload
-            print('GuardianRequestService: Received insert payload: $payload');
             final newRec = payload.newRecord as Map<String, dynamic>?;
             if (newRec == null) return;
             final target = newRec['guardian_id']?.toString();
-            print('GuardianRequestService: Target guardian_id: $target, current gid: $gid');
             if (target != gid) return;
 
             final assistedId = newRec['assisted_id']?.toString();
@@ -46,14 +43,10 @@ class GuardianRequestService {
             // Lookup assisted profile for a nicer label
             final prof = await ProfileService.fetchProfile(supa, userId: assistedId);
             final name = (prof?['fullname'] ?? prof?['name'] ?? 'Assisted').toString();
-            print('GuardianRequestService: Showing dialog for assisted: $name');
 
             // Show an interrupting dialog using global nav key
             final ctx = navKey.currentState?.context;
-            if (ctx == null) {
-              print('GuardianRequestService: No context available for dialog');
-              return;
-            }
+            if (ctx == null) return;
 
             // Ensure dialog is shown on UI thread
             await showDialog<void>(
@@ -139,12 +132,10 @@ class GuardianRequestService {
                                   if (!dctx.mounted) return;
                                   Navigator.of(dctx).pop();
                                   try {
-                                    print('GuardianRequestService: Accepting request for assisted_id: $assistedId');
                                     await supa.from('assisted_guardians').update({'status': 'accepted'}).eq('assisted_id', assistedId).eq('guardian_id', gid);
-                                    // Do not update profile here; let assisted user handle linking after confirmation
-                                  } catch (e) {
-                                    print('GuardianRequestService: Error accepting: $e');
-                                  }
+                                    // Also update assisted profile guardian_id for legacy flows
+                                    await supa.from('profile').update({'guardian_id': gid}).eq('id', assistedId);
+                                  } catch (_) {}
                                 },
                                 child: Text(
                                   'ACCEPT',
@@ -167,11 +158,8 @@ class GuardianRequestService {
                                   if (!dctx.mounted) return;
                                   Navigator.of(dctx).pop();
                                   try {
-                                    print('GuardianRequestService: Rejecting request for assisted_id: $assistedId');
                                     await supa.from('assisted_guardians').update({'status': 'rejected'}).eq('assisted_id', assistedId).eq('guardian_id', gid);
-                                  } catch (e) {
-                                    print('GuardianRequestService: Error rejecting: $e');
-                                  }
+                                  } catch (_) {}
                                 },
                                 child: Text(
                                   'REJECT',
