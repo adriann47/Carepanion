@@ -8,8 +8,7 @@ import 'notification_regular.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'profile_screen_regular.dart';
-import 'companion_list.dart';
-import '/screen/welcome_screen.dart'; 
+import 'companion_list.dart'; 
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -329,13 +328,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _divider(w),
                     // ✅ LOGOUT functionality added
                     InkWell(
-                      onTap: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const WelcomeScreen(),
-                          ),
+                      onTap: () async {
+                        try {
+                          await Supabase.instance.client.auth.signOut(scope: SignOutScope.global);
+                        } catch (_) {
+                          // Fallback: local sign out if scope not supported
+                          await Supabase.instance.client.auth.signOut();
+                        }
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Signed out successfully')),
                         );
+                        await Future.delayed(const Duration(milliseconds: 300));
+                        if (mounted) {
+                          Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
+                        }
                       },
                       child: _buildSettingRow(Icons.logout, "LOGOUT", w, h),
                     ),
