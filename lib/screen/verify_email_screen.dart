@@ -290,167 +290,168 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     const primaryTextColor = Color(0xFFCA5000); // All text except button
     return Scaffold(
       backgroundColor: const Color(0xFFFDF8F0),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const SizedBox(height: 80),
+      resizeToAvoidBottomInset: true, // Allow Flutter to handle keyboard
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              const SizedBox(height: 40), // Reduced from 60
 
-            // Verify your Email Address (bold, multi-line)
-            Text(
-              _useSms ? "Verify your Phone Number" : "Verify your Email",
-              textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(
-                color: primaryTextColor,
-                fontSize: 25,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Verify message
-            Text(
-              _useSms
-                  ? "We sent a 6-digit code to your phone via SMS.\nEnter the code below to continue."
-                  : "We sent a verification link and a 6-digit code to your email.\nEnter the code below to continue.",
-              textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(color: primaryTextColor),
-            ),
-            const SizedBox(height: 100), // Space below this text
-            const SizedBox(height: 30),
-
-            const SizedBox(height: 20),
-
-            // OTP section
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Or verify with 6-digit code',
+              // Verify your Email Address (bold, multi-line)
+              Text(
+                _useSms ? "Verify your Phone Number" : "Verify your Email",
+                textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   color: primaryTextColor,
+                  fontSize: 25,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            if (_devLocalOtp && _localOtp != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6.0),
+              const SizedBox(height: 10),
+
+              // Verify message
+              Text(
+                _useSms
+                    ? "We sent a 6-digit code to your phone via SMS.\nEnter the code below to continue."
+                    : "We sent a verification link and a 6-digit code to your email.\nEnter the code below to continue.",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(color: primaryTextColor),
+              ),
+              const SizedBox(height: 40), // Reduced from 60
+
+              // OTP section
+              Align(
+                alignment: Alignment.centerLeft,
                 child: Text(
-                  'DEV code: $_localOtp',
+                  'Or verify with 6-digit code',
                   style: GoogleFonts.nunito(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
+                    color: primaryTextColor,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-            // Intentionally hide the email from UI per request; still used internally for resend/verify
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(6, (index) {
-                return SizedBox(
-                  width: 45,
-                  child: TextField(
-                    controller: _otpControllers[index],
-                    focusNode: _otpFocus[index],
-                    textAlign: TextAlign.center,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(1),
-                    ],
-                    onChanged: (v) {
-                      if (v.isNotEmpty && index < 5) {
-                        _otpFocus[index + 1].requestFocus();
-                      }
-                      if (v.isEmpty && index > 0) {
-                        _otpFocus[index - 1].requestFocus();
-                      }
-                    },
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white),
-                      ),
-                      fillColor: Colors.white,
-                      filled: true,
+              const SizedBox(height: 12),
+              if (_devLocalOtp && _localOtp != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6.0),
+                  child: Text(
+                    'DEV code: $_localOtp',
+                    style: GoogleFonts.nunito(
+                      color: Colors.grey.shade700,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-                );
-              }),
-            ),
-            const SizedBox(height: 12),
-            Center(
-              child: SizedBox(
-                width: 200,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: _isVerifying ? null : _verifyOtp,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.pinkAccent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                ),
+              // Intentionally hide the email from UI per request; still used internally for resend/verify
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(6, (index) {
+                  return SizedBox(
+                    width: 45,
+                    child: TextField(
+                      controller: _otpControllers[index],
+                      focusNode: _otpFocus[index],
+                      textAlign: TextAlign.center,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(1),
+                      ],
+                      onChanged: (v) {
+                        if (v.isNotEmpty && index < 5) {
+                          _otpFocus[index + 1].requestFocus();
+                        }
+                        if (v.isEmpty && index > 0) {
+                          _otpFocus[index - 1].requestFocus();
+                        }
+                      },
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.white),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.white),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.white),
+                        ),
+                        fillColor: Colors.white,
+                        filled: true,
+                      ),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: SizedBox(
+                  width: 200,
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: _isVerifying ? null : _verifyOtp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.pinkAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    child: _isVerifying
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                        : Text(
+                            'Submit',
+                            style: GoogleFonts.nunito(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Resend text with "Resend" underlined
+              Center(
+                child: GestureDetector(
+                  onTap: () async {
+                    if (_cooldown > 0 || _isSending) return;
+                    await _sendOtp();
+                  },
+                  child: RichText(
+                    text: TextSpan(
+                      style: GoogleFonts.nunito(color: primaryTextColor),
+                      children: [
+                        const TextSpan(text: "Didn't receive any code? "),
+                        TextSpan(
+                          text: _cooldown > 0
+                              ? 'Resend in ${_cooldown}s'
+                              : 'Resend',
+                          style: const TextStyle(
+                            decoration: TextDecoration.underline,
+                            decorationColor: Color(0xFFCA5000),
+                            decorationThickness: 2,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: _isVerifying
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(Colors.white),
-                          ),
-                        )
-                      : Text(
-                          'Submit',
-                          style: GoogleFonts.nunito(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                 ),
               ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // Resend text with "Resend" underlined
-            Center(
-              child: GestureDetector(
-                onTap: () async {
-                  if (_cooldown > 0 || _isSending) return;
-                  await _sendOtp();
-                },
-                child: RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.nunito(color: primaryTextColor),
-                    children: [
-                      const TextSpan(text: "Didn't receive any code? "),
-                      TextSpan(
-                        text: _cooldown > 0
-                            ? 'Resend in ${_cooldown}s'
-                            : 'Resend',
-                        style: const TextStyle(
-                          decoration: TextDecoration.underline,
-                          decorationColor: Color(0xFFCA5000),
-                          decorationThickness: 2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+              const SizedBox(height: 40), // Extra bottom padding for keyboard
+            ],
+          ),
         ),
       ),
     );
