@@ -12,6 +12,8 @@ import 'package:softeng/services/task_service.dart';
 import 'package:softeng/services/guardian_notification_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
+// NOTE: Removed StreakService import – we now source the streak solely from user_streaks
+// import 'package:softeng/services/streak_service.dart';
 
 // ====================== MAIN SCREEN ======================
 class TasksScreenRegular extends StatefulWidget {
@@ -28,37 +30,99 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   String? _userId;
   String? _fullName;
   String? _email;
+
   RealtimeChannel? _profileChannel;
   RealtimeChannel? _tasksUpdatesChannel;
+  RealtimeChannel? _streakChannel;
+
   List<Map<String, dynamic>> _completedNotifications = [];
-  int _streak = 0;
+
+  int? _streak; // null = loading; we’ll show 0 only when the DB actually says 0.
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
     _subscribeProfileChanges();
-    _refreshStreak();
+    _bindStreak(); // fetch + realtime subscribe
     _subscribeAssistedTaskCompletions();
-    _subscribeNotificationsForStreak();
-    // Popups are handled globally by ReminderService; no local timer here.
+    _subscribeNotificationsForStreak(); // will trigger a re-fetch when a “done” is recorded
   }
 
   @override
   void dispose() {
     _profileChannel?.unsubscribe();
     _tasksUpdatesChannel?.unsubscribe();
+    _streakChannel?.unsubscribe();
     super.dispose();
   }
 
-  Future<void> _refreshStreak() async {
-    try {
-      final s = await TaskService.computeGuardianStreak();
-      if (!mounted) return;
-      setState(() => _streak = s);
-    } catch (_) {}
+  // ---------- STREAK (user_streaks.current_streak) ----------
+  Future<void> _bindStreak() async {
+    await _fetchStreakFromDb(); // initial load
+    _subscribeStreakChanges();   // live updates
   }
 
+  Future<void> _fetchStreakFromDb() async {
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) return;
+
+      // Expect one row per user in user_streaks
+      final rows = await client
+          .from('user_streaks')
+          .select('current_streak')
+          .eq('user_id', user.id)
+          .limit(1);
+
+      final value = (rows is List && rows.isNotEmpty)
+          ? int.tryParse(rows.first['current_streak'].toString()) ?? 0
+          : 0;
+
+      if (mounted) setState(() => _streak = value);
+    } catch (_) {
+      if (mounted) setState(() => _streak ??= 0);
+    }
+  }
+
+  void _subscribeStreakChanges() {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) return;
+
+    _streakChannel = client
+        .channel('public:user_streaks:user:${user.id}')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'user_streaks',
+        callback: (payload) {
+          final row = payload.newRecord;
+          if (row['user_id']?.toString() != user.id) return;
+          final val = int.tryParse('${row['current_streak'] ?? 0}') ?? 0;
+          if (mounted) setState(() => _streak = val);
+        },
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'user_streaks',
+        callback: (payload) {
+          final row = payload.newRecord;
+          if (row['user_id']?.toString() != user.id) return;
+          final val = int.tryParse('${row['current_streak'] ?? 0}') ?? 0;
+          if (mounted) setState(() => _streak = val);
+        },
+      )
+      ..subscribe();
+  }
+
+  Future<void> _refreshStreak() async {
+    await _fetchStreakFromDb();
+  }
+
+  // ---------- PROFILE ----------
   String _friendlyFromEmail(String email) {
     if (email.contains('@')) {
       final local = email.split('@').first;
@@ -128,27 +192,28 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         .subscribe();
   }
 
+  // ---------- TASK/NOTIF SUBSCRIPTIONS ----------
   void _subscribeNotificationsForStreak() {
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
     if (user == null) return;
-    // Reuse tasks updates channel slot if free, else create a secondary channel
     final ch = client.channel('public:task_notifications:guardian:${user.id}')
       ..onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
         table: 'task_notifications',
-        callback: (payload) {
+        callback: (payload) async {
           final rec = payload.newRecord;
           if (rec['guardian_id']?.toString() != user.id) return;
           final action = (rec['action'] ?? '').toString();
           if (action == 'done') {
-            _refreshStreak();
+            // When a task is completed, the server-side should bump the streak.
+            // We re-fetch to show the updated value from user_streaks.
+            await _refreshStreak();
           }
         },
       )
       ..subscribe();
-    // Track so we can clean up
     _tasksUpdatesChannel ??= ch;
   }
 
@@ -209,12 +274,18 @@ class _TasksScreenState extends State<TasksScreenRegular> {
             setState(() {
               _completedNotifications = [notif, ..._completedNotifications].take(50).toList();
             });
+
+            // After a completion, re-fetch streak to reflect DB logic.
+            if (becameDone) {
+              await _refreshStreak();
+            }
           } catch (_) {}
         },
       )
       ..subscribe();
   }
 
+  // ---------- NAV ----------
   void _onTabTapped(int index) async {
     setState(() => _currentIndex = index);
     if (index == 1) {
@@ -242,6 +313,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     }
   }
 
+  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
     final titleStyle = GoogleFonts.nunito(
@@ -249,6 +321,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
       fontWeight: FontWeight.w800,
       color: const Color(0xFF2D2D2D),
     );
+
+    final int shownStreak = _streak ?? 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFEF9F4),
@@ -270,8 +344,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
               // --- STREAK CARD ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   border: Border.all(color: Colors.orange.shade200),
@@ -286,31 +359,46 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.emoji_events,
-                        color: Colors.orange, size: 30),
+                    const Icon(Icons.emoji_events, color: Colors.orange, size: 30),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _streak <= 0
-                                ? "NO STREAK YET"
-                                : (_streak == 1
-                                    ? "1 DAY STREAK!"
-                                    : "$_streak DAYS STREAK!"),
-                            style: GoogleFonts.nunito(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: const Color(0xFF2D2D2D),
+                          if (_streak == null)
+                            Row(
+                              children: [
+                                SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.orange.shade400),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Loading streak…",
+                                  style: GoogleFonts.nunito(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    color: const Color(0xFF2D2D2D),
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            Text(
+                              shownStreak <= 0
+                                  ? "NO STREAK YET"
+                                  : (shownStreak == 1 ? "1 DAY STREAK!" : "$shownStreak DAYS STREAK!"),
+                              style: GoogleFonts.nunito(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: const Color(0xFF2D2D2D),
+                              ),
                             ),
-                          ),
                           const SizedBox(height: 4),
                           Text(
                             "Thanks for showing up today! Consistency is the key to forming strong habits.",
-                            style: GoogleFonts.nunito(
-                                fontSize: 12,
-                                color: const Color(0xFF4A4A4A)),
+                            style: GoogleFonts.nunito(fontSize: 12, color: const Color(0xFF4A4A4A)),
                           ),
                         ],
                       ),
@@ -330,13 +418,11 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: _TodayTasksStream(
                   onEdited: (task, done) async {
-                    setState(() {
-                      if (done && _streak == 0) {
-                        _streak = 1;
-                      }
-                    });
+                    // No optimistic streak mutation here; we trust DB/trigger logic.
+                    // Just re-fetch to reflect any server-side streak increments.
                     await _refreshStreak();
-                    Future.delayed(const Duration(milliseconds: 400), () {
+                    // tiny debounce to accommodate any trigger lag
+                    Future.delayed(const Duration(milliseconds: 250), () {
                       if (mounted) _refreshStreak();
                     });
                   },
@@ -359,12 +445,9 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu',
-              isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Companion',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications',
-              isSelected: _currentIndex == 3),
+          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
+          _navItem(Icons.family_restroom, 'Companion', isSelected: _currentIndex == 2),
+          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -386,8 +469,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
           color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
         ),
         child: Center(
-          child: Icon(icon,
-              size: 28, color: isSelected ? Colors.pink : Colors.black87),
+          child: Icon(icon, size: 28, color: isSelected ? Colors.pink : Colors.black87),
         ),
       ),
     );
@@ -449,8 +531,7 @@ class _UserHeaderCard extends StatelessWidget {
                           fit: BoxFit.cover,
                         )
                       : const Center(
-                          child: Icon(Icons.person,
-                              size: 44, color: Color(0xFF8E4A1E))),
+                          child: Icon(Icons.person, size: 44, color: Color(0xFF8E4A1E))),
                 ),
                 const SizedBox(width: 14),
 
@@ -698,9 +779,9 @@ class _TaskTileState extends State<_TaskTile> {
     } catch (e) {
       if (mounted) {
         setState(() => _done = prev);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to update task: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update task: $e')),
+        );
       }
     }
   }
@@ -808,8 +889,7 @@ class _TaskTileState extends State<_TaskTile> {
                             child: Checkbox(
                               value: _done,
                               onChanged: (v) => _toggleDone(v ?? false),
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               visualDensity: const VisualDensity(
                                 horizontal: -4,
                                 vertical: -4,
@@ -840,16 +920,11 @@ class _TaskTileState extends State<_TaskTile> {
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: catColor.withOpacity(0.12),
                                     borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
-                                      color: catColor.withOpacity(0.45),
-                                    ),
+                                    border: Border.all(color: catColor.withOpacity(0.45)),
                                   ),
                                   child: Text(
                                     catLabel,
@@ -866,19 +941,14 @@ class _TaskTileState extends State<_TaskTile> {
                           ),
 
                           IconButton(
-                            icon: const Icon(
-                              Icons.edit,
-                              size: 18,
-                              color: Color(0xFF36495A),
-                            ),
+                            icon: const Icon(Icons.edit, size: 18, color: Color(0xFF36495A)),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: () async {
                               final changed = await Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                      EditTaskScreen(task: widget.task),
+                                  builder: (_) => EditTaskScreen(task: widget.task),
                                 ),
                               );
                               if (changed == true) {
@@ -891,8 +961,7 @@ class _TaskTileState extends State<_TaskTile> {
                       const SizedBox(height: 8),
 
                       _infoLine(label: 'TIME', value: time),
-                      if ((note).isNotEmpty)
-                        _infoLine(label: 'NOTE', value: note),
+                      if ((note).isNotEmpty) _infoLine(label: 'NOTE', value: note),
                     ],
                   ),
                 ),
