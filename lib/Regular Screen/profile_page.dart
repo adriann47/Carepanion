@@ -184,7 +184,7 @@ class _ProfilePageState extends State<ProfilePage> {
     } else if (index == 3) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
+        MaterialPageRoute(builder: (context) => NotificationScreen()),
       );
     }
   }

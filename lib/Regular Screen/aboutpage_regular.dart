@@ -38,7 +38,7 @@ class _AboutPageState extends State<AboutPage> {
       // Notifications (if you have a separate notification screen)
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
+        MaterialPageRoute(builder: (context) => NotificationScreen()),
       );
     } else if (index == 4) {
       Navigator.pushReplacement(

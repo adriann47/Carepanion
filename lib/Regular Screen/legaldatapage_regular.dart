@@ -38,7 +38,7 @@ class _LegalDataPageState extends State<LegalDataPage> {
       // Notifications (if you have a separate notification screen)
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
+        MaterialPageRoute(builder: (context) => NotificationScreen()),
       );
     } else if (index == 4) {
       Navigator.pushReplacement(

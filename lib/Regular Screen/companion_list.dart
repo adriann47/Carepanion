@@ -4,7 +4,7 @@ import '../data/profile_service.dart';
 import 'companion_detail.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
-import 'notification_screen.dart'; // ✅ Added this import
+import 'notification_screen.dart';
 import 'profile_screen_regular.dart';
 class CompanionListScreen extends StatefulWidget {
   const CompanionListScreen({super.key});
@@ -188,7 +188,7 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
       // ✅ Go to Notification Screen when Notification icon clicked
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
+        MaterialPageRoute(builder: (context) => NotificationScreen()),
       );
     }
     else if (index == 4) {

@@ -3,7 +3,7 @@ import '../Assisted Screen/daily_tasks_screen.dart';
 import 'tasks_screen_regular.dart';
 import 'profile_screen_regular.dart';
 import '../Regular Screen/companion_list.dart';
-import '../Regular Screen/notification_screen.dart';
+import 'notification_screen.dart';
 import '../Regular Screen/add_task.dart';
 
 class CalendarScreenRegular extends StatefulWidget {
@@ -45,7 +45,7 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
     } else if (index == 3) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
+        MaterialPageRoute(builder: (context) => NotificationScreen()),
       );
     } else if (index == 4) {
       Navigator.pushReplacement(
