@@ -302,21 +302,6 @@ class _RegistrationEmailScreenState extends State<RegistrationEmailScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString().toLowerCase();
-      if (msg.contains('row-level security') || msg.contains('42501')) {
-        // Ignore RLS error from profile trigger, proceed with registration
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VerifyEmailScreen(
-              email: email,
-              fullName: fullName.isEmpty ? null : fullName,
-            ),
-          ),
-        );
-        return;
-      }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Registration failed: $e')));

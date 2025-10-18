@@ -28,6 +28,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   // Set to false to use Supabase's real OTP flow.
   final bool _devLocalOtp = false; // Step A: use real email OTP
   String? _localOtp; // holds the generated 6-digit code when using local OTP
+  bool _autoSent = false; // ensure we only auto-send once
   // If SMS is requested but the provider is disabled, allow opting-in to email fallback.
   bool _forceEmailFallback = false;
 
@@ -61,15 +62,14 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   void initState() {
     super.initState();
     // Auto-send OTP on first build when email is available and we're using real email OTP
-    // Disabled to prevent rate limit issues
-    // WidgetsBinding.instance.addPostFrameCallback((_) async {
-    //   if (!_devLocalOtp &&
-    //       !_autoSent &&
-    //       (_emailOrSessionEmail != null || _useSms)) {
-    //     _autoSent = true;
-    //     await _sendOtp();
-    //   }
-    // });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!_devLocalOtp &&
+          !_autoSent &&
+          (_emailOrSessionEmail != null || _useSms)) {
+        _autoSent = true;
+        await _sendOtp();
+      }
+    });
   }
 
   void _fillOtpControllersWith(String code) {
@@ -89,7 +89,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
-  void _startCooldown([int seconds = 30]) {
+  void _startCooldown([int seconds = 60]) {
     _cooldownTimer?.cancel();
     setState(() => _cooldown = seconds);
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -154,14 +154,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString();
-      final msgLower = msg.toLowerCase();
-      if (msgLower.contains('rate_limit') || msgLower.contains('send_rate_limit') || msgLower.contains('429')) {
-        _startCooldown(30);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please wait 30 seconds before requesting another code.')),
-        );
-        return;
-      }
       // If SMS provider isn't configured in Supabase, offer an email fallback (when available)
       if (_useSms && msg.toLowerCase().contains('phone_provider_disabled')) {
         await _handleSmsProviderDisabled();
