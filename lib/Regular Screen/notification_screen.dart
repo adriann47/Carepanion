@@ -76,7 +76,7 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
       }
     }
 
-    // Test direct query to see if completed tasks exist
+    // Test direct query to see if completed/skipped tasks exist
     try {
       final uid = supabase.auth.currentUser?.id;
       if (uid != null) {
@@ -84,20 +84,42 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
             .from('tasks')
             .select('*')
             .eq('created_by', uid)
-            .eq('status', 'done')
+            .or('status.eq.done,status.eq.skip,status.eq.skipped')
             .order('created_at', ascending: false)
             .limit(5);
 
         if (kDebugMode) {
-          print('Direct task completion query result: ${completedTasks.length} items');
+          print('Direct task completion/skipped query result: ${completedTasks.length} items');
           if (completedTasks.isNotEmpty) {
-            print('Most recent completed task: ${completedTasks.first}');
+            print('Most recent completed/skipped task: ${completedTasks.first}');
           }
         }
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Direct task completion query failed: $e');
+        print('Direct task completion/skipped query failed: $e');
+      }
+    }
+
+    // Also test if we can see any tasks at all
+    try {
+      final uid = supabase.auth.currentUser?.id;
+      if (uid != null) {
+        final allTasks = await supabase
+            .from('tasks')
+            .select('*')
+            .limit(10);
+
+        if (kDebugMode) {
+          print('All tasks query result: ${allTasks.length} items');
+          if (allTasks.isNotEmpty) {
+            print('Sample task: ${allTasks.first}');
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('All tasks query failed: $e');
       }
     }
   }
@@ -130,27 +152,29 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
     }
 
     try {
-      // Do a direct query to get the latest completed tasks created by this guardian
+      // Do a direct query to get the latest completed/skipped tasks created by this guardian
       final directData = await supabase
           .from('tasks')
           .select('*')
           .eq('created_by', uid)
-          .eq('status', 'done')
+          .or('status.eq.done,status.eq.skip,status.eq.skipped')
           .order('created_at', ascending: false)
           .limit(50); // Get more for better coverage
 
       if (mounted) {
         // Convert task data to notification format
         final notifications = directData.map((task) {
+          final status = task['status']?.toString().toLowerCase() ?? '';
+          final action = status == 'done' ? 'done' : 'skipped';
           return {
             'id': task['id'],
             'task_id': task['id'].toString(),
-            'assisted_id': task['user_id'], // The assisted user who completed the task
+            'assisted_id': task['user_id'], // The assisted user who completed/skipped the task
             'guardian_id': uid,
             'user_id': task['user_id'],
-            'title': task['title'] ?? 'Task Completed',
+            'title': task['title'] ?? (status == 'done' ? 'Task Completed' : 'Task Skipped'),
             'scheduled_at': task['start_at'],
-            'action': 'done',
+            'action': action,
             'action_at': task['created_at'] ?? DateTime.now().toIso8601String(),
             'is_read': false,
             'due_date': task['due_date'],
@@ -192,7 +216,7 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
     super.dispose();
   }
 
-  void _startNotificationStream() {
+  void _startNotificationStream() async {
     final supabase = Supabase.instance.client;
     final uid = supabase.auth.currentUser?.id;
 
@@ -212,8 +236,10 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
       print('Starting task completion notification stream for guardian: $uid');
     }
 
-    // Listen to tasks table for status changes to 'done'
-    // Filter for tasks created by this guardian (created_by = uid) and status = 'done'
+    // First, do an initial query to get existing completed and skipped tasks
+    await _loadInitialNotifications(uid);
+
+    // Then set up the stream for real-time updates
     _streamSubscription = supabase
         .from('tasks')
         .stream(primaryKey: ['id'])
@@ -229,19 +255,24 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
             }
 
             if (mounted) {
-              // Filter for tasks with status 'done' and convert to notification format
-              final completedTasks = data.where((task) => task['status'] == 'done').toList();
+              // Filter for tasks with status 'done' or 'skip'/'skipped' and convert to notification format
+              final relevantTasks = data.where((task) {
+                final status = task['status']?.toString().toLowerCase() ?? '';
+                return status == 'done' || status == 'skip' || status == 'skipped';
+              }).toList();
 
-              final notifications = completedTasks.map((task) {
+              final notifications = relevantTasks.map((task) {
+                final status = task['status']?.toString().toLowerCase() ?? '';
+                final action = status == 'done' ? 'done' : 'skipped';
                 return {
                   'id': task['id'],
                   'task_id': task['id'].toString(),
-                  'assisted_id': task['user_id'], // The assisted user who completed the task
+                  'assisted_id': task['user_id'], // The assisted user who completed/skipped the task
                   'guardian_id': uid,
                   'user_id': task['user_id'],
-                  'title': task['title'] ?? 'Task Completed',
+                  'title': task['title'] ?? (status == 'done' ? 'Task Completed' : 'Task Skipped'),
                   'scheduled_at': task['start_at'],
-                  'action': 'done',
+                  'action': action,
                   'action_at': task['created_at'] ?? DateTime.now().toIso8601String(),
                   'is_read': false,
                   'due_date': task['due_date'],
@@ -260,7 +291,7 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
                   .toList();
 
               if (kDebugMode) {
-                print('Filtered completed tasks: ${filteredNotifications.length} items');
+                print('Filtered completed/skipped tasks: ${filteredNotifications.length} items');
               }
 
               setState(() {
@@ -292,6 +323,78 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
 
     if (kDebugMode) {
       print('Task completion notification stream subscription created');
+    }
+  }
+
+  Future<void> _loadInitialNotifications(String uid) async {
+    if (kDebugMode) {
+      print('Loading initial notifications for guardian: $uid');
+    }
+
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Get all completed and skipped tasks created by this guardian
+      final relevantTasks = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('created_by', uid)
+          .or('status.eq.done,status.eq.skip,status.eq.skipped')
+          .order('created_at', ascending: false)
+          .limit(50); // Get more for better coverage
+
+      if (kDebugMode) {
+        print('Initial query returned ${relevantTasks.length} completed/skipped tasks');
+        if (relevantTasks.isNotEmpty) {
+          print('Sample task: ${relevantTasks.first}');
+        }
+      }
+
+      if (mounted) {
+        // Convert task data to notification format
+              final notifications = relevantTasks.map((task) {
+                final status = task['status']?.toString().toLowerCase() ?? '';
+                final action = status == 'done' ? 'done' : 'skipped';
+                return {
+                  'id': task['id'],
+                  'task_id': task['id'].toString(),
+                  'assisted_id': task['user_id'], // The assisted user who completed/skipped the task
+                  'guardian_id': uid,
+                  'user_id': task['user_id'],
+                  'title': task['title'] ?? (status == 'done' ? 'Task Completed' : 'Task Skipped'),
+                  'scheduled_at': task['start_at'],
+                  'action': action,
+                  'action_at': task['created_at'] ?? DateTime.now().toIso8601String(),
+                  'is_read': false,
+                  'due_date': task['due_date'],
+                  'description': task['description'],
+                };
+              }).toList();        // Filter to show notifications from the last 7 days
+        final filteredNotifications = notifications
+            .where((notification) {
+              final actionAt = DateTime.tryParse(notification['action_at']?.toString() ?? '');
+              if (actionAt == null) return false;
+              final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+              return actionAt.isAfter(sevenDaysAgo);
+            })
+            .toList();
+
+        if (kDebugMode) {
+          print('Initial notifications loaded: ${filteredNotifications.length} items after filtering');
+          if (filteredNotifications.isNotEmpty) {
+            print('First notification: ${filteredNotifications.first}');
+          }
+        }
+
+        setState(() {
+          _currentNotifications = filteredNotifications;
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading initial notifications: $e');
+        print('Error details: ${e.toString()}');
+      }
     }
   }
 
@@ -403,7 +506,7 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
     // Restart the notification stream
     _startNotificationStream();
 
-    // Also do a direct query to check if completed tasks exist
+    // Also do a direct query to check if completed/skipped tasks exist
     final supabase = Supabase.instance.client;
     final uid = supabase.auth.currentUser?.id;
     if (uid != null && kDebugMode) {
@@ -412,16 +515,16 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
             .from('tasks')
             .select('*')
             .eq('created_by', uid)
-            .eq('status', 'done')
+            .or('status.eq.done,status.eq.skip,status.eq.skipped')
             .order('created_at', ascending: false)
             .limit(10);
 
-        print('Direct task completion query result: ${directData.length} completed tasks');
+        print('Direct task completion/skipped query result: ${directData.length} completed/skipped tasks');
         if (directData.isNotEmpty) {
-          print('Latest completed task: ${directData.first}');
+          print('Latest task: ${directData.first}');
         }
       } catch (e) {
-        print('Direct task completion query error: $e');
+        print('Direct task completion/skipped query error: $e');
       }
     }
   }
@@ -429,32 +532,49 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
 
 
   void _onTabTapped(int index) {
+    if (kDebugMode) {
+      print('NotificationScreen: _onTabTapped called with index $index, current index $_currentIndex');
+    }
+
+    if (_currentIndex == index) {
+      // Already on this tab, just refresh if it's notifications
+      if (index == 3) {
+        _refreshNotifications();
+      }
+      return;
+    }
+
     setState(() => _currentIndex = index);
 
-    if (index == 0) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const TasksScreenRegular()),
-      );
-    } else if (index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const CalendarScreenRegular()),
-      );
-    } else if (index == 2) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const CompanionListScreen()),
-      );
-    } else if (index == 3) {
-      // Already on notifications - just refresh
-      _refreshNotifications();
-    } else if (index == 4) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const ProfileScreen()),
-      );
+    Widget destinationScreen;
+    switch (index) {
+      case 0:
+        destinationScreen = const TasksScreenRegular();
+        break;
+      case 1:
+        destinationScreen = const CalendarScreenRegular();
+        break;
+      case 2:
+        destinationScreen = const CompanionListScreen();
+        break;
+      case 3:
+        // Stay on notifications screen
+        return;
+      case 4:
+        destinationScreen = const ProfileScreen();
+        break;
+      default:
+        return;
     }
+
+    if (kDebugMode) {
+      print('NotificationScreen: Navigating to ${destinationScreen.runtimeType}');
+    }
+
+    // Replace current route with the destination screen
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => destinationScreen),
+    );
   }
 
   @override
