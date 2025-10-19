@@ -150,12 +150,10 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     String? guardianId = _guardianUserId;
 
     try {
-      guardianId ??=
-          await ReinforcementLearningService.resolveGuardianIdFor(
+      guardianId ??= await ReinforcementLearningService.resolveGuardianIdFor(
         _assistedUserId,
       );
-      suggestions = await ReinforcementLearningService
-          .fetchScheduleSuggestions(
+      suggestions = await ReinforcementLearningService.fetchScheduleSuggestions(
         dueDate: date,
         assistedUserId: _assistedUserId,
         category: _selectedCategory.isEmpty ? null : _selectedCategory,
@@ -228,8 +226,9 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
       return ChoiceChip(
         label: Text(hasConflict ? '(!)' : displayLabel),
         selected: selected,
-        selectedColor:
-            hasConflict ? const Color(0xFFFFD1D1) : const Color(0xFF9BE8D8),
+        selectedColor: hasConflict
+            ? const Color(0xFFFFD1D1)
+            : const Color(0xFF9BE8D8),
         backgroundColor: hasConflict ? const Color(0xFFFFF1F1) : null,
         onSelected: (value) {
           if (value) {
@@ -241,7 +240,8 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
       );
     }).toList();
 
-    final selectedSuggestion = _selectedSuggestionId != null && _suggestions.isNotEmpty
+    final selectedSuggestion =
+        _selectedSuggestionId != null && _suggestions.isNotEmpty
         ? _suggestions.firstWhere(
             (s) => s.id == _selectedSuggestionId,
             orElse: () => _suggestions.first,
@@ -263,12 +263,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        if (chips.isNotEmpty)
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: chips,
-          ),
+        if (chips.isNotEmpty) Wrap(spacing: 10, runSpacing: 8, children: chips),
         if (_selectedSuggestionId != null)
           const Padding(
             padding: EdgeInsets.only(top: 6),
@@ -321,10 +316,11 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     if (_loadingScheduleRecommendation) return;
     setState(() => _loadingScheduleRecommendation = true);
     try {
-      final rec = await ReinforcementLearningService.fetchScheduleRecommendation(
-        assistedUserId: _assistedUserId,
-        category: _selectedCategory.isEmpty ? null : _selectedCategory,
-      );
+      final rec =
+          await ReinforcementLearningService.fetchScheduleRecommendation(
+            assistedUserId: _assistedUserId,
+            category: _selectedCategory.isEmpty ? null : _selectedCategory,
+          );
       if (!mounted) return;
       setState(() => _scheduleRecommendation = rec);
     } catch (_) {
@@ -387,13 +383,14 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     });
 
     try {
-      final suggestions = await ReinforcementLearningService.fetchTitleSuggestions(
-        assistedUserId: _assistedUserId,
-        dueDate: _selectedDate,
-        startTime: _startTime,
-        partialQuery: query,
-        category: _selectedCategory.isEmpty ? null : _selectedCategory,
-      );
+      final suggestions =
+          await ReinforcementLearningService.fetchTitleSuggestions(
+            assistedUserId: _assistedUserId,
+            dueDate: _selectedDate,
+            startTime: _startTime,
+            partialQuery: query,
+            category: _selectedCategory.isEmpty ? null : _selectedCategory,
+          );
 
       if (mounted) {
         setState(() {
@@ -445,8 +442,6 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     });
   }
 
-
-
   int _classifyRequestId = 0;
   Future<void> _classifyTitle(String title) async {
     if (title.trim().length < 3) return;
@@ -485,11 +480,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   String? _conflictMessageForSuggestion(ScheduleSuggestion suggestion) {
     final date = _selectedDate;
     if (date == null) return null;
-    return _conflictMessageForRange(
-      suggestion.start,
-      suggestion.end,
-      date,
-    );
+    return _conflictMessageForRange(suggestion.start, suggestion.end, date);
   }
 
   String? _activeTimeConflict() {
@@ -505,17 +496,21 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   ) {
     if (_tasksForDay.isEmpty) return null;
     final startDate = _buildDateTime(date, start);
-    final endDate = _buildDateTime(date, end ?? start)
-        .add(end == null ? const Duration(minutes: 5) : Duration.zero);
+    final endDate = _buildDateTime(
+      date,
+      end ?? start,
+    ).add(end == null ? const Duration(minutes: 5) : Duration.zero);
     for (final task in _tasksForDay) {
       // Skip the current task being edited
       final taskId = task['id']?.toString();
       final currentTaskId = widget.task['id']?.toString();
-      if (taskId != null && currentTaskId != null && taskId == currentTaskId) continue;
-      
+      if (taskId != null && currentTaskId != null && taskId == currentTaskId)
+        continue;
+
       final otherStart = _parseTaskTime(task['start_at'], date);
       if (otherStart == null) continue;
-      final otherEnd = _parseTaskTime(task['end_at'], date) ??
+      final otherEnd =
+          _parseTaskTime(task['end_at'], date) ??
           otherStart.add(const Duration(minutes: 15));
       if (_rangesOverlap(startDate, endDate, otherStart, otherEnd)) {
         final title = (task['title'] ?? 'another reminder').toString();
@@ -529,13 +524,8 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     return null;
   }
 
-  DateTime _buildDateTime(DateTime date, TimeOfDay time) => DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-      );
+  DateTime _buildDateTime(DateTime date, TimeOfDay time) =>
+      DateTime(date.year, date.month, date.day, time.hour, time.minute);
 
   DateTime? _parseTaskTime(dynamic raw, DateTime date) {
     if (raw == null) return null;
@@ -566,26 +556,25 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
   }
 
-
-
   Future<void> _saveTask() async {
     final id = (widget.task['id'] as num).toInt();
 
     if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a title')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter a title')));
       return;
     }
     if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a date')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a date')));
       return;
     }
 
     try {
-      final assistedId = _assistedUserId ??
+      final assistedId =
+          _assistedUserId ??
           widget.forUserId ??
           widget.task['user_id']?.toString() ??
           Supabase.instance.client.auth.currentUser?.id;
@@ -628,9 +617,9 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save task: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save task: $e')));
     }
   }
 
@@ -644,31 +633,44 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
         title: const Text('Delete task?'),
         content: const Text('This action cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
     if (confirm != true) return;
 
     try {
-  final ok = await TaskService.deleteTask(id, forUserId: widget.forUserId ?? widget.task['user_id'] as String?);
+      final ok = await TaskService.deleteTask(
+        id,
+        forUserId: widget.forUserId ?? widget.task['user_id'] as String?,
+      );
       if (!mounted) return;
       if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Task deleted')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Task deleted')));
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Task not deleted. It may not exist or you may not have permission.')),
+          const SnackBar(
+            content: Text(
+              'Task not deleted. It may not exist or you may not have permission.',
+            ),
+          ),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
     }
   }
 
@@ -724,55 +726,51 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                   // Title input with suggestions
                   _buildTitleInputWithSuggestions(),
                   const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(child: _buildDateField()),
-                    ],
-                  ),
+                  Row(children: [Expanded(child: _buildDateField())]),
                 ],
               ),
             ),
 
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: _buildSuggestionPanel(),
+            ),
+            if (_loadingScheduleRecommendation)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 30),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            else if (_scheduleRecommendation != null)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: _buildSuggestionPanel(),
-              ),
-              if (_loadingScheduleRecommendation)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 30),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                )
-              else if (_scheduleRecommendation != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 30),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Suggested schedule: ${_scheduleRecommendation!.daysLabel} at ${_scheduleRecommendation!.timeLabel}',
-                      style: const TextStyle(
-                        color: Color(0xFF3A4A5A),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Suggested schedule: ${_scheduleRecommendation!.daysLabel} at ${_scheduleRecommendation!.timeLabel}',
+                    style: const TextStyle(
+                      color: Color(0xFF3A4A5A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+              ),
 
-              const SizedBox(height: 35),
+            const SizedBox(height: 35),
 
             // Start / End Time
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: Row(
-                  children: [
-                    Expanded(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: Row(
+                children: [
+                  Expanded(
                     child: _buildTimeField(
                       label: "START TIME",
                       time: _startTime,
@@ -786,37 +784,37 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                       time: _endTime,
                       onTap: () => _selectTime(false),
                     ),
+                  ),
+                ],
+              ),
+            ),
+            if (_activeTimeConflict() != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(30, 6, 30, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFB53030),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _activeTimeConflict()!,
+                        style: const TextStyle(
+                          color: Color(0xFFB53030),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              if (_activeTimeConflict() != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(30, 6, 30, 0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.warning_amber_rounded,
-                        color: Color(0xFFB53030),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _activeTimeConflict()!,
-                          style: const TextStyle(
-                            color: Color(0xFFB53030),
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
 
-              const SizedBox(height: 35),
+            const SizedBox(height: 35),
 
             // Description
             Padding(
@@ -906,7 +904,6 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     );
   }
 
-
   Widget _buildInputField({
     required String label,
     required TextEditingController controller,
@@ -964,7 +961,11 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
           const SizedBox(height: 3),
           Row(
             children: [
-              const Icon(Icons.arrow_drop_down, size: 20, color: Colors.black54),
+              const Icon(
+                Icons.arrow_drop_down,
+                size: 20,
+                color: Colors.black54,
+              ),
               Expanded(
                 child: Text(
                   _selectedDate != null
@@ -973,7 +974,11 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                   style: const TextStyle(fontSize: 14),
                 ),
               ),
-              const Icon(Icons.calendar_today, color: Color(0xFFB6EAFF), size: 25),
+              const Icon(
+                Icons.calendar_today,
+                color: Color(0xFFB6EAFF),
+                size: 25,
+              ),
             ],
           ),
           const Divider(color: Colors.black87, thickness: 1),
@@ -1008,7 +1013,11 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                 time != null ? time.format(context) : '',
                 style: const TextStyle(fontSize: 14),
               ),
-              const Icon(Icons.arrow_drop_down, size: 20, color: Colors.black54),
+              const Icon(
+                Icons.arrow_drop_down,
+                size: 20,
+                color: Colors.black54,
+              ),
             ],
           ),
           const Divider(color: Colors.black87, thickness: 1),
@@ -1062,10 +1071,15 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                 return InkWell(
                   onTap: () => _selectTitleSuggestion(suggestion),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       border: index < _titleSuggestions.length - 1
-                          ? Border(bottom: BorderSide(color: Colors.grey.shade200))
+                          ? Border(
+                              bottom: BorderSide(color: Colors.grey.shade200),
+                            )
                           : null,
                     ),
                     child: Row(
@@ -1108,13 +1122,19 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                         if (suggestion.metadata?['category'] != null) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: _getCategoryColor(suggestion.metadata!['category'] as String),
+                              color: _getCategoryColor(
+                                suggestion.metadata!['category'] as String,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              (suggestion.metadata!['category'] as String).substring(0, 3),
+                              (suggestion.metadata!['category'] as String)
+                                  .substring(0, 3),
                               style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -1155,8 +1175,8 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
           _selectedSuggestionId = null;
         });
         _loadSuggestions();
-    _loadScheduleRecommendation();
-    _loadTasksForDay();
+        _loadScheduleRecommendation();
+        _loadTasksForDay();
       },
       child: Container(
         alignment: Alignment.center,
@@ -1171,21 +1191,9 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
         ),
       ),
     );
   }
 }
-
-
-
-
-
-
-
-
-

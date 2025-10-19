@@ -36,7 +36,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final client = Supabase.instance.client;
       final authUser = client.auth.currentUser;
 
-  final data = await ProfileService.fetchProfile(client);
+      final data = await ProfileService.fetchProfile(client);
       if (!mounted) return;
 
       final fullname = (data?['fullname'] as String?)?.trim();
@@ -44,14 +44,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final email = authUser?.email ?? '';
         if (email.contains('@')) {
           final local = email.split('@').first;
-          final parts = local.split(RegExp(r'[._\s]+')).where((s) => s.isNotEmpty);
-          return parts.map((p) => p[0].toUpperCase() + p.substring(1)).join(' ');
+          final parts = local
+              .split(RegExp(r'[._\s]+'))
+              .where((s) => s.isNotEmpty);
+          return parts
+              .map((p) => p[0].toUpperCase() + p.substring(1))
+              .join(' ');
         }
         return email;
       }();
 
       setState(() {
-        _fullName = (fullname != null && fullname.isNotEmpty) ? fullname : friendlyFromEmail;
+        _fullName = (fullname != null && fullname.isNotEmpty)
+            ? fullname
+            : friendlyFromEmail;
         final raw = data?['avatar_url'] as String?;
         _avatarUrl = (raw == null || raw.trim().isEmpty)
             ? null
@@ -96,7 +102,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final nameText = (_fullName == null || _fullName!.trim().isEmpty) ? '—' : _fullName!;
+    final nameText = (_fullName == null || _fullName!.trim().isEmpty)
+        ? '—'
+        : _fullName!;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F4EF),
@@ -116,7 +124,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               CircleAvatar(
                 radius: 40,
                 backgroundColor: Colors.brown[200],
-                backgroundImage: _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                backgroundImage: _avatarUrl != null
+                    ? NetworkImage(_avatarUrl!)
+                    : null,
                 child: _avatarUrl == null
                     ? const Icon(Icons.person, size: 50, color: Colors.white)
                     : null,
@@ -162,37 +172,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 25),
 
               // --- MENU BUTTONS ---
-              _menuButton(Icons.person, 'PROFILE', const Color(0xFFB2EBF2), onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ProfilePage()),
-                );
-                if (mounted) _loadProfile();
-              }),
-              _menuButton(Icons.settings, 'SETTINGS', const Color(0xFFF8BBD0), onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                );
-              }),
-              _menuButton(Icons.info, 'ABOUT', const Color(0xFFFFE0B2), onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AboutPage()),
-                );
-              }),
-              _menuButton(Icons.help_outline, 'HELP & SUPPORT', const Color(0xFFB3E5FC), onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HelpSupportPage()),
-                );
-              }),
-              _menuButton(Icons.policy, 'LEGAL & DATA', const Color(0xFFF8BBD0), onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LegalDataPage()),
-                );
-              }),
+              _menuButton(
+                Icons.person,
+                'PROFILE',
+                const Color(0xFFB2EBF2),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProfilePage(),
+                    ),
+                  );
+                  if (mounted) _loadProfile();
+                },
+              ),
+              _menuButton(
+                Icons.settings,
+                'SETTINGS',
+                const Color(0xFFF8BBD0),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              _menuButton(
+                Icons.info,
+                'ABOUT',
+                const Color(0xFFFFE0B2),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AboutPage()),
+                  );
+                },
+              ),
+              _menuButton(
+                Icons.help_outline,
+                'HELP & SUPPORT',
+                const Color(0xFFB3E5FC),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HelpSupportPage(),
+                    ),
+                  );
+                },
+              ),
+              _menuButton(
+                Icons.policy,
+                'LEGAL & DATA',
+                const Color(0xFFF8BBD0),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LegalDataPage(),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -210,9 +253,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Calendar', isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Alert', isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
+          _navItem(
+            Icons.calendar_today,
+            'Calendar',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Alert',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -220,7 +275,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // --- MENU BUTTON ---
-  static Widget _menuButton(IconData icon, String text, Color color, {VoidCallback? onTap}) {
+  static Widget _menuButton(
+    IconData icon,
+    String text,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -237,7 +297,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Expanded(
               child: Text(
                 text,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             const Icon(Icons.arrow_forward_ios, size: 16),

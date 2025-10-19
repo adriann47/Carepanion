@@ -1,4 +1,4 @@
-﻿import 'dart:io' show Platform;
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -38,6 +38,12 @@ class NotificationService {
         if (payload != null && payload.isNotEmpty) {
           try {
             final data = jsonDecode(payload) as Map<String, dynamic>;
+            final type = data['type']?.toString();
+            if (type == 'guardian_request') {
+              // For guardian requests, the dialog is already shown by the service
+              // when the insert happens, so we don't need to do anything here
+              return;
+            }
             final id = data['task_id']?.toString();
             if (id != null) {
               await ReminderService.showPopupForTaskId(id);
@@ -71,6 +77,19 @@ class NotificationService {
           vibrationPattern: vib,
         );
         await androidImpl?.createNotificationChannel(channel);
+
+        // Create channel for guardian requests
+        final requestChannel = AndroidNotificationChannel(
+          'carepanion_requests', // id
+          'Companion Requests', // name
+          description: 'Notifications for companion connection requests',
+          importance: Importance.high,
+          playSound: true,
+          showBadge: true,
+          enableVibration: true,
+          vibrationPattern: vib,
+        );
+        await androidImpl?.createNotificationChannel(requestChannel);
       } catch (_) {}
     }
     if (Platform.isAndroid) {
@@ -110,12 +129,18 @@ class NotificationService {
     return null;
   }
 
-  static NotificationDetails _details() {
+  static NotificationDetails _details({
+    String channelId = 'carepanion_reminders',
+  }) {
     final vibrate = NotificationPreferences.vibrationEnabled.value;
     final AndroidNotificationDetails android = AndroidNotificationDetails(
-      'carepanion_reminders',
-      'Task Reminders',
-      channelDescription: 'Reminder notifications for due tasks',
+      channelId,
+      channelId == 'carepanion_reminders'
+          ? 'Task Reminders'
+          : 'Companion Requests',
+      channelDescription: channelId == 'carepanion_reminders'
+          ? 'Reminder notifications for due tasks'
+          : 'Notifications for companion connection requests',
       importance: Importance.max,
       priority: Priority.high,
       category: AndroidNotificationCategory.alarm,
@@ -137,9 +162,34 @@ class NotificationService {
     required String title,
     required String body,
     String? payload,
+    String channelId = 'carepanion_reminders',
   }) async {
     if (!NotificationPreferences.pushEnabled.value) return;
-    await _plugin.show(id, title, body, _details(), payload: payload);
+    // Enrich payload with title/body so native side can do TTS when app isn't active
+    String enrichedPayload;
+    try {
+      final Map<String, dynamic> base = (payload != null && payload.isNotEmpty)
+          ? (jsonDecode(payload) as Map<String, dynamic>)
+          : <String, dynamic>{};
+      base.putIfAbsent('task_title', () => title);
+      if (body.isNotEmpty) {
+        base.putIfAbsent('task_note', () => body);
+      }
+      enrichedPayload = jsonEncode(base);
+    } catch (_) {
+      // If payload wasn't JSON, fall back to a minimal JSON
+      enrichedPayload = jsonEncode({
+        'task_title': title,
+        if (body.isNotEmpty) 'task_note': body,
+      });
+    }
+    await _plugin.show(
+      id,
+      title,
+      body,
+      _details(channelId: channelId),
+      payload: enrichedPayload,
+    );
   }
 
   static Future<void> cancel(int id) async {
@@ -162,28 +212,45 @@ class NotificationService {
     String? payload,
   }) async {
     final tzTime = tz.TZDateTime.from(whenLocal, tz.local);
-// Schedule a visual local notification as fallback (respects push toggle)
-if (NotificationPreferences.pushEnabled.value) {
-  await _plugin.zonedSchedule(
-    id,
-    title,
-    body,
-    tzTime,
-    _details(),
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    uiLocalNotificationDateInterpretation:
-        UILocalNotificationDateInterpretation.absoluteTime,
-    payload: payload,
-  );
-}
+    // Enrich payload with title/body for native full-screen TTS
+    String enrichedPayload;
+    try {
+      final Map<String, dynamic> base = (payload != null && payload.isNotEmpty)
+          ? (jsonDecode(payload) as Map<String, dynamic>)
+          : <String, dynamic>{};
+      base.putIfAbsent('task_title', () => title);
+      if (body.isNotEmpty) {
+        base.putIfAbsent('task_note', () => body);
+      }
+      enrichedPayload = jsonEncode(base);
+    } catch (_) {
+      enrichedPayload = jsonEncode({
+        'task_title': title,
+        if (body.isNotEmpty) 'task_note': body,
+      });
+    }
+    // Schedule a visual local notification as fallback (respects push toggle)
+    if (NotificationPreferences.pushEnabled.value) {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzTime,
+        _details(),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: enrichedPayload,
+      );
+    }
 
-// Also schedule a native exact alarm that starts the full-screen Activity
+    // Also schedule a native exact alarm that starts the full-screen Activity
     try {
       final epoch = whenLocal.toUtc().millisecondsSinceEpoch;
       await _native.invokeMethod('scheduleAlarm', {
         'when': epoch,
         'id': id,
-        'payload': payload ?? '',
+        'payload': enrichedPayload,
       });
     } catch (e) {
       if (kDebugMode) {
@@ -200,12 +267,15 @@ void notificationTapBackground(NotificationResponse response) async {
   if (payload == null || payload.isEmpty) return;
   try {
     final data = jsonDecode(payload) as Map<String, dynamic>;
+    final type = data['type']?.toString();
+    if (type == 'guardian_request') {
+      // For guardian requests, we don't need to do anything special in background
+      // The dialog will be shown when the app is foregrounded
+      return;
+    }
     final id = data['task_id']?.toString();
     if (id != null) {
       await ReminderService.showPopupForTaskId(id);
     }
   } catch (_) {}
 }
-
-
-

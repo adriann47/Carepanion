@@ -18,7 +18,24 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val payload = intent.getStringExtra("payload")
+        val id = intent.getIntExtra("id", -1)
         Log.i("ReminderAlarmReceiver", "onReceive payload=$payload")
+        if (id != -1) {
+            try { AlarmStore.remove(context, id) } catch (_: Exception) {}
+        }
+
+        // Extract friendly title/body from payload for better notification text
+        var notifTitle = "Task Reminder"
+        var notifBody = "Tap to view your reminder"
+        try {
+            if (payload != null) {
+                val obj = org.json.JSONObject(payload)
+                val t = obj.optString("task_title")
+                val n = obj.optString("task_note")
+                if (!t.isNullOrBlank()) notifTitle = t
+                if (!n.isNullOrBlank()) notifBody = n else notifBody = "It's time to do this task."
+            }
+        } catch (_: Exception) { }
 
         // Build intent to launch the full-screen activity
         val fullScreenIntent = Intent(context, ReminderFullScreenActivity::class.java).apply {
@@ -48,8 +65,8 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
 
         val notif = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("Task Reminder")
-            .setContentText("Tap to view your reminder")
+            .setContentTitle(notifTitle)
+            .setContentText(notifBody)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)

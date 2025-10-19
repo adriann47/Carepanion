@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 // Keep alert as a modal confirmation; return to prior screen on pop
 
 class EmergencyAlertScreen extends StatelessWidget {
-  const EmergencyAlertScreen({super.key, required this.assistedName, required this.isGuardianView});
+  const EmergencyAlertScreen({
+    super.key,
+    required this.assistedName,
+    required this.isGuardianView,
+  });
 
   final String assistedName;
   final bool isGuardianView;
@@ -16,8 +20,11 @@ class EmergencyAlertScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.notifications_active,
-                  size: 100, color: Colors.white),
+              const Icon(
+                Icons.notifications_active,
+                size: 100,
+                color: Colors.white,
+              ),
               const SizedBox(height: 30),
               Text(
                 "EMERGENCY",
@@ -47,8 +54,10 @@ class EmergencyAlertScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.redAccent,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 40,
+                    vertical: 15,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),

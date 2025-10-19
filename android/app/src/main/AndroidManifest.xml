@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.carepanion.app">
 
+    <!-- Internet access required for Supabase API calls in release builds -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Runtime notification permission for Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Enable vibration for notifications -->
@@ -9,6 +11,8 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Allow full-screen intent notifications (Android 10+) -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Receive boot completed to reschedule alarms after reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:label="CarePanion"
@@ -68,6 +72,15 @@
         
     <!-- Receiver used by native AlarmManager to launch full-screen reminder -->
     <receiver android:name=".ReminderAlarmReceiver" android:exported="true" />
+    <receiver
+        android:name=".BootReceiver"
+        android:enabled="true"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.BOOT_COMPLETED" />
+            <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+        </intent-filter>
+    </receiver>
     </application>
 
     <!-- Required to query activities that can process text, see:

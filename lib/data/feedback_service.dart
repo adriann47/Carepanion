@@ -26,7 +26,8 @@ class FeedbackService {
       'attachments': attachments,
       'app_version': appVersion ?? '',
       // Use kIsWeb/defaultTargetPlatform so this works on web and mobile
-      'platform': platform ?? (kIsWeb ? 'web' : defaultTargetPlatform.toString()),
+      'platform':
+          platform ?? (kIsWeb ? 'web' : defaultTargetPlatform.toString()),
     };
 
     // 1) Prepare payload: remove nulls so we don't send columns the DB may not have
@@ -42,7 +43,14 @@ class FeedbackService {
       final msg = e.toString().toLowerCase();
       // common optional fields we include; if the DB complains about any of
       // them being missing, remove and retry once.
-      final optionalCols = ['stars', 'attachments', 'app_version', 'platform', 'role', 'subject'];
+      final optionalCols = [
+        'stars',
+        'attachments',
+        'app_version',
+        'platform',
+        'role',
+        'subject',
+      ];
       bool modified = false;
       for (final col in optionalCols) {
         if (msg.contains("'$col'") || msg.contains(col)) {

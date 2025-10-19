@@ -33,7 +33,8 @@ class EmergencyService {
     }
 
     try {
-      if (_forGuardianId == user.id && _channel != null) return; // already active
+      if (_forGuardianId == user.id && _channel != null)
+        return; // already active
       _unsubscribe();
       _forGuardianId = user.id;
 
@@ -61,7 +62,10 @@ class EmergencyService {
                 final newRec = payload.newRecord as Map<String, dynamic>?;
                 final assistedId = newRec?['assisted_id']?.toString();
                 if (assistedId != null && assistedId.isNotEmpty) {
-                  final prof = await ProfileService.fetchProfile(Supabase.instance.client, userId: assistedId);
+                  final prof = await ProfileService.fetchProfile(
+                    Supabase.instance.client,
+                    userId: assistedId,
+                  );
                   assistedName = (prof?['fullname'] ?? '').toString().trim();
                 }
               } catch (_) {}

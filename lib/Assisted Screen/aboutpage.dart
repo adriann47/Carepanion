@@ -37,11 +37,15 @@ class _AboutPageState extends State<AboutPage> {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const ProfileScreen()),
+                          builder: (context) => const ProfileScreen(),
+                        ),
                       );
                     },
-                    child: const Icon(Icons.arrow_back,
-                        color: Colors.black87, size: 28),
+                    child: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.black87,
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(height: 18),
                   const Text(
@@ -61,9 +65,9 @@ class _AboutPageState extends State<AboutPage> {
             /// --- MAIN CONTENT ---
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 22).copyWith(
-                  bottom: 24,
-                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                ).copyWith(bottom: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [

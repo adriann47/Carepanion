@@ -6,6 +6,7 @@ import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'notification_screen.dart';
 import 'profile_screen_regular.dart';
+
 class CompanionListScreen extends StatefulWidget {
   const CompanionListScreen({super.key});
 
@@ -34,10 +35,9 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
 
     // Listen for assisted_guardians changes for this guardian
     _agChannel?.unsubscribe();
-    _agChannel = client
-        .channel('public:assisted_guardians:guardian:$gid')
+    _agChannel = client.channel('public:assisted_guardians:guardian:$gid')
       ..onPostgresChanges(
-        event: PostgresChangeEvent.insert,
+        event: PostgresChangeEvent.update,
         schema: 'public',
         table: 'assisted_guardians',
         callback: (payload) async {
@@ -45,68 +45,16 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
             final newRec = payload.newRecord as Map<String, dynamic>?;
             // Debug log: print payload (helps in dev builds)
             // ignore: avoid_print
-            print('assisted_guardians INSERT payload: $newRec');
+            print('assisted_guardians UPDATE payload: $newRec');
 
-            if (newRec?['guardian_id']?.toString() == gid) {
-              final assistedId = newRec?['assisted_id']?.toString();
-              if (assistedId != null && assistedId.isNotEmpty) {
-                // Show a short snackbar so the guardian sees something even if the dialog fails
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('New companion request received')),
-                  );
-                }
-
-                // Prompt guardian to accept or reject the request
-                final prof = await ProfileService.fetchProfile(client, userId: assistedId);
-                if (!mounted) return;
-                final name = (prof?['fullname'] ?? prof?['name'] ?? 'Assisted') as String;
-                // showDialog must be called from the UI thread
-                if (mounted) {
-                  try {
-                    await showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Companion request'),
-                        content: Text('$name requested you as guardian. Accept?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () async {
-                              Navigator.of(ctx).pop();
-                              // mark as rejected
-                              await client.from('assisted_guardians').update({'status': 'rejected'}).eq('assisted_id', assistedId).eq('guardian_id', gid);
-                              _loadAssisteds();
-                            },
-                            child: const Text('Reject'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () async {
-                              Navigator.of(ctx).pop();
-                              // mark as accepted
-                              await client.from('assisted_guardians').update({'status': 'accepted'}).eq('assisted_id', assistedId).eq('guardian_id', gid);
-                              // update profile to set guardian_id for the assisted user
-                              await client.from('profile').update({'guardian_id': gid}).eq('id', assistedId);
-                              _loadAssisteds();
-                            },
-                            child: const Text('Accept'),
-                          ),
-                        ],
-                      ),
-                    );
-                  } catch (ex) {
-                    // ignore: avoid_print
-                    print('Error showing companion request dialog: $ex');
-                    // fallback: ensure assisteds list refreshed
-                    _loadAssisteds();
-                  }
-                }
-              } else {
-                _loadAssisteds();
-              }
+            if (newRec?['guardian_id']?.toString() == gid &&
+                newRec?['status'] == 'accepted') {
+              // Refresh the list when a request is accepted
+              _loadAssisteds();
             }
           } catch (e) {
             // ignore: avoid_print
-            print('Error handling assisted_guardians insert payload: $e');
+            print('Error handling assisted_guardians update payload: $e');
             _loadAssisteds();
           }
         },
@@ -120,8 +68,11 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
           if (oldRec?['guardian_id']?.toString() == gid) {
             final assistedId = oldRec?['assisted_id']?.toString();
             if (assistedId != null && assistedId.isNotEmpty) {
-              setState(() => _assisteds =
-                  _assisteds.where((e) => e['id']?.toString() != assistedId).toList());
+              setState(
+                () => _assisteds = _assisteds
+                    .where((e) => e['id']?.toString() != assistedId)
+                    .toList(),
+              );
             } else {
               _loadAssisteds();
             }
@@ -132,8 +83,7 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
 
     // Also listen for legacy profile updates where assisted rows change guardian_id to this guardian
     _profileChannel?.unsubscribe();
-    _profileChannel = client
-        .channel('public:profile_guardian:guardian:$gid')
+    _profileChannel = client.channel('public:profile_guardian:guardian:$gid')
       ..onPostgresChanges(
         event: PostgresChangeEvent.update,
         schema: 'public',
@@ -159,7 +109,10 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
       final supabase = Supabase.instance.client;
       final guardianId = supabase.auth.currentUser?.id;
       if (guardianId != null) {
-        final rows = await ProfileService.fetchAssistedsForGuardian(supabase, guardianUserId: guardianId);
+        final rows = await ProfileService.fetchAssistedsForGuardian(
+          supabase,
+          guardianUserId: guardianId,
+        );
         setState(() => _assisteds = rows);
       } else {
         setState(() => _assisteds = []);
@@ -190,8 +143,7 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
         context,
         MaterialPageRoute(builder: (context) => NotificationScreen()),
       );
-    }
-    else if (index == 4) {
+    } else if (index == 4) {
       // ✅ Go to Notification Screen when Notification icon clicked
       Navigator.push(
         context,
@@ -236,8 +188,12 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
                     itemCount: _assisteds.length,
                     itemBuilder: (context, idx) {
                       final p = _assisteds[idx];
-                      final fullname = (p['fullname'] ?? p['full_name'] ?? p['name'])?.toString() ?? 'No name';
-                      final avatar = (p['avatar_url'] as String?)?.isNotEmpty == true
+                      final fullname =
+                          (p['fullname'] ?? p['full_name'] ?? p['name'])
+                              ?.toString() ??
+                          'No name';
+                      final avatar =
+                          (p['avatar_url'] as String?)?.isNotEmpty == true
                           ? p['avatar_url'] as String
                           : 'assets/logo.jpg';
 
@@ -257,8 +213,14 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
                         child: Container(
                           width: double.infinity,
                           height: 110,
-                          margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          margin: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 16,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.lightBlue[100],
                             borderRadius: BorderRadius.circular(20),
@@ -312,11 +274,21 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Companions',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications',
-              isSelected: _currentIndex == 3),
+          _navItem(
+            Icons.calendar_today,
+            'Menu',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Companions',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -324,8 +296,11 @@ class _CompanionListScreenState extends State<CompanionListScreen> {
   }
 
   // --- Reusable Nav Item Widget ---
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {required bool isSelected}) {
+  static BottomNavigationBarItem _navItem(
+    IconData icon,
+    String label, {
+    required bool isSelected,
+  }) {
     return BottomNavigationBarItem(
       label: label,
       icon: Container(

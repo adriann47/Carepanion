@@ -17,7 +17,9 @@ class GuardianNotificationService {
     required String action, // 'done' | 'skipped'
     DateTime? actionAt,
   }) async {
-    print('GuardianNotificationService.recordTaskOutcome called: taskId=$taskId, assistedId=$assistedId, action=$action');
+    print(
+      'GuardianNotificationService.recordTaskOutcome called: taskId=$taskId, assistedId=$assistedId, action=$action',
+    );
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
     if (user == null) {
@@ -25,7 +27,9 @@ class GuardianNotificationService {
       return;
     }
 
-    final act = (action.toLowerCase() == 'skip') ? 'skipped' : action.toLowerCase();
+    final act = (action.toLowerCase() == 'skip')
+        ? 'skipped'
+        : action.toLowerCase();
     final when = (actionAt ?? DateTime.now().toUtc());
     final whenIso = when.toIso8601String();
     final scheduledIso = scheduledAt?.toUtc().toIso8601String();
@@ -33,46 +37,71 @@ class GuardianNotificationService {
     // Determine target guardians
     List<String> guardianIds = [];
     try {
-      final role = (await ProfileService.getCurrentUserRole(client))?.toLowerCase();
+      final role = (await ProfileService.getCurrentUserRole(
+        client,
+      ))?.toLowerCase();
       print('GuardianNotificationService: Current user role = $role');
       if (role == 'regular') {
         guardianIds = [user.id];
-        print('GuardianNotificationService: Regular user, adding self as guardian: ${user.id}');
+        print(
+          'GuardianNotificationService: Regular user, adding self as guardian: ${user.id}',
+        );
       } else {
-        print('GuardianNotificationService: Assisted user, querying assisted_guardians table for assistedId: $assistedId');
+        print(
+          'GuardianNotificationService: Assisted user, querying assisted_guardians table for assistedId: $assistedId',
+        );
         final List rows = await client
             .from('assisted_guardians')
             .select('guardian_id,status')
             .eq('assisted_id', assistedId);
-        print('GuardianNotificationService: Found ${rows.length} guardian relationships');
+        print(
+          'GuardianNotificationService: Found ${rows.length} guardian relationships',
+        );
         for (final r in rows) {
           final gid = (r['guardian_id'] ?? '').toString();
           final status = (r['status'] ?? 'accepted').toString();
-          print('GuardianNotificationService: Guardian $gid with status $status');
+          print(
+            'GuardianNotificationService: Guardian $gid with status $status',
+          );
           if (gid.isEmpty) continue;
           if (status == 'accepted' || status.isEmpty) {
             guardianIds.add(gid);
-            print('GuardianNotificationService: Added guardian $gid to notification targets');
+            print(
+              'GuardianNotificationService: Added guardian $gid to notification targets',
+            );
           }
         }
         // If no guardians found, fall back to creator seeing their own page if they are the assisted
         if (guardianIds.isEmpty) {
           guardianIds = [user.id];
-          print('GuardianNotificationService: No guardians found, falling back to user: ${user.id}');
+          print(
+            'GuardianNotificationService: No guardians found, falling back to user: ${user.id}',
+          );
         }
       }
     } catch (e) {
       print('GuardianNotificationService: Error determining guardians: $e');
       // If fetching guardians fails, queue locally to retry later
-      await _enqueue(taskId: taskId, assistedId: assistedId, title: title, scheduledIso: scheduledIso, act: act, whenIso: whenIso);
+      await _enqueue(
+        taskId: taskId,
+        assistedId: assistedId,
+        title: title,
+        scheduledIso: scheduledIso,
+        act: act,
+        whenIso: whenIso,
+      );
       return;
     }
 
     //print debug terminal to test if data is correct
-    print('recordTaskOutcome: user=${user.id}, assisted=$assistedId, action=$action, guardians=$guardianIds');
+    print(
+      'recordTaskOutcome: user=${user.id}, assisted=$assistedId, action=$action, guardians=$guardianIds',
+    );
     // Fan-out inserts (idempotent)
     for (final gid in guardianIds.toSet()) {
-      print('GuardianNotificationService: Attempting to create notification for guardian $gid');
+      print(
+        'GuardianNotificationService: Attempting to create notification for guardian $gid',
+      );
       try {
         final exist = await client
             .from('task_notifications')
@@ -83,11 +112,15 @@ class GuardianNotificationService {
             .limit(1)
             .maybeSingle();
         if (exist != null) {
-          print('GuardianNotificationService: Notification already exists for guardian $gid, skipping');
+          print(
+            'GuardianNotificationService: Notification already exists for guardian $gid, skipping',
+          );
           continue;
         }
-        
-        print('GuardianNotificationService: Inserting notification for guardian $gid');
+
+        print(
+          'GuardianNotificationService: Inserting notification for guardian $gid',
+        );
         await client.from('task_notifications').upsert({
           'task_id': taskId,
           'assisted_id': assistedId,
@@ -99,14 +132,26 @@ class GuardianNotificationService {
           'action_at': whenIso,
           'is_read': false,
         });
-        print('GuardianNotificationService: Successfully created notification for guardian $gid');
+        print(
+          'GuardianNotificationService: Successfully created notification for guardian $gid',
+        );
       } catch (e) {
-        print('GuardianNotificationService: Failed to create notification for guardian $gid: $e');
+        print(
+          'GuardianNotificationService: Failed to create notification for guardian $gid: $e',
+        );
         if (kDebugMode) {
           // ignore: avoid_print
           print('GuardianNotificationService insert failed, queuing: $e');
         }
-        await _enqueue(taskId: taskId, assistedId: assistedId,title: title, scheduledIso: scheduledIso, act: act, whenIso: whenIso, guardianId: gid);
+        await _enqueue(
+          taskId: taskId,
+          assistedId: assistedId,
+          title: title,
+          scheduledIso: scheduledIso,
+          act: act,
+          whenIso: whenIso,
+          guardianId: gid,
+        );
       }
     }
   }
@@ -157,12 +202,18 @@ class GuardianNotificationService {
     final List<String> remaining = [];
     for (final s in raw) {
       Map<String, dynamic> m;
-      try { m = jsonDecode(s) as Map<String, dynamic>; } catch (_) { continue; }
+      try {
+        m = jsonDecode(s) as Map<String, dynamic>;
+      } catch (_) {
+        continue;
+      }
       final String taskId = m['task_id'].toString();
       final String assistedId = m['assisted_id'].toString();
       final String title = (m['title'] ?? 'Task').toString();
       final String act = (m['action'] ?? 'done').toString();
-      final String whenIso = (m['action_at'] ?? DateTime.now().toUtc().toIso8601String()).toString();
+      final String whenIso =
+          (m['action_at'] ?? DateTime.now().toUtc().toIso8601String())
+              .toString();
       final String? scheduledIso = m['scheduled_at']?.toString();
       final String? gid = m['guardian_id']?.toString();
 
@@ -171,7 +222,9 @@ class GuardianNotificationService {
         targets = [gid];
       } else {
         try {
-          final role = (await ProfileService.getCurrentUserRole(client))?.toLowerCase();
+          final role = (await ProfileService.getCurrentUserRole(
+            client,
+          ))?.toLowerCase();
           if (role == 'regular') {
             targets = [user.id];
           } else {
@@ -209,7 +262,8 @@ class GuardianNotificationService {
             'task_id': taskId,
             'assisted_id': assistedId,
             'guardian_id': t,
-            'user_id': (m['user_id'] ?? Supabase.instance.client.auth.currentUser?.id),
+            'user_id':
+                (m['user_id'] ?? Supabase.instance.client.auth.currentUser?.id),
             'title': title,
             if (scheduledIso != null) 'scheduled_at': scheduledIso,
             'action': act,
@@ -225,7 +279,9 @@ class GuardianNotificationService {
       }
     }
 
-    try { await prefs.setStringList(_queueKey, remaining); } catch (_) {}
+    try {
+      await prefs.setStringList(_queueKey, remaining);
+    } catch (_) {}
   }
 
   static Future<void> markAllReadForGuardian(String guardianId) async {

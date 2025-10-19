@@ -1,11 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:softeng/services/task_service.dart';
 import 'package:softeng/services/rl_service.dart';
 
 class AddTaskScreen extends StatefulWidget {
   final DateTime? selectedDate; // Made optional
-  final String? forUserId; // optional target user id (guardian creating for assisted)
+  final String?
+  forUserId; // optional target user id (guardian creating for assisted)
 
   const AddTaskScreen({super.key, this.selectedDate, this.forUserId});
 
@@ -74,13 +75,14 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     });
 
     try {
-      final suggestions = await ReinforcementLearningService.fetchTitleSuggestions(
-        assistedUserId: widget.forUserId,
-        dueDate: _selectedDate,
-        startTime: _startTime,
-        partialQuery: query,
-        category: _selectedCategory.isEmpty ? null : _selectedCategory,
-      );
+      final suggestions =
+          await ReinforcementLearningService.fetchTitleSuggestions(
+            assistedUserId: widget.forUserId,
+            dueDate: _selectedDate,
+            startTime: _startTime,
+            partialQuery: query,
+            category: _selectedCategory.isEmpty ? null : _selectedCategory,
+          );
 
       if (mounted) {
         setState(() {
@@ -138,12 +140,13 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     setState(() => _isLoadingTimeSuggestions = true);
 
     try {
-      final suggestions = await ReinforcementLearningService.fetchScheduleSuggestions(
-        dueDate: date,
-        assistedUserId: widget.forUserId,
-        category: _selectedCategory.isEmpty ? null : _selectedCategory,
-        existingTasks: _existingTasksForDay,
-      );
+      final suggestions =
+          await ReinforcementLearningService.fetchScheduleSuggestions(
+            dueDate: date,
+            assistedUserId: widget.forUserId,
+            category: _selectedCategory.isEmpty ? null : _selectedCategory,
+            existingTasks: _existingTasksForDay,
+          );
 
       if (mounted && requestId == _timeSuggestionRequestId) {
         setState(() {
@@ -168,7 +171,10 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     setState(() => _fetchingTasksForDay = true);
 
     try {
-      final rows = await TaskService.getTasksForDate(date, forUserId: widget.forUserId);
+      final rows = await TaskService.getTasksForDate(
+        date,
+        forUserId: widget.forUserId,
+      );
       if (mounted) {
         setState(() => _existingTasksForDay = rows);
       }
@@ -205,9 +211,19 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     return _conflictMessageForRange(_startTime!, _endTime, date);
   }
 
-  String? _conflictMessageForRange(TimeOfDay start, TimeOfDay? end, DateTime date) {
+  String? _conflictMessageForRange(
+    TimeOfDay start,
+    TimeOfDay? end,
+    DateTime date,
+  ) {
     if (_existingTasksForDay.isEmpty) return null;
-    final startDate = DateTime(date.year, date.month, date.day, start.hour, start.minute);
+    final startDate = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      start.hour,
+      start.minute,
+    );
     final endDate = end != null
         ? DateTime(date.year, date.month, date.day, end.hour, end.minute)
         : startDate.add(const Duration(minutes: 15));
@@ -215,7 +231,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     for (final task in _existingTasksForDay) {
       final otherStart = _parseTaskTime(task['start_at'], date);
       if (otherStart == null) continue;
-      final otherEnd = _parseTaskTime(task['end_at'], date) ?? otherStart.add(const Duration(minutes: 15));
+      final otherEnd =
+          _parseTaskTime(task['end_at'], date) ??
+          otherStart.add(const Duration(minutes: 15));
 
       if (startDate.isBefore(otherEnd) && otherStart.isBefore(endDate)) {
         final title = (task['title'] ?? 'another task').toString();
@@ -290,7 +308,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         // If selecting a start time for today, disallow times before now
         if (_selectedDate != null && pickedDt.isBefore(now)) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cannot set a start time in the past')),
+            const SnackBar(
+              content: Text('Cannot set a start time in the past'),
+            ),
           );
           return;
         }
@@ -312,7 +332,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           );
           if (!pickedDt.isAfter(startDt)) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('End time must be after start time')),
+              const SnackBar(
+                content: Text('End time must be after start time'),
+              ),
             );
             return;
           }
@@ -332,15 +354,15 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   Future<void> _saveTask() async {
     if ((_titleController.text).trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a title')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter a title')));
       return;
     }
     if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a date')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a date')));
       return;
     }
 
@@ -394,7 +416,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           if (!endDt.isAfter(startDt)) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('End time must be after start time')),
+                const SnackBar(
+                  content: Text('End time must be after start time'),
+                ),
               );
             }
             return;
@@ -422,9 +446,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save task: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save task: $e')));
     }
   }
 
@@ -435,7 +459,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       resizeToAvoidBottomInset: true, // <-- Fix overflow when keyboard appears
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 16),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min, // <-- Prevent overflow
             children: [
@@ -451,7 +477,10 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     bottomRight: Radius.circular(50),
                   ),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 25,
+                  vertical: 40,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -473,13 +502,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     _buildTitleInputWithSuggestions(),
                     const SizedBox(height: 20),
                     // Date picker
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildDateField(),
-                        ),
-                      ],
-                    ),
+                    Row(children: [Expanded(child: _buildDateField())]),
                   ],
                 ),
               ),
@@ -627,7 +650,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 ),
               ),
 
-              const SizedBox(height: 40), // Adjusted spacing after removing navbar
+              const SizedBox(
+                height: 40,
+              ), // Adjusted spacing after removing navbar
             ],
           ),
         ),
@@ -680,10 +705,15 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 return InkWell(
                   onTap: () => _selectSuggestion(suggestion),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       border: index < _titleSuggestions.length - 1
-                          ? Border(bottom: BorderSide(color: Colors.grey.shade200))
+                          ? Border(
+                              bottom: BorderSide(color: Colors.grey.shade200),
+                            )
                           : null,
                     ),
                     child: Row(
@@ -726,13 +756,19 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                         if (suggestion.metadata?['category'] != null) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: _getCategoryColor(suggestion.metadata!['category'] as String),
+                              color: _getCategoryColor(
+                                suggestion.metadata!['category'] as String,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              (suggestion.metadata!['category'] as String).substring(0, 3),
+                              (suggestion.metadata!['category'] as String)
+                                  .substring(0, 3),
                               style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -820,7 +856,11 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           const SizedBox(height: 3),
           Row(
             children: [
-              const Icon(Icons.arrow_drop_down, size: 20, color: Colors.black54),
+              const Icon(
+                Icons.arrow_drop_down,
+                size: 20,
+                color: Colors.black54,
+              ),
               Expanded(
                 child: Text(
                   _selectedDate != null
@@ -829,7 +869,11 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                   style: const TextStyle(fontSize: 14),
                 ),
               ),
-              const Icon(Icons.calendar_today, color: Color(0xFFB6EAFF), size: 25),
+              const Icon(
+                Icons.calendar_today,
+                color: Color(0xFFB6EAFF),
+                size: 25,
+              ),
             ],
           ),
           const Divider(color: Colors.black87, thickness: 1),
@@ -864,7 +908,11 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 time != null ? time.format(context) : '',
                 style: const TextStyle(fontSize: 14),
               ),
-              const Icon(Icons.arrow_drop_down, size: 20, color: Colors.black54),
+              const Icon(
+                Icons.arrow_drop_down,
+                size: 20,
+                color: Colors.black54,
+              ),
             ],
           ),
           const Divider(color: Colors.black87, thickness: 1),
@@ -893,10 +941,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
         ),
       ),
     );
@@ -931,12 +976,20 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       final displayLabel = suggestion.label.isNotEmpty
           ? suggestion.label
           : _formatTimeSuggestionLabel(suggestion);
-      final hasConflict = _conflictMessageForRange(suggestion.start, suggestion.end, _selectedDate!) != null;
+      final hasConflict =
+          _conflictMessageForRange(
+            suggestion.start,
+            suggestion.end,
+            _selectedDate!,
+          ) !=
+          null;
 
       return ChoiceChip(
         label: Text(hasConflict ? '(!)' : displayLabel),
         selected: selected,
-        selectedColor: hasConflict ? const Color(0xFFFFD1D1) : const Color(0xFF9BE8D8),
+        selectedColor: hasConflict
+            ? const Color(0xFFFFD1D1)
+            : const Color(0xFF9BE8D8),
         backgroundColor: hasConflict ? const Color(0xFFFFF1F1) : null,
         onSelected: (value) {
           if (value) {
@@ -960,11 +1013,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 10,
-          runSpacing: 8,
-          children: chips,
-        ),
+        Wrap(spacing: 10, runSpacing: 8, children: chips),
         if (_selectedTimeSuggestionId != null)
           const Padding(
             padding: EdgeInsets.only(top: 6),

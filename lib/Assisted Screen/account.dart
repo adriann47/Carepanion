@@ -621,29 +621,29 @@ class _AccountPageState extends State<AccountPage> {
                 right: w * 0.05,
                 bottom: 16,
               ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        color: Color(0xFF3D3D3D),
-                      ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Color(0xFF3D3D3D),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "ACCOUNT",
-                      style: GoogleFonts.nunito(
-                        fontSize: w * 0.07,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF3D3D3D),
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "ACCOUNT",
+                    style: GoogleFonts.nunito(
+                      fontSize: w * 0.07,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF3D3D3D),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
+          ),
 
           // Content
           Expanded(
@@ -651,9 +651,7 @@ class _AccountPageState extends State<AccountPage> {
               padding: EdgeInsets.symmetric(
                 horizontal: w * 0.08,
                 vertical: h * 0.02,
-              ).copyWith(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
+              ).copyWith(bottom: MediaQuery.of(context).viewInsets.bottom + 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -821,5 +819,3 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 }
-
-

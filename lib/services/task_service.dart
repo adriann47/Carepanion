@@ -46,7 +46,9 @@ class TaskService {
     String? category,
     String? forUserId,
   }) async {
-    print('TaskService.createTask: Creating task for user ${forUserId ?? _uid}');
+    print(
+      'TaskService.createTask: Creating task for user ${forUserId ?? _uid}',
+    );
     final startAt = _combineDateAndTime(dueDate, startTime)?.toUtc();
     final endAt = _combineDateAndTime(dueDate, endTime)?.toUtc();
 
@@ -421,7 +423,8 @@ class TaskService {
     for (final row in list) {
       final status = (row['status'] ?? '').toString().toLowerCase();
       final isDoneRaw = row['is_done'] ?? row['done'];
-      final isDone = status == 'done' ||
+      final isDone =
+          status == 'done' ||
           (isDoneRaw is bool && isDoneRaw) ||
           (isDoneRaw is String && (isDoneRaw == 'true' || isDoneRaw == '1')) ||
           (isDoneRaw is num && isDoneRaw != 0);

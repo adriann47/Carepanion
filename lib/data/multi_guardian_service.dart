@@ -95,13 +95,15 @@ class MultiGuardianService {
     if (gid == null) return false;
 
     try {
-      await client
-          .from('assisted_guardians')
-          .insert({'assisted_id': assistedId, 'guardian_id': gid});
+      await client.from('assisted_guardians').insert({
+        'assisted_id': assistedId,
+        'guardian_id': gid,
+      });
       return true;
     } catch (e) {
       final msg = e.toString().toLowerCase();
-      final relMissing = msg.contains('assisted_guardians') &&
+      final relMissing =
+          msg.contains('assisted_guardians') &&
           (msg.contains('relation') || msg.contains('does not exist'));
       if (relMissing) {
         // Join table missing; signal caller so they can prompt for DB setup.
@@ -170,10 +172,10 @@ class MultiGuardianService {
       } catch (_) {}
 
       if (idSet.isEmpty) return [];
-    final rows = await client
-      .from(profileTable)
-      .select('id, fullname, email, public_id, avatar_url')
-      .inFilter('id', idSet.toList());
+      final rows = await client
+          .from(profileTable)
+          .select('id, fullname, email, public_id, avatar_url')
+          .inFilter('id', idSet.toList());
       return List<Map<String, dynamic>>.from(rows as List);
     } catch (e) {
       // If join table missing, gracefully return empty to allow UI to hint setup

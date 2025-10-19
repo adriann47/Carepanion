@@ -42,9 +42,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // ✅ Extract user info
       setState(() {
         _avatarUrl = data?['avatar_url'] as String?;
-        _fullName = (data?['fullname'] ??
-                '${data?['first_name'] ?? ''} ${data?['last_name'] ?? ''}')
-            .trim();
+        _fullName =
+            (data?['fullname'] ??
+                    '${data?['first_name'] ?? ''} ${data?['last_name'] ?? ''}')
+                .trim();
         _phone = ProfileService.readPhoneFrom(data);
         _birthday = ProfileService.readBirthdayFrom(data);
       });
@@ -60,8 +61,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Join table changes
     _agChannel?.unsubscribe();
-    _agChannel = client
-        .channel('public:assisted_guardians:profile')
+    _agChannel = client.channel('public:assisted_guardians:profile')
       ..onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
@@ -88,8 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Legacy profile.guardian_id updates for current assisted
     _profileChannel?.unsubscribe();
-    _profileChannel = client
-        .channel('public:profile_guardian:profile')
+    _profileChannel = client.channel('public:profile_guardian:profile')
       ..onPostgresChanges(
         event: PostgresChangeEvent.update,
         schema: 'public',
@@ -138,8 +137,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               CircleAvatar(
                 radius: 48,
                 backgroundColor: Colors.brown[300],
-                backgroundImage:
-                    _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                backgroundImage: _avatarUrl != null
+                    ? NetworkImage(_avatarUrl!)
+                    : null,
                 child: _avatarUrl == null
                     ? const Icon(Icons.person, size: 56, color: Colors.white)
                     : null,
@@ -220,7 +220,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               if (_guardianProfiles.isNotEmpty)
-                ..._guardianProfiles.map((g) => _guardianCard(g, guardianCardColor)),
+                ..._guardianProfiles.map(
+                  (g) => _guardianCard(g, guardianCardColor),
+                ),
 
               const SizedBox(height: 30),
 
@@ -232,7 +234,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ProfilePage()),
+                    MaterialPageRoute(
+                      builder: (context) => const ProfilePage(),
+                    ),
                   );
                 },
               ),
@@ -244,7 +248,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const SettingsScreen()),
+                      builder: (context) => const SettingsScreen(),
+                    ),
                   );
                 },
               ),
@@ -267,7 +272,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const HelpSupportPage()),
+                      builder: (context) => const HelpSupportPage(),
+                    ),
                   );
                 },
               ),
@@ -279,7 +285,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const LegalDataPage()),
+                      builder: (context) => const LegalDataPage(),
+                    ),
                   );
                 },
               ),
@@ -319,8 +326,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           CircleAvatar(
             radius: 28,
             backgroundColor: Colors.pinkAccent,
-            backgroundImage:
-                avatarUrl != null && avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+            backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                ? NetworkImage(avatarUrl)
+                : null,
             child: avatarUrl == null || avatarUrl.isEmpty
                 ? const Icon(Icons.person, color: Colors.white, size: 30)
                 : null,
@@ -348,10 +356,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 2),
                 Text(
                   'EMAIL: $email',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[800],
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[800]),
                 ),
               ],
             ),

@@ -18,7 +18,8 @@ class NotificationScreen extends StatefulWidget {
   State<NotificationScreen> createState() => _NotificationScreenState();
 }
 
-class _NotificationScreenState extends State<NotificationScreen> with WidgetsBindingObserver {
+class _NotificationScreenState extends State<NotificationScreen>
+    with WidgetsBindingObserver {
   int _currentIndex = 3; // Notifications tab selected
   Map<String, String> _assistedUserNames = {};
   Map<String, Map<String, dynamic>> _taskDetails = {};
@@ -43,8 +44,11 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
     // Start listening to notifications
     _startNotificationStream();
     // Listen for auth state changes
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
-      if (event.event == AuthChangeEvent.signedIn || event.event == AuthChangeEvent.tokenRefreshed) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      event,
+    ) {
+      if (event.event == AuthChangeEvent.signedIn ||
+          event.event == AuthChangeEvent.tokenRefreshed) {
         if (mounted) {
           _startNotificationStream();
         }
@@ -89,9 +93,13 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
             .limit(5);
 
         if (kDebugMode) {
-          print('Direct task completion/skipped query result: ${completedTasks.length} items');
+          print(
+            'Direct task completion/skipped query result: ${completedTasks.length} items',
+          );
           if (completedTasks.isNotEmpty) {
-            print('Most recent completed/skipped task: ${completedTasks.first}');
+            print(
+              'Most recent completed/skipped task: ${completedTasks.first}',
+            );
           }
         }
       }
@@ -105,10 +113,7 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
     try {
       final uid = supabase.auth.currentUser?.id;
       if (uid != null) {
-        final allTasks = await supabase
-            .from('tasks')
-            .select('*')
-            .limit(10);
+        final allTasks = await supabase.from('tasks').select('*').limit(10);
 
         if (kDebugMode) {
           print('All tasks query result: ${allTasks.length} items');
@@ -169,10 +174,13 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
           return {
             'id': task['id'],
             'task_id': task['id'].toString(),
-            'assisted_id': task['user_id'], // The assisted user who completed/skipped the task
+            'assisted_id':
+                task['user_id'], // The assisted user who completed/skipped the task
             'guardian_id': uid,
             'user_id': task['user_id'],
-            'title': task['title'] ?? (status == 'done' ? 'Task Completed' : 'Task Skipped'),
+            'title':
+                task['title'] ??
+                (status == 'done' ? 'Task Completed' : 'Task Skipped'),
             'scheduled_at': task['start_at'],
             'action': action,
             'action_at': task['created_at'] ?? DateTime.now().toIso8601String(),
@@ -183,17 +191,19 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
         }).toList();
 
         // Filter to show notifications from the last 7 days
-        final filteredData = notifications
-            .where((notification) {
-              final actionAt = DateTime.tryParse(notification['action_at']?.toString() ?? '');
-              if (actionAt == null) return false;
-              final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-              return actionAt.isAfter(sevenDaysAgo);
-            })
-            .toList();
+        final filteredData = notifications.where((notification) {
+          final actionAt = DateTime.tryParse(
+            notification['action_at']?.toString() ?? '',
+          );
+          if (actionAt == null) return false;
+          final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+          return actionAt.isAfter(sevenDaysAgo);
+        }).toList();
 
         if (kDebugMode) {
-          print('Silent refresh: ${filteredData.length} completed task notifications found');
+          print(
+            'Silent refresh: ${filteredData.length} completed task notifications found',
+          );
         }
 
         setState(() {
@@ -258,7 +268,9 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
               // Filter for tasks with status 'done' or 'skip'/'skipped' and convert to notification format
               final relevantTasks = data.where((task) {
                 final status = task['status']?.toString().toLowerCase() ?? '';
-                return status == 'done' || status == 'skip' || status == 'skipped';
+                return status == 'done' ||
+                    status == 'skip' ||
+                    status == 'skipped';
               }).toList();
 
               final notifications = relevantTasks.map((task) {
@@ -267,13 +279,17 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
                 return {
                   'id': task['id'],
                   'task_id': task['id'].toString(),
-                  'assisted_id': task['user_id'], // The assisted user who completed/skipped the task
+                  'assisted_id':
+                      task['user_id'], // The assisted user who completed/skipped the task
                   'guardian_id': uid,
                   'user_id': task['user_id'],
-                  'title': task['title'] ?? (status == 'done' ? 'Task Completed' : 'Task Skipped'),
+                  'title':
+                      task['title'] ??
+                      (status == 'done' ? 'Task Completed' : 'Task Skipped'),
                   'scheduled_at': task['start_at'],
                   'action': action,
-                  'action_at': task['created_at'] ?? DateTime.now().toIso8601String(),
+                  'action_at':
+                      task['created_at'] ?? DateTime.now().toIso8601String(),
                   'is_read': false,
                   'due_date': task['due_date'],
                   'description': task['description'],
@@ -281,17 +297,21 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
               }).toList();
 
               // Filter to show notifications from the last 7 days
-              final filteredNotifications = notifications
-                  .where((notification) {
-                    final actionAt = DateTime.tryParse(notification['action_at']?.toString() ?? '');
-                    if (actionAt == null) return false;
-                    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-                    return actionAt.isAfter(sevenDaysAgo);
-                  })
-                  .toList();
+              final filteredNotifications = notifications.where((notification) {
+                final actionAt = DateTime.tryParse(
+                  notification['action_at']?.toString() ?? '',
+                );
+                if (actionAt == null) return false;
+                final sevenDaysAgo = DateTime.now().subtract(
+                  const Duration(days: 7),
+                );
+                return actionAt.isAfter(sevenDaysAgo);
+              }).toList();
 
               if (kDebugMode) {
-                print('Filtered completed/skipped tasks: ${filteredNotifications.length} items');
+                print(
+                  'Filtered completed/skipped tasks: ${filteredNotifications.length} items',
+                );
               }
 
               setState(() {
@@ -299,7 +319,9 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
               });
 
               if (kDebugMode) {
-                print('Task completion notifications updated: ${filteredNotifications.length} notifications');
+                print(
+                  'Task completion notifications updated: ${filteredNotifications.length} notifications',
+                );
               }
             }
           },
@@ -344,7 +366,9 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
           .limit(50); // Get more for better coverage
 
       if (kDebugMode) {
-        print('Initial query returned ${relevantTasks.length} completed/skipped tasks');
+        print(
+          'Initial query returned ${relevantTasks.length} completed/skipped tasks',
+        );
         if (relevantTasks.isNotEmpty) {
           print('Sample task: ${relevantTasks.first}');
         }
@@ -352,35 +376,40 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
 
       if (mounted) {
         // Convert task data to notification format
-              final notifications = relevantTasks.map((task) {
-                final status = task['status']?.toString().toLowerCase() ?? '';
-                final action = status == 'done' ? 'done' : 'skipped';
-                return {
-                  'id': task['id'],
-                  'task_id': task['id'].toString(),
-                  'assisted_id': task['user_id'], // The assisted user who completed/skipped the task
-                  'guardian_id': uid,
-                  'user_id': task['user_id'],
-                  'title': task['title'] ?? (status == 'done' ? 'Task Completed' : 'Task Skipped'),
-                  'scheduled_at': task['start_at'],
-                  'action': action,
-                  'action_at': task['created_at'] ?? DateTime.now().toIso8601String(),
-                  'is_read': false,
-                  'due_date': task['due_date'],
-                  'description': task['description'],
-                };
-              }).toList();        // Filter to show notifications from the last 7 days
-        final filteredNotifications = notifications
-            .where((notification) {
-              final actionAt = DateTime.tryParse(notification['action_at']?.toString() ?? '');
-              if (actionAt == null) return false;
-              final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-              return actionAt.isAfter(sevenDaysAgo);
-            })
-            .toList();
+        final notifications = relevantTasks.map((task) {
+          final status = task['status']?.toString().toLowerCase() ?? '';
+          final action = status == 'done' ? 'done' : 'skipped';
+          return {
+            'id': task['id'],
+            'task_id': task['id'].toString(),
+            'assisted_id':
+                task['user_id'], // The assisted user who completed/skipped the task
+            'guardian_id': uid,
+            'user_id': task['user_id'],
+            'title':
+                task['title'] ??
+                (status == 'done' ? 'Task Completed' : 'Task Skipped'),
+            'scheduled_at': task['start_at'],
+            'action': action,
+            'action_at': task['created_at'] ?? DateTime.now().toIso8601String(),
+            'is_read': false,
+            'due_date': task['due_date'],
+            'description': task['description'],
+          };
+        }).toList(); // Filter to show notifications from the last 7 days
+        final filteredNotifications = notifications.where((notification) {
+          final actionAt = DateTime.tryParse(
+            notification['action_at']?.toString() ?? '',
+          );
+          if (actionAt == null) return false;
+          final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+          return actionAt.isAfter(sevenDaysAgo);
+        }).toList();
 
         if (kDebugMode) {
-          print('Initial notifications loaded: ${filteredNotifications.length} items after filtering');
+          print(
+            'Initial notifications loaded: ${filteredNotifications.length} items after filtering',
+          );
           if (filteredNotifications.isNotEmpty) {
             print('First notification: ${filteredNotifications.first}');
           }
@@ -409,13 +438,19 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
       }
 
       // Get all assisted users for this guardian
-      final assistedUsers = await ProfileService.fetchAssistedsForGuardian(client, guardianUserId: user.id);
+      final assistedUsers = await ProfileService.fetchAssistedsForGuardian(
+        client,
+        guardianUserId: user.id,
+      );
 
       // Create a map of user ID to display name
       final names = <String, String>{};
       for (final user in assistedUsers) {
         final userId = user['id'] as String;
-        final fullName = user['fullname'] as String? ?? user['email'] as String? ?? 'Unknown User';
+        final fullName =
+            user['fullname'] as String? ??
+            user['email'] as String? ??
+            'Unknown User';
         names[userId] = fullName;
       }
 
@@ -436,7 +471,8 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
   }
 
   Future<void> _loadUserNameIfNeeded(String userId) async {
-    if (_assistedUserNames.containsKey(userId) || _loadingUserIds.contains(userId)) {
+    if (_assistedUserNames.containsKey(userId) ||
+        _loadingUserIds.contains(userId)) {
       return;
     }
 
@@ -450,7 +486,10 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
           .maybeSingle();
 
       if (userData != null && mounted) {
-        final fullName = userData['fullname'] as String? ?? userData['email'] as String? ?? 'Unknown User';
+        final fullName =
+            userData['fullname'] as String? ??
+            userData['email'] as String? ??
+            'Unknown User';
         setState(() {
           _assistedUserNames[userId] = fullName;
         });
@@ -519,7 +558,9 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
             .order('created_at', ascending: false)
             .limit(10);
 
-        print('Direct task completion/skipped query result: ${directData.length} completed/skipped tasks');
+        print(
+          'Direct task completion/skipped query result: ${directData.length} completed/skipped tasks',
+        );
         if (directData.isNotEmpty) {
           print('Latest task: ${directData.first}');
         }
@@ -529,11 +570,11 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
     }
   }
 
-
-
   void _onTabTapped(int index) {
     if (kDebugMode) {
-      print('NotificationScreen: _onTabTapped called with index $index, current index $_currentIndex');
+      print(
+        'NotificationScreen: _onTabTapped called with index $index, current index $_currentIndex',
+      );
     }
 
     if (_currentIndex == index) {
@@ -568,7 +609,9 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
     }
 
     if (kDebugMode) {
-      print('NotificationScreen: Navigating to ${destinationScreen.runtimeType}');
+      print(
+        'NotificationScreen: Navigating to ${destinationScreen.runtimeType}',
+      );
     }
 
     // Replace current route with the destination screen
@@ -620,24 +663,28 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
                       onLoadTaskDetails: _loadTaskDetailsIfNeeded,
                     )
                   : uid == null
-                      ? const Center(child: Text('Please sign in to view notifications.'))
-                      : _currentNotifications.isEmpty && _isLoadingNames
-                          ? const Center(child: CircularProgressIndicator())
-                          : _currentNotifications.isEmpty
-                              ? RefreshIndicator(
-                                  onRefresh: _refreshNotifications,
-                                  child: const Center(child: Text('No notifications yet. Pull to refresh.')),
-                                )
-                              : RefreshIndicator(
-                                  onRefresh: _refreshNotifications,
-                                  child: _NotificationList(
-                                    notifications: _currentNotifications,
-                                    assistedUserNames: _assistedUserNames,
-                                    taskDetails: _taskDetails,
-                                    onLoadUserName: _loadUserNameIfNeeded,
-                                    onLoadTaskDetails: _loadTaskDetailsIfNeeded,
-                                  ),
-                                ),
+                  ? const Center(
+                      child: Text('Please sign in to view notifications.'),
+                    )
+                  : _currentNotifications.isEmpty && _isLoadingNames
+                  ? const Center(child: CircularProgressIndicator())
+                  : _currentNotifications.isEmpty
+                  ? RefreshIndicator(
+                      onRefresh: _refreshNotifications,
+                      child: const Center(
+                        child: Text('No notifications yet. Pull to refresh.'),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _refreshNotifications,
+                      child: _NotificationList(
+                        notifications: _currentNotifications,
+                        assistedUserNames: _assistedUserNames,
+                        taskDetails: _taskDetails,
+                        onLoadUserName: _loadUserNameIfNeeded,
+                        onLoadTaskDetails: _loadTaskDetailsIfNeeded,
+                      ),
+                    ),
             ),
           ],
         ),
@@ -655,9 +702,21 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Companions', isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
+          _navItem(
+            Icons.calendar_today,
+            'Menu',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Companions',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -665,8 +724,11 @@ class _NotificationScreenState extends State<NotificationScreen> with WidgetsBin
   }
 
   // --- Reusable Nav Item Widget ---
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {required bool isSelected}) {
+  static BottomNavigationBarItem _navItem(
+    IconData icon,
+    String label, {
+    required bool isSelected,
+  }) {
     return BottomNavigationBarItem(
       label: label,
       icon: Container(
@@ -748,7 +810,8 @@ class _NotificationTileState extends State<_NotificationTile> {
     // Load data lazily when the tile is first created
     final assistedId = widget.notification['assisted_id']?.toString();
 
-    if (assistedId != null && !widget.assistedUserNames.containsKey(assistedId)) {
+    if (assistedId != null &&
+        !widget.assistedUserNames.containsKey(assistedId)) {
       widget.onLoadUserName(assistedId);
     }
 
@@ -764,8 +827,12 @@ class _NotificationTileState extends State<_NotificationTile> {
     final assistedId = n['assisted_id']?.toString() ?? '';
     final assistedName = widget.assistedUserNames[assistedId] ?? 'Loading...';
 
-    final actionAt = DateTime.tryParse((n['action_at'] ?? '').toString())?.toLocal();
-    final timeString = actionAt != null ? TimeOfDay.fromDateTime(actionAt).format(context) : '';
+    final actionAt = DateTime.tryParse(
+      (n['action_at'] ?? '').toString(),
+    )?.toLocal();
+    final timeString = actionAt != null
+        ? TimeOfDay.fromDateTime(actionAt).format(context)
+        : '';
 
     // Get task details directly from notification (already included)
     final dueDate = n['due_date']?.toString();
@@ -809,8 +876,8 @@ class _NotificationTileState extends State<_NotificationTile> {
                   color: isDone
                       ? Colors.green.withOpacity(0.1)
                       : isSkipped
-                          ? Colors.red.withOpacity(0.1)
-                          : Colors.grey.withOpacity(0.1),
+                      ? Colors.red.withOpacity(0.1)
+                      : Colors.grey.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(

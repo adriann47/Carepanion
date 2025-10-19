@@ -11,6 +11,8 @@ object AlarmScheduler {
     fun scheduleExact(context: Context, triggerAtMillis: Long, requestCode: Int, payload: String?) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, ReminderAlarmReceiver::class.java)
+        // Include id and payload so receivers can handle cleanup and display
+        intent.putExtra("id", requestCode)
         intent.putExtra("payload", payload)
         // Use UPDATE_CURRENT so repeated scheduling with same id updates the existing PendingIntent
         var flags = PendingIntent.FLAG_UPDATE_CURRENT
@@ -31,6 +33,7 @@ object AlarmScheduler {
     fun cancel(context: Context, requestCode: Int) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, ReminderAlarmReceiver::class.java)
+        intent.putExtra("id", requestCode)
         var flags = PendingIntent.FLAG_UPDATE_CURRENT
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             flags = flags or PendingIntent.FLAG_IMMUTABLE

@@ -9,12 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'notification_prefs.dart';
 import '../data/profile_service.dart';
 
-enum ReminderAction {
-  notifyNow,
-  deferShort,
-  deferLong,
-  escalateGuardian,
-}
+enum ReminderAction { notifyNow, deferShort, deferLong, escalateGuardian }
 
 class ReminderDecision {
   ReminderDecision({
@@ -150,9 +145,7 @@ class ReinforcementLearningService {
         if (data['defer_minutes'] != null) {
           final minutes = double.tryParse(data['defer_minutes'].toString());
           if (minutes != null && minutes > 0) {
-            deferDuration = Duration(
-              milliseconds: (minutes * 60000).round(),
-            );
+            deferDuration = Duration(milliseconds: (minutes * 60000).round());
           }
         }
         if (data['snooze_options'] is List) {
@@ -184,7 +177,11 @@ class ReinforcementLearningService {
 
     if (snoozeOptions.isEmpty) {
       snoozeOptions = const [
-        SnoozeOption(duration: Duration(minutes: 5), label: '5 min', isPreferred: true),
+        SnoozeOption(
+          duration: Duration(minutes: 5),
+          label: '5 min',
+          isPreferred: true,
+        ),
         SnoozeOption(duration: Duration(minutes: 10), label: '10 min'),
         SnoozeOption(duration: Duration(minutes: 15), label: '15 min'),
       ];
@@ -239,7 +236,10 @@ class ReinforcementLearningService {
         'result_at': DateTime.now().toUtc().toIso8601String(),
         if (extra != null && extra.isNotEmpty) 'result_meta': jsonEncode(extra),
       };
-      await _client.from('task_reminder_events').update(payload).eq('id', eventId);
+      await _client
+          .from('task_reminder_events')
+          .update(payload)
+          .eq('id', eventId);
     } catch (_) {
       // non-fatal
     }
@@ -258,7 +258,8 @@ class ReinforcementLearningService {
         'task_id': taskId,
         'status': status,
         'logged_at': DateTime.now().toUtc().toIso8601String(),
-        if (completedAt != null) 'completed_at': completedAt.toUtc().toIso8601String(),
+        if (completedAt != null)
+          'completed_at': completedAt.toUtc().toIso8601String(),
         if (latency != null) 'latency_seconds': latency.inSeconds,
         if (decisionEventId != null) 'decision_event_id': decisionEventId,
       };
@@ -282,11 +283,14 @@ class ReinforcementLearningService {
       ),
     );
     try {
-      await _client.functions.invoke('notify_guardian', body: {
-        'task_id': taskRow['id'],
-        'assisted_id': taskRow['user_id'],
-        'metadata': metadata,
-      });
+      await _client.functions.invoke(
+        'notify_guardian',
+        body: {
+          'task_id': taskRow['id'],
+          'assisted_id': taskRow['user_id'],
+          'metadata': metadata,
+        },
+      );
     } catch (_) {
       // ignore; guardian notification is best-effort
     }
@@ -339,12 +343,19 @@ class ReinforcementLearningService {
           // Check for conflicts if existing tasks are provided
           bool hasConflict = false;
           if (existingTasks != null) {
-            hasConflict = _hasTimeConflict(start!, end, dueDate, existingTasks, taskId);
+            hasConflict = _hasTimeConflict(
+              start!,
+              end,
+              dueDate,
+              existingTasks,
+              taskId,
+            );
           }
 
           result.add(
             ScheduleSuggestion(
-              id: raw['suggestion_id']?.toString() ??
+              id:
+                  raw['suggestion_id']?.toString() ??
                   'policy_${result.length}_${DateTime.now().millisecondsSinceEpoch}',
               label: raw['label']?.toString() ?? 'Suggested slot',
               start: start!,
@@ -370,16 +381,20 @@ class ReinforcementLearningService {
 
     if (!fetched) {
       // Enhanced fallback suggestions with time-aware, contextual scheduling
-      result.addAll(_generateTimeAwareScheduleSuggestions(
-        dueDate,
-        category,
-        existingTasks,
-        taskId,
-      ));
+      result.addAll(
+        _generateTimeAwareScheduleSuggestions(
+          dueDate,
+          category,
+          existingTasks,
+          taskId,
+        ),
+      );
     }
 
     // Filter out conflicting suggestions and sort by score
-    final conflictFree = result.where((s) => !(s.metadata?['has_conflict'] ?? false)).toList();
+    final conflictFree = result
+        .where((s) => !(s.metadata?['has_conflict'] ?? false))
+        .toList();
     conflictFree.sort((a, b) {
       final aScore = a.score ?? 0.0;
       final bScore = b.score ?? 0.0;
@@ -449,27 +464,30 @@ class ReinforcementLearningService {
     // Remove time-based filtering - suggestions should be available anytime
     final body = {
       'assisted_user_id': assistedUserId,
-      'due_date': dueDate != null ? DateFormat('yyyy-MM-dd').format(dueDate) : null,
+      'due_date': dueDate != null
+          ? DateFormat('yyyy-MM-dd').format(dueDate)
+          : null,
       'local_time': startTime != null ? _timeToString(startTime) : null,
       'query': partialQuery,
       'category': category,
     }..removeWhere((key, value) => value == null);
 
     try {
-      final resp = await _client.functions.invoke(
-        'title_policy',
-        body: body,
-      );
+      final resp = await _client.functions.invoke('title_policy', body: body);
       final data = resp.data;
       if (data is List) {
-        return data.whereType<Map>().map((row) {
-          return TitleSuggestion(
-            title: row['title']?.toString() ?? '',
-            reason: row['reason']?.toString() ?? '',
-            emoji: row['emoji']?.toString(),
-            metadata: Map<String, dynamic>.from(row),
-          );
-        }).where((suggestion) => suggestion.title.trim().isNotEmpty).toList();
+        return data
+            .whereType<Map>()
+            .map((row) {
+              return TitleSuggestion(
+                title: row['title']?.toString() ?? '',
+                reason: row['reason']?.toString() ?? '',
+                emoji: row['emoji']?.toString(),
+                metadata: Map<String, dynamic>.from(row),
+              );
+            })
+            .where((suggestion) => suggestion.title.trim().isNotEmpty)
+            .toList();
       }
     } catch (e) {
       if (kDebugMode) {
@@ -479,7 +497,10 @@ class ReinforcementLearningService {
     }
 
     // Enhanced fallback with intelligent suggestions based on user patterns
-    List<TitleSuggestion> fallbacks = _generateIntelligentTitleSuggestions(partialQuery, category);
+    List<TitleSuggestion> fallbacks = _generateIntelligentTitleSuggestions(
+      partialQuery,
+      category,
+    );
 
     // Category-specific enhancements
     if (category != null && category.isNotEmpty) {
@@ -490,41 +511,75 @@ class ReinforcementLearningService {
             title: 'Take prescribed medication',
             reason: 'Stay on schedule with health routine',
             emoji: '💊',
-            metadata: {'category': 'MEDICATION', 'priority': 'high', 'time_context': 'health_routine'},
+            metadata: {
+              'category': 'MEDICATION',
+              'priority': 'high',
+              'time_context': 'health_routine',
+            },
           ),
           TitleSuggestion(
             title: 'Schedule doctor appointment',
             reason: 'Book routine health check-up',
             emoji: '🏥',
-            metadata: {'category': 'OTHER', 'priority': 'medium', 'time_context': 'planning', 'suggested_date_offset': 14, 'suggested_time': '09:00'},
+            metadata: {
+              'category': 'OTHER',
+              'priority': 'medium',
+              'time_context': 'planning',
+              'suggested_date_offset': 14,
+              'suggested_time': '09:00',
+            },
           ),
           TitleSuggestion(
             title: 'Weekly medication refill reminder',
             reason: 'Order prescription refills',
             emoji: '�',
-            metadata: {'category': 'MEDICATION', 'priority': 'medium', 'time_context': 'planning', 'suggested_date_offset': 7, 'suggested_time': '10:00'},
+            metadata: {
+              'category': 'MEDICATION',
+              'priority': 'medium',
+              'time_context': 'planning',
+              'suggested_date_offset': 7,
+              'suggested_time': '10:00',
+            },
           ),
         ];
-        fallbacks.insertAll(0, medicationSuggestions); // Add to beginning for priority
+        fallbacks.insertAll(
+          0,
+          medicationSuggestions,
+        ); // Add to beginning for priority
       } else if (mapped == 'EXERCISE') {
         final exerciseSuggestions = [
           TitleSuggestion(
             title: 'Morning exercise routine',
             reason: 'Start the day with gentle exercise',
             emoji: '🏃',
-            metadata: {'category': 'EXERCISE', 'priority': 'medium', 'time_context': 'morning_routine', 'suggested_time': '07:30'},
+            metadata: {
+              'category': 'EXERCISE',
+              'priority': 'medium',
+              'time_context': 'morning_routine',
+              'suggested_time': '07:30',
+            },
           ),
           TitleSuggestion(
             title: 'Short walk outside',
             reason: 'Light cardio and fresh air',
             emoji: '🚶',
-            metadata: {'category': 'EXERCISE', 'priority': 'medium', 'time_context': 'cardio'},
+            metadata: {
+              'category': 'EXERCISE',
+              'priority': 'medium',
+              'time_context': 'cardio',
+            },
           ),
           TitleSuggestion(
             title: 'Weekly grocery shopping',
             reason: 'Plan and shop for weekly meals',
             emoji: '🛒',
-            metadata: {'category': 'OTHER', 'priority': 'medium', 'time_context': 'planning', 'suggested_date_offset': 7, 'suggested_time': '10:00'},
+            metadata: {
+              'category': 'OTHER',
+              'priority': 'medium',
+              'time_context': 'planning',
+              'suggested_date_offset': 7,
+              'suggested_time': '10:00',
+            },
           ),
         ];
         fallbacks.insertAll(0, exerciseSuggestions);
@@ -544,7 +599,9 @@ class ReinforcementLearningService {
       final aPriority = a.metadata?['priority'] ?? 'medium';
       final bPriority = b.metadata?['priority'] ?? 'medium';
       const priorityOrder = {'high': 3, 'medium': 2, 'low': 1};
-      return (priorityOrder[bPriority] ?? 2).compareTo(priorityOrder[aPriority] ?? 2);
+      return (priorityOrder[bPriority] ?? 2).compareTo(
+        priorityOrder[aPriority] ?? 2,
+      );
     });
 
     return fallbacks.take(8).toList(); // Return top 8 suggestions
@@ -573,7 +630,9 @@ class ReinforcementLearningService {
     if (lower.contains('call') || lower.contains('guardian')) {
       return 'Communication';
     }
-    if (lower.contains('pay') || lower.contains('bill') || lower.contains('bank')) {
+    if (lower.contains('pay') ||
+        lower.contains('bill') ||
+        lower.contains('bank')) {
       return 'Finance';
     }
     if (lower.contains('exercise') ||
@@ -591,16 +650,17 @@ class ReinforcementLearningService {
     try {
       final resp = await _client.functions.invoke(
         'schedule_frequency_policy',
-        body: {
-          'assisted_user_id': assistedUserId,
-          'category': category,
-        }..removeWhere((key, value) => value == null),
+        body: {'assisted_user_id': assistedUserId, 'category': category}
+          ..removeWhere((key, value) => value == null),
       );
       final data = resp.data;
       if (data is Map) {
         final days = data['days_label']?.toString();
         final time = data['time_label']?.toString();
-        if (days != null && days.isNotEmpty && time != null && time.isNotEmpty) {
+        if (days != null &&
+            days.isNotEmpty &&
+            time != null &&
+            time.isNotEmpty) {
           return ScheduleRecommendation(
             daysLabel: days,
             timeLabel: time,
@@ -646,14 +706,22 @@ class ReinforcementLearningService {
     if (category == 'MEDICATION') {
       // For medication, shorter snoozes to ensure timely taking
       baseOptions.addAll([
-        SnoozeOption(duration: Duration(minutes: 5), label: '5 min', isPreferred: true),
+        SnoozeOption(
+          duration: Duration(minutes: 5),
+          label: '5 min',
+          isPreferred: true,
+        ),
         SnoozeOption(duration: Duration(minutes: 10), label: '10 min'),
         SnoozeOption(duration: Duration(minutes: 15), label: '15 min'),
       ]);
     } else if (category == 'EXERCISE') {
       // For exercise, slightly longer to allow preparation
       baseOptions.addAll([
-        SnoozeOption(duration: Duration(minutes: 10), label: '10 min', isPreferred: true),
+        SnoozeOption(
+          duration: Duration(minutes: 10),
+          label: '10 min',
+          isPreferred: true,
+        ),
         SnoozeOption(duration: Duration(minutes: 15), label: '15 min'),
         SnoozeOption(duration: Duration(minutes: 30), label: '30 min'),
       ]);
@@ -663,14 +731,22 @@ class ReinforcementLearningService {
       if (now.hour < 12) {
         // Morning - shorter snoozes for morning routine
         baseOptions.addAll([
-          SnoozeOption(duration: Duration(minutes: 5), label: '5 min', isPreferred: true),
+          SnoozeOption(
+            duration: Duration(minutes: 5),
+            label: '5 min',
+            isPreferred: true,
+          ),
           SnoozeOption(duration: Duration(minutes: 10), label: '10 min'),
           SnoozeOption(duration: Duration(minutes: 15), label: '15 min'),
         ]);
       } else if (now.hour >= 18) {
         // Evening - can be more flexible
         baseOptions.addAll([
-          SnoozeOption(duration: Duration(minutes: 10), label: '10 min', isPreferred: true),
+          SnoozeOption(
+            duration: Duration(minutes: 10),
+            label: '10 min',
+            isPreferred: true,
+          ),
           SnoozeOption(duration: Duration(minutes: 15), label: '15 min'),
           SnoozeOption(duration: Duration(minutes: 30), label: '30 min'),
         ]);
@@ -678,7 +754,11 @@ class ReinforcementLearningService {
         // Daytime - balanced options
         baseOptions.addAll([
           SnoozeOption(duration: Duration(minutes: 5), label: '5 min'),
-          SnoozeOption(duration: Duration(minutes: 10), label: '10 min', isPreferred: true),
+          SnoozeOption(
+            duration: Duration(minutes: 10),
+            label: '10 min',
+            isPreferred: true,
+          ),
           SnoozeOption(duration: Duration(minutes: 15), label: '15 min'),
           SnoozeOption(duration: Duration(minutes: 30), label: '30 min'),
         ]);
@@ -714,8 +794,10 @@ class ReinforcementLearningService {
   static Future<String?> resolveGuardianIdFor(String? assistedId) async {
     if (assistedId == null) return null;
     try {
-      final prof =
-          await ProfileService.fetchProfile(_client, userId: assistedId);
+      final prof = await ProfileService.fetchProfile(
+        _client,
+        userId: assistedId,
+      );
       final guardianId = (prof?['guardian_id'] as String?)?.trim();
       if (guardianId != null && guardianId.isNotEmpty) return guardianId;
     } catch (_) {}
@@ -728,7 +810,10 @@ class ReinforcementLearningService {
     return '$hour:$minute';
   }
 
-  static List<TitleSuggestion> _generateIntelligentTitleSuggestions(String? partialQuery, String? category) {
+  static List<TitleSuggestion> _generateIntelligentTitleSuggestions(
+    String? partialQuery,
+    String? category,
+  ) {
     // Base suggestions that are always available regardless of time
     final baseSuggestions = [
       // Health and medication
@@ -736,19 +821,31 @@ class ReinforcementLearningService {
         title: 'Take medication',
         reason: 'Stay on schedule with health routine',
         emoji: '💊',
-        metadata: {'category': 'MEDICATION', 'priority': 'high', 'suggested_time': '08:00'},
+        metadata: {
+          'category': 'MEDICATION',
+          'priority': 'high',
+          'suggested_time': '08:00',
+        },
       ),
       TitleSuggestion(
         title: 'Morning vitamins',
         reason: 'Start the day with essential nutrients',
         emoji: '🌅',
-        metadata: {'category': 'MEDICATION', 'priority': 'medium', 'suggested_time': '08:00'},
+        metadata: {
+          'category': 'MEDICATION',
+          'priority': 'medium',
+          'suggested_time': '08:00',
+        },
       ),
       TitleSuggestion(
         title: 'Evening medication',
         reason: 'Complete daily medication routine',
         emoji: '💊',
-        metadata: {'category': 'MEDICATION', 'priority': 'high', 'suggested_time': '20:00'},
+        metadata: {
+          'category': 'MEDICATION',
+          'priority': 'high',
+          'suggested_time': '20:00',
+        },
       ),
 
       // Exercise and activity
@@ -756,7 +853,11 @@ class ReinforcementLearningService {
         title: 'Light exercise',
         reason: 'Stay active and healthy',
         emoji: '🏃',
-        metadata: {'category': 'EXERCISE', 'priority': 'medium', 'suggested_time': '09:00'},
+        metadata: {
+          'category': 'EXERCISE',
+          'priority': 'medium',
+          'suggested_time': '09:00',
+        },
       ),
       TitleSuggestion(
         title: 'Short walk',
@@ -808,7 +909,12 @@ class ReinforcementLearningService {
         title: 'Doctor appointment',
         reason: 'Schedule health check-ups',
         emoji: '🏥',
-        metadata: {'category': 'OTHER', 'priority': 'medium', 'suggested_date_offset': 14, 'suggested_time': '09:00'},
+        metadata: {
+          'category': 'OTHER',
+          'priority': 'medium',
+          'suggested_date_offset': 14,
+          'suggested_time': '09:00',
+        },
       ),
 
       // Common tasks
@@ -816,7 +922,12 @@ class ReinforcementLearningService {
         title: 'Grocery shopping',
         reason: 'Plan weekly meal shopping',
         emoji: '🛒',
-        metadata: {'category': 'OTHER', 'priority': 'medium', 'suggested_date_offset': 7, 'suggested_time': '10:00'},
+        metadata: {
+          'category': 'OTHER',
+          'priority': 'medium',
+          'suggested_date_offset': 7,
+          'suggested_time': '10:00',
+        },
       ),
       TitleSuggestion(
         title: 'Pay bills',
@@ -870,7 +981,13 @@ class ReinforcementLearningService {
     List<Map<String, dynamic>> existingTasks,
     String? excludeTaskId,
   ) {
-    final startDate = DateTime(date.year, date.month, date.day, start.hour, start.minute);
+    final startDate = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      start.hour,
+      start.minute,
+    );
     final endDate = end != null
         ? DateTime(date.year, date.month, date.day, end.hour, end.minute)
         : startDate.add(const Duration(minutes: 15)); // Default 15 min duration
@@ -883,7 +1000,8 @@ class ReinforcementLearningService {
       final otherStart = _parseTaskTime(task['start_at'], date);
       if (otherStart == null) continue;
 
-      final otherEnd = _parseTaskTime(task['end_at'], date) ??
+      final otherEnd =
+          _parseTaskTime(task['end_at'], date) ??
           otherStart.add(const Duration(minutes: 15));
 
       // Check for time overlap
@@ -931,30 +1049,140 @@ class ReinforcementLearningService {
       if (mapped == 'MEDICATION') {
         // Medication scheduling - spread throughout the day with meal alignment
         final medicationSlots = [
-          _ScheduleSlot('Morning medication with breakfast', 8, 0, 8, 30, 0.95, 'morning_routine'),
-          _ScheduleSlot('Lunchtime medication', 12, 0, 12, 30, 0.90, 'lunch_routine'),
-          _ScheduleSlot('Evening medication with dinner', 18, 0, 18, 30, 0.95, 'dinner_routine'),
-          _ScheduleSlot('Bedtime medication', 21, 0, 21, 30, 0.85, 'bedtime_routine'),
-          _ScheduleSlot('Mid-morning medication', 10, 0, 10, 30, 0.75, 'mid_morning'),
+          _ScheduleSlot(
+            'Morning medication with breakfast',
+            8,
+            0,
+            8,
+            30,
+            0.95,
+            'morning_routine',
+          ),
+          _ScheduleSlot(
+            'Lunchtime medication',
+            12,
+            0,
+            12,
+            30,
+            0.90,
+            'lunch_routine',
+          ),
+          _ScheduleSlot(
+            'Evening medication with dinner',
+            18,
+            0,
+            18,
+            30,
+            0.95,
+            'dinner_routine',
+          ),
+          _ScheduleSlot(
+            'Bedtime medication',
+            21,
+            0,
+            21,
+            30,
+            0.85,
+            'bedtime_routine',
+          ),
+          _ScheduleSlot(
+            'Mid-morning medication',
+            10,
+            0,
+            10,
+            30,
+            0.75,
+            'mid_morning',
+          ),
         ];
-        suggestions.addAll(_createScheduleSuggestions(medicationSlots, dueDate, existingTasks, taskId, 'MEDICATION'));
+        suggestions.addAll(
+          _createScheduleSuggestions(
+            medicationSlots,
+            dueDate,
+            existingTasks,
+            taskId,
+            'MEDICATION',
+          ),
+        );
       } else if (mapped == 'EXERCISE') {
         // Exercise scheduling - optimal times for energy and safety
         final exerciseSlots = [
-          _ScheduleSlot('Morning energy boost exercise', 9, 0, 10, 0, 0.85, 'morning_energy'),
-          _ScheduleSlot('Post-lunch circulation walk', 13, 30, 14, 30, 0.80, 'afternoon_circulation'),
-          _ScheduleSlot('Gentle evening stretching', 17, 0, 17, 45, 0.75, 'evening_relaxation'),
-          _ScheduleSlot('Late afternoon mobility', 16, 0, 16, 45, 0.70, 'late_afternoon'),
-          _ScheduleSlot('Mid-morning light activity', 10, 30, 11, 15, 0.65, 'mid_morning'),
+          _ScheduleSlot(
+            'Morning energy boost exercise',
+            9,
+            0,
+            10,
+            0,
+            0.85,
+            'morning_energy',
+          ),
+          _ScheduleSlot(
+            'Post-lunch circulation walk',
+            13,
+            30,
+            14,
+            30,
+            0.80,
+            'afternoon_circulation',
+          ),
+          _ScheduleSlot(
+            'Gentle evening stretching',
+            17,
+            0,
+            17,
+            45,
+            0.75,
+            'evening_relaxation',
+          ),
+          _ScheduleSlot(
+            'Late afternoon mobility',
+            16,
+            0,
+            16,
+            45,
+            0.70,
+            'late_afternoon',
+          ),
+          _ScheduleSlot(
+            'Mid-morning light activity',
+            10,
+            30,
+            11,
+            15,
+            0.65,
+            'mid_morning',
+          ),
         ];
-        suggestions.addAll(_createScheduleSuggestions(exerciseSlots, dueDate, existingTasks, taskId, 'EXERCISE'));
+        suggestions.addAll(
+          _createScheduleSuggestions(
+            exerciseSlots,
+            dueDate,
+            existingTasks,
+            taskId,
+            'EXERCISE',
+          ),
+        );
       } else {
         // General/other tasks - time-based suggestions with context
-        suggestions.addAll(_generateGeneralScheduleSuggestions(dueDate, currentPeriod, existingTasks, taskId));
+        suggestions.addAll(
+          _generateGeneralScheduleSuggestions(
+            dueDate,
+            currentPeriod,
+            existingTasks,
+            taskId,
+          ),
+        );
       }
     } else {
       // No category specified - provide general time-based suggestions
-      suggestions.addAll(_generateGeneralScheduleSuggestions(dueDate, currentPeriod, existingTasks, taskId));
+      suggestions.addAll(
+        _generateGeneralScheduleSuggestions(
+          dueDate,
+          currentPeriod,
+          existingTasks,
+          taskId,
+        ),
+      );
     }
 
     return suggestions;
@@ -971,40 +1199,200 @@ class ReinforcementLearningService {
     switch (currentPeriod) {
       case 'morning':
         final morningSlots = [
-          _ScheduleSlot('Morning routine completion', 9, 0, 10, 0, 0.85, 'morning_productivity'),
-          _ScheduleSlot('Mid-morning focus time', 10, 30, 11, 30, 0.80, 'mid_morning'),
-          _ScheduleSlot('Pre-lunch preparation', 11, 30, 12, 30, 0.75, 'pre_lunch'),
-          _ScheduleSlot('Early morning start', 8, 30, 9, 30, 0.70, 'early_morning'),
-          _ScheduleSlot('Late morning planning', 11, 0, 12, 0, 0.65, 'late_morning'),
+          _ScheduleSlot(
+            'Morning routine completion',
+            9,
+            0,
+            10,
+            0,
+            0.85,
+            'morning_productivity',
+          ),
+          _ScheduleSlot(
+            'Mid-morning focus time',
+            10,
+            30,
+            11,
+            30,
+            0.80,
+            'mid_morning',
+          ),
+          _ScheduleSlot(
+            'Pre-lunch preparation',
+            11,
+            30,
+            12,
+            30,
+            0.75,
+            'pre_lunch',
+          ),
+          _ScheduleSlot(
+            'Early morning start',
+            8,
+            30,
+            9,
+            30,
+            0.70,
+            'early_morning',
+          ),
+          _ScheduleSlot(
+            'Late morning planning',
+            11,
+            0,
+            12,
+            0,
+            0.65,
+            'late_morning',
+          ),
         ];
-        suggestions.addAll(_createScheduleSuggestions(morningSlots, dueDate, existingTasks, taskId, 'GENERAL'));
+        suggestions.addAll(
+          _createScheduleSuggestions(
+            morningSlots,
+            dueDate,
+            existingTasks,
+            taskId,
+            'GENERAL',
+          ),
+        );
         break;
       case 'afternoon':
         final afternoonSlots = [
-          _ScheduleSlot('Post-lunch productivity', 13, 30, 14, 30, 0.85, 'post_lunch'),
-          _ScheduleSlot('Afternoon focus window', 14, 30, 15, 30, 0.80, 'afternoon_focus'),
-          _ScheduleSlot('Late afternoon tasks', 16, 0, 17, 0, 0.75, 'late_afternoon'),
-          _ScheduleSlot('Mid-afternoon break activities', 15, 0, 16, 0, 0.70, 'mid_afternoon'),
-          _ScheduleSlot('Early afternoon planning', 13, 0, 14, 0, 0.65, 'early_afternoon'),
+          _ScheduleSlot(
+            'Post-lunch productivity',
+            13,
+            30,
+            14,
+            30,
+            0.85,
+            'post_lunch',
+          ),
+          _ScheduleSlot(
+            'Afternoon focus window',
+            14,
+            30,
+            15,
+            30,
+            0.80,
+            'afternoon_focus',
+          ),
+          _ScheduleSlot(
+            'Late afternoon tasks',
+            16,
+            0,
+            17,
+            0,
+            0.75,
+            'late_afternoon',
+          ),
+          _ScheduleSlot(
+            'Mid-afternoon break activities',
+            15,
+            0,
+            16,
+            0,
+            0.70,
+            'mid_afternoon',
+          ),
+          _ScheduleSlot(
+            'Early afternoon planning',
+            13,
+            0,
+            14,
+            0,
+            0.65,
+            'early_afternoon',
+          ),
         ];
-        suggestions.addAll(_createScheduleSuggestions(afternoonSlots, dueDate, existingTasks, taskId, 'GENERAL'));
+        suggestions.addAll(
+          _createScheduleSuggestions(
+            afternoonSlots,
+            dueDate,
+            existingTasks,
+            taskId,
+            'GENERAL',
+          ),
+        );
         break;
       case 'evening':
         final eveningSlots = [
-          _ScheduleSlot('Evening routine tasks', 18, 0, 19, 0, 0.85, 'evening_routine'),
-          _ScheduleSlot('Pre-dinner preparation', 17, 30, 18, 30, 0.80, 'pre_dinner'),
-          _ScheduleSlot('Wind-down activities', 19, 30, 20, 30, 0.75, 'wind_down'),
-          _ScheduleSlot('Late evening planning', 20, 0, 21, 0, 0.70, 'late_evening'),
-          _ScheduleSlot('Early evening tasks', 18, 30, 19, 30, 0.65, 'early_evening'),
+          _ScheduleSlot(
+            'Evening routine tasks',
+            18,
+            0,
+            19,
+            0,
+            0.85,
+            'evening_routine',
+          ),
+          _ScheduleSlot(
+            'Pre-dinner preparation',
+            17,
+            30,
+            18,
+            30,
+            0.80,
+            'pre_dinner',
+          ),
+          _ScheduleSlot(
+            'Wind-down activities',
+            19,
+            30,
+            20,
+            30,
+            0.75,
+            'wind_down',
+          ),
+          _ScheduleSlot(
+            'Late evening planning',
+            20,
+            0,
+            21,
+            0,
+            0.70,
+            'late_evening',
+          ),
+          _ScheduleSlot(
+            'Early evening tasks',
+            18,
+            30,
+            19,
+            30,
+            0.65,
+            'early_evening',
+          ),
         ];
-        suggestions.addAll(_createScheduleSuggestions(eveningSlots, dueDate, existingTasks, taskId, 'GENERAL'));
+        suggestions.addAll(
+          _createScheduleSuggestions(
+            eveningSlots,
+            dueDate,
+            existingTasks,
+            taskId,
+            'GENERAL',
+          ),
+        );
         break;
       default: // night
         final nightSlots = [
           _ScheduleSlot('Pre-bed preparation', 21, 0, 22, 0, 0.60, 'pre_bed'),
-          _ScheduleSlot('Nighttime routine', 20, 30, 21, 30, 0.55, 'night_routine'),
+          _ScheduleSlot(
+            'Nighttime routine',
+            20,
+            30,
+            21,
+            30,
+            0.55,
+            'night_routine',
+          ),
         ];
-        suggestions.addAll(_createScheduleSuggestions(nightSlots, dueDate, existingTasks, taskId, 'GENERAL'));
+        suggestions.addAll(
+          _createScheduleSuggestions(
+            nightSlots,
+            dueDate,
+            existingTasks,
+            taskId,
+            'GENERAL',
+          ),
+        );
         break;
     }
 
@@ -1024,7 +1412,13 @@ class ReinforcementLearningService {
 
       bool hasConflict = false;
       if (existingTasks != null) {
-        hasConflict = _hasTimeConflict(start, end, dueDate, existingTasks, taskId);
+        hasConflict = _hasTimeConflict(
+          start,
+          end,
+          dueDate,
+          existingTasks,
+          taskId,
+        );
       }
 
       return ScheduleSuggestion(
@@ -1072,4 +1466,3 @@ class _ScheduleSlot {
   final double score;
   final String timeContext;
 }
-

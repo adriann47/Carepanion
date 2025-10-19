@@ -55,13 +55,14 @@ class _SignInScreenState extends State<SignInScreen> {
     final user = supabase.auth.currentUser;
     String? fullName;
     final dynamic rawMeta = user?.userMetadata;
-    final Map<String, dynamic>? meta =
-        rawMeta is Map<String, dynamic> ? rawMeta : null;
+    final Map<String, dynamic>? meta = rawMeta is Map<String, dynamic>
+        ? rawMeta
+        : null;
     if (meta != null) {
-      final String? given =
-          (meta['first_name'] ?? meta['given_name'])?.toString();
-      final String? family =
-          (meta['last_name'] ?? meta['family_name'])?.toString();
+      final String? given = (meta['first_name'] ?? meta['given_name'])
+          ?.toString();
+      final String? family = (meta['last_name'] ?? meta['family_name'])
+          ?.toString();
       final String? composite = (meta['full_name'] ?? meta['name'])?.toString();
 
       final parts = <String>[
@@ -122,7 +123,8 @@ class _SignInScreenState extends State<SignInScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                  'Please verify your email first. We\'ll resend the code.'),
+                'Please verify your email first. We\'ll resend the code.',
+              ),
             ),
           );
           try {
@@ -135,19 +137,19 @@ class _SignInScreenState extends State<SignInScreen> {
           return;
         }
 
-       // Invalid credentials → show simple error message
-if (msg.contains('invalid login credentials')) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Invalid email or password. Please try again.'),
-    ),
-  );
-  return;
-}
+        // Invalid credentials → show simple error message
+        if (msg.contains('invalid login credentials')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid email or password. Please try again.'),
+            ),
+          );
+          return;
+        }
 
-
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -159,8 +161,9 @@ if (msg.contains('invalid login credentials')) {
     setState(() => _isLoading = true);
     try {
       _googleOAuthPending = true;
-      final redirect =
-          kIsWeb ? Uri.base.origin : 'io.supabase.flutter://callback';
+      final redirect = kIsWeb
+          ? Uri.base.origin
+          : 'io.supabase.flutter://callback';
       await supabase.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirect,
@@ -168,12 +171,14 @@ if (msg.contains('invalid login credentials')) {
       );
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Google sign-in failed: $e")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Google sign-in failed: $e")));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -336,15 +341,7 @@ if (msg.contains('invalid login credentials')) {
                 // Remember + Forgot
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                       
-                        
-                      ],
-                    ),
-                    
-                  ],
+                  children: [Row(children: [])],
                 ),
                 const SizedBox(height: 30),
 
@@ -365,8 +362,9 @@ if (msg.contains('invalid login credentials')) {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : Text(

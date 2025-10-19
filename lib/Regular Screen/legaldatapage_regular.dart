@@ -48,7 +48,6 @@ class _LegalDataPageState extends State<LegalDataPage> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -76,11 +75,15 @@ class _LegalDataPageState extends State<LegalDataPage> {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const ProfileScreen()),
+                          builder: (context) => const ProfileScreen(),
+                        ),
                       );
                     },
-                    child: const Icon(Icons.arrow_back,
-                        color: Colors.black87, size: 28),
+                    child: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.black87,
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(height: 18),
                   const Text(
@@ -140,10 +143,22 @@ class _LegalDataPageState extends State<LegalDataPage> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Calendar', isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Companions', isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
-          
+          _navItem(
+            Icons.calendar_today,
+            'Calendar',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Companions',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
+
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -151,8 +166,11 @@ class _LegalDataPageState extends State<LegalDataPage> {
   }
 
   /// --- NAVBAR ITEM WITH PINK HIGHLIGHT WHEN SELECTED ---
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {required bool isSelected}) {
+  static BottomNavigationBarItem _navItem(
+    IconData icon,
+    String label, {
+    required bool isSelected,
+  }) {
     return BottomNavigationBarItem(
       label: label,
       icon: Container(

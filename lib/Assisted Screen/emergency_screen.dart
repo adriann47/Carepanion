@@ -109,21 +109,25 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       final assistedId = user.id;
 
       // Resolve all guardians for this assisted (join table + legacy fallback)
-      final Set<String> guardianIds = await MultiGuardianService.listGuardianIds(
-        client,
-        assistedUserId: assistedId,
-      );
+      final Set<String> guardianIds =
+          await MultiGuardianService.listGuardianIds(
+            client,
+            assistedUserId: assistedId,
+          );
 
       if (guardianIds.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No guardian linked. Guardian will not be notified.')),
+          const SnackBar(
+            content: Text('No guardian linked. Guardian will not be notified.'),
+          ),
         );
       }
 
       // Insert one alert row per guardian, including assisted_id when available
       int successCount = 0;
       final int attempts = guardianIds.length;
-      bool assistedIdSupported = true; // assume column exists until proven otherwise
+      bool assistedIdSupported =
+          true; // assume column exists until proven otherwise
       for (final gid in guardianIds) {
         final basePayload = <String, dynamic>{
           'guardian_id': gid,
@@ -141,7 +145,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
             continue; // success with assisted_id
           } catch (e) {
             final msg = e.toString().toLowerCase();
-            final missingAssisted = msg.contains('assisted_id') && (msg.contains('column') || msg.contains('does not exist'));
+            final missingAssisted =
+                msg.contains('assisted_id') &&
+                (msg.contains('column') || msg.contains('does not exist'));
             if (!missingAssisted) rethrow;
             assistedIdSupported = false; // fallback for subsequent inserts
           }
@@ -161,9 +167,9 @@ class _EmergencyScreenState extends State<EmergencyScreen>
             ? 'Emergency sent to $successCount guardian${successCount == 1 ? '' : 's'}'
             : 'Emergency sent to $successCount of $attempts guardians';
         // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
       }
     } catch (_) {
       // Non-blocking; UI flow proceeds regardless
@@ -233,7 +239,7 @@ class _EmergencyScreenState extends State<EmergencyScreen>
       ),
 
       /// ✅ Use custom navbar
-       bottomNavigationBar: const NavbarAssisted(currentIndex: 2),
+      bottomNavigationBar: const NavbarAssisted(currentIndex: 2),
     );
   }
 }

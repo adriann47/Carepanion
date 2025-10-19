@@ -25,14 +25,19 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
     final val = _guardianController.text.trim();
     if (val.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter guardian ID')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enter guardian ID')));
       return;
     }
     // Create a guardian request (assisted_guardians row with status 'pending')
     setState(() => _isLoading = true);
     final supabase = Supabase.instance.client;
     try {
-      await ProfileService.requestGuardianByPublicId(supabase, guardianPublicId: val);
+      await ProfileService.requestGuardianByPublicId(
+        supabase,
+        guardianPublicId: val,
+      );
 
       if (!mounted) return;
       // Show a blocking waiting dialog while we poll for guardian response
@@ -40,7 +45,9 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
         context: context,
         barrierDismissible: false,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           backgroundColor: Colors.white,
           child: SingleChildScrollView(
             child: Container(
@@ -62,11 +69,17 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
                   const SizedBox(height: 16),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 20,
+                      horizontal: 18,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFC68A),
                       borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: const Color(0xFFCA5000), width: 1.6),
+                      border: Border.all(
+                        color: const Color(0xFFCA5000),
+                        width: 1.6,
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.06),
@@ -98,7 +111,9 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
                         ),
                         const SizedBox(height: 16),
                         const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFCA5000)),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFFCA5000),
+                          ),
                         ),
                       ],
                     ),
@@ -110,27 +125,41 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
         ),
       );
 
-      final status = await ProfileService.waitForGuardianResponse(supabase, timeout: const Duration(minutes: 5));
+      final status = await ProfileService.waitForGuardianResponse(
+        supabase,
+        timeout: const Duration(minutes: 5),
+      );
       // Close waiting dialog
       if (mounted) Navigator.of(context).pop();
 
       if (status == 'accepted') {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian accepted.')));
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TasksScreen()));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Guardian accepted.')));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const TasksScreen()),
+        );
         return;
       } else if (status == 'rejected') {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardian rejected your request.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Guardian rejected your request.')),
+        );
         return;
       } else {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No response from guardian (timeout).')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No response from guardian (timeout).')),
+        );
         return;
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to request guardian: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to request guardian: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -151,11 +180,7 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Logo
-                Image.asset(
-                  "assets/logo.jpg",
-                  width: 80,
-                  height: 80,
-                ),
+                Image.asset("assets/logo.jpg", width: 80, height: 80),
                 const SizedBox(width: 15),
                 // CARE-PANION text
                 Transform.translate(
@@ -221,7 +246,6 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
             ),
 
             const SizedBox(height: 40), // spacing above the button
-
             // Submit button -> navigate to TasksScreen
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -233,7 +257,14 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
               ),
               onPressed: _isLoading ? null : _submitGuardian,
               child: _isLoading
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
                   : const Text(
                       "Submit",
                       style: TextStyle(

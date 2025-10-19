@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/navigation.dart';
 import '../data/profile_service.dart';
+import 'notification_service.dart';
 
 /// Service that listens for incoming assisted_guardians requests targeted at
 /// the currently signed-in guardian and shows an interrupting dialog to
@@ -24,8 +26,7 @@ class GuardianRequestService {
     // Unsubscribe existing
     _channel?.unsubscribe();
 
-    _channel = supa
-        .channel('public:assisted_guardians:guardian:$gid')
+    _channel = supa.channel('public:assisted_guardians:guardian:$gid')
       ..onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
@@ -37,16 +38,53 @@ class GuardianRequestService {
             final target = newRec['guardian_id']?.toString();
             if (target != gid) return;
 
+            // Only handle freshly created pending requests
+            final status = (newRec['status'] ?? '').toString().toLowerCase();
+            if (status.isNotEmpty && status != 'pending') return;
+
             final assistedId = newRec['assisted_id']?.toString();
             if (assistedId == null || assistedId.isEmpty) return;
 
+            // Debug log
+            print(
+              'GuardianRequestService: Received request from assisted: $assistedId',
+            );
+
             // Lookup assisted profile for a nicer label
-            final prof = await ProfileService.fetchProfile(supa, userId: assistedId);
-            final name = (prof?['fullname'] ?? prof?['name'] ?? 'Assisted').toString();
+            final prof = await ProfileService.fetchProfile(
+              supa,
+              userId: assistedId,
+            );
+            final name = (prof?['fullname'] ?? prof?['name'] ?? 'Assisted')
+                .toString();
+
+            // Show a local notification
+            await NotificationService.showNow(
+              id: DateTime.now().millisecondsSinceEpoch ~/ 1000, // unique id
+              title: 'Companion Request',
+              body: '$name wants to connect with you',
+              payload: jsonEncode({
+                'type': 'guardian_request',
+                'assisted_id': assistedId,
+                'guardian_id': gid,
+              }),
+              channelId: 'carepanion_requests',
+            );
 
             // Show an interrupting dialog using global nav key
-            final ctx = navKey.currentState?.overlay?.context;
-            if (ctx == null) return;
+            // Retry up to 5 times with 500ms delay if context not available
+            BuildContext? ctx;
+            for (int attempt = 0; attempt < 5; attempt++) {
+              ctx = navKey.currentState?.overlay?.context;
+              if (ctx != null) break;
+              await Future.delayed(const Duration(milliseconds: 500));
+            }
+            if (ctx == null) {
+              print(
+                'GuardianRequestService: No context available after retries for dialog',
+              );
+              return;
+            }
 
             // Ensure dialog is shown on UI thread
             await showDialog<void>(
@@ -54,12 +92,17 @@ class GuardianRequestService {
               barrierDismissible: false,
               builder: (dctx) {
                 return Dialog(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                   backgroundColor: Colors.white,
                   child: SingleChildScrollView(
                     child: Container(
                       width: 320,
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20,
+                        horizontal: 18,
+                      ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -78,11 +121,17 @@ class GuardianRequestService {
                           // Orange user id pill
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 18,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFFFC68A),
                               borderRadius: BorderRadius.circular(28),
-                              border: Border.all(color: const Color(0xFFCA5000), width: 1.6),
+                              border: Border.all(
+                                color: const Color(0xFFCA5000),
+                                width: 1.6,
+                              ),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.06),
@@ -125,17 +174,35 @@ class GuardianRequestService {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF7DECF7),
                                   shape: const StadiumBorder(),
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 28),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 28,
+                                  ),
                                   elevation: 0,
                                 ),
                                 onPressed: () async {
                                   if (!dctx.mounted) return;
                                   Navigator.of(dctx).pop();
                                   try {
-                                    await supa.from('assisted_guardians').update({'status': 'accepted'}).eq('assisted_id', assistedId).eq('guardian_id', gid);
-                                    // Also update assisted profile guardian_id for legacy flows
-                                    await supa.from('profile').update({'guardian_id': gid}).eq('id', assistedId);
-                                  } catch (_) {}
+                                    await supa
+                                        .from('assisted_guardians')
+                                        .update({'status': 'accepted'})
+                                        .eq('assisted_id', assistedId)
+                                        .eq('guardian_id', gid)
+                                        .eq('status', 'pending');
+                                    // Also update assisted profile guardian_id for legacy flows (best-effort)
+                                    try {
+                                      await ProfileService.setGuardianIdForAssisted(
+                                        supa,
+                                        assistedUserId: assistedId,
+                                        guardianUserId: gid,
+                                      );
+                                    } catch (_) {}
+                                  } catch (e) {
+                                    print(
+                                      'GuardianRequestService: Error accepting request: $e',
+                                    );
+                                  }
                                 },
                                 child: Text(
                                   'ACCEPT',
@@ -151,15 +218,27 @@ class GuardianRequestService {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFF9687C),
                                   shape: const StadiumBorder(),
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 28),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 28,
+                                  ),
                                   elevation: 0,
                                 ),
                                 onPressed: () async {
                                   if (!dctx.mounted) return;
                                   Navigator.of(dctx).pop();
                                   try {
-                                    await supa.from('assisted_guardians').update({'status': 'rejected'}).eq('assisted_id', assistedId).eq('guardian_id', gid);
-                                  } catch (_) {}
+                                    await supa
+                                        .from('assisted_guardians')
+                                        .update({'status': 'rejected'})
+                                        .eq('assisted_id', assistedId)
+                                        .eq('guardian_id', gid)
+                                        .eq('status', 'pending');
+                                  } catch (e) {
+                                    print(
+                                      'GuardianRequestService: Error rejecting request: $e',
+                                    );
+                                  }
                                 },
                                 child: Text(
                                   'REJECT',
@@ -179,7 +258,7 @@ class GuardianRequestService {
               },
             );
           } catch (e) {
-            // ignore errors
+            print('GuardianRequestService: Error in callback: $e');
           }
         },
       )

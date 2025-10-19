@@ -37,11 +37,15 @@ class _LegalDataPageState extends State<LegalDataPage> {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const ProfileScreen()),
+                          builder: (context) => const ProfileScreen(),
+                        ),
                       );
                     },
-                    child: const Icon(Icons.arrow_back,
-                        color: Colors.black87, size: 28),
+                    child: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.black87,
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(height: 18),
                   const Text(
@@ -93,7 +97,9 @@ class _LegalDataPageState extends State<LegalDataPage> {
       ),
 
       /// --- CUSTOM NAV BAR ---
-      bottomNavigationBar: const NavbarAssisted(currentIndex: 3), // ✅ Use shared widget
+      bottomNavigationBar: const NavbarAssisted(
+        currentIndex: 3,
+      ), // ✅ Use shared widget
     );
   }
 }

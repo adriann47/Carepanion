@@ -50,14 +50,21 @@ class NavbarAssisted extends StatelessWidget {
       items: [
         _navItem(Icons.home, 'Home', isSelected: currentIndex == 0),
         _navItem(Icons.calendar_today, 'Menu', isSelected: currentIndex == 1),
-        _navItem(Icons.warning_amber_rounded, 'Alert', isSelected: currentIndex == 2),
+        _navItem(
+          Icons.warning_amber_rounded,
+          'Alert',
+          isSelected: currentIndex == 2,
+        ),
         _navItem(Icons.person, 'Profile', isSelected: currentIndex == 3),
       ],
     );
   }
 
   static BottomNavigationBarItem _navItem(
-      IconData icon, String label, {bool isSelected = false}) {
+    IconData icon,
+    String label, {
+    bool isSelected = false,
+  }) {
     return BottomNavigationBarItem(
       label: label,
       icon: Container(

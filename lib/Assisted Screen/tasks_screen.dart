@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:softeng/data/profile_service.dart';
 import 'package:softeng/services/task_service.dart';
@@ -143,7 +143,9 @@ class _TasksScreen extends State<TasksScreen> with WidgetsBindingObserver {
             if (taskId == null) return;
 
             // Find the task in our local list and update its status
-            final taskIndex = _tasks.indexWhere((t) => t['id']?.toString() == taskId);
+            final taskIndex = _tasks.indexWhere(
+              (t) => t['id']?.toString() == taskId,
+            );
             if (taskIndex != -1) {
               final updatedTask = Map<String, dynamic>.from(_tasks[taskIndex]);
               updatedTask['status'] = newRec['status'];
@@ -444,11 +446,22 @@ class _TasksScreen extends State<TasksScreen> with WidgetsBindingObserver {
                                     await TaskService.markDone(taskId);
                                     // Persist outcome for guardians notification page
                                     try {
-                                      final assistedId = Supabase.instance.client.auth.currentUser?.id ?? (t['user_id']?.toString() ?? '');
+                                      final assistedId =
+                                          Supabase
+                                              .instance
+                                              .client
+                                              .auth
+                                              .currentUser
+                                              ?.id ??
+                                          (t['user_id']?.toString() ?? '');
                                       final sa = t['start_at'];
                                       DateTime? scheduled;
                                       if (sa != null) {
-                                        try { scheduled = DateTime.parse(sa.toString()); } catch (_) {}
+                                        try {
+                                          scheduled = DateTime.parse(
+                                            sa.toString(),
+                                          );
+                                        } catch (_) {}
                                       }
                                       await GuardianNotificationService.recordTaskOutcome(
                                         taskId: taskId.toString(),
@@ -460,10 +473,14 @@ class _TasksScreen extends State<TasksScreen> with WidgetsBindingObserver {
                                       );
                                     } catch (_) {}
                                     // Refresh global streak so it persists across app restarts
-                                    try { await StreakService.refresh(); } catch (_) {}
+                                    try {
+                                      await StreakService.refresh();
+                                    } catch (_) {}
                                   } else {
                                     await TaskService.markTodo(taskId);
-                                    try { await StreakService.refresh(); } catch (_) {}
+                                    try {
+                                      await StreakService.refresh();
+                                    } catch (_) {}
                                   }
                                 } catch (_) {
                                   if (mounted) {
@@ -834,5 +851,3 @@ class _AssistedTaskTile extends StatelessWidget {
     );
   }
 }
-
-

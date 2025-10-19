@@ -20,8 +20,18 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
   int _currentIndex = 1; // Default to Calendar tab
 
   static const List<String> _monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 
   bool _isSameDay(DateTime a, DateTime b) =>
@@ -99,7 +109,10 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
                   children: [
                     const Text(
                       'DATE',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -140,32 +153,38 @@ class _CalendarScreenRegularState extends State<CalendarScreenRegular> {
 
                               // Year dropdown (2015–2034)
                               // Year dropdown (2 years before and 2 years after current year)
-DropdownButton<int>(
-  value: _focusedMonth.year,
-  underline: const SizedBox.shrink(),
-  items: List.generate(5, (i) {
-    int currentYear = DateTime.now().year;
-    int displayYear = currentYear - 2 + i;
-    return DropdownMenuItem<int>(
-      value: displayYear,
-      child: Text(
-        displayYear.toString(),
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }),
-  onChanged: (int? newYear) {
-    if (newYear == null) return;
-    setState(() {
-      _focusedMonth = DateTime(newYear, _focusedMonth.month, 1);
-      _selectedDate = DateTime(newYear, _focusedMonth.month, 1);
-    });
-  },
-),
-
-
+                              DropdownButton<int>(
+                                value: _focusedMonth.year,
+                                underline: const SizedBox.shrink(),
+                                items: List.generate(5, (i) {
+                                  int currentYear = DateTime.now().year;
+                                  int displayYear = currentYear - 2 + i;
+                                  return DropdownMenuItem<int>(
+                                    value: displayYear,
+                                    child: Text(
+                                      displayYear.toString(),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  );
+                                }),
+                                onChanged: (int? newYear) {
+                                  if (newYear == null) return;
+                                  setState(() {
+                                    _focusedMonth = DateTime(
+                                      newYear,
+                                      _focusedMonth.month,
+                                      1,
+                                    );
+                                    _selectedDate = DateTime(
+                                      newYear,
+                                      _focusedMonth.month,
+                                      1,
+                                    );
+                                  });
+                                },
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -187,18 +206,20 @@ DropdownButton<int>(
                             itemCount: gridDates.length,
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 7,
-                              childAspectRatio: 1.3,
-                            ),
+                                  crossAxisCount: 7,
+                                  childAspectRatio: 1.3,
+                                ),
                             itemBuilder: (context, index) {
                               final date = gridDates[index];
                               if (date == null) return const SizedBox.shrink();
 
-                              final bool isToday =
-                                  _isSameDay(date, DateTime.now());
+                              final bool isToday = _isSameDay(
+                                date,
+                                DateTime.now(),
+                              );
                               final bool isSelected =
                                   _selectedDate != null &&
-                                      _isSameDay(date, _selectedDate!);
+                                  _isSameDay(date, _selectedDate!);
 
                               return GestureDetector(
                                 onTap: () {
@@ -206,7 +227,10 @@ DropdownButton<int>(
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => DailyTasksScreen(selectedDate: date, forUserId: widget.forUserId),
+                                      builder: (context) => DailyTasksScreen(
+                                        selectedDate: date,
+                                        forUserId: widget.forUserId,
+                                      ),
                                     ),
                                   );
                                 },
@@ -233,8 +257,9 @@ DropdownButton<int>(
                                           '${date.day}',
                                           style: TextStyle(
                                             fontSize: 14,
-                                            fontWeight:
-                                                isToday ? FontWeight.w700 : null,
+                                            fontWeight: isToday
+                                                ? FontWeight.w700
+                                                : null,
                                             color: isToday
                                                 ? Colors.black
                                                 : Colors.black87,
@@ -280,8 +305,10 @@ DropdownButton<int>(
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.pink,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 14,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
@@ -304,12 +331,21 @@ DropdownButton<int>(
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Calendar',
-              isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications',
-              isSelected: _currentIndex == 3),
+          _navItem(
+            Icons.calendar_today,
+            'Calendar',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Alert',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),

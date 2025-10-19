@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:softeng/Regular%20Screen/tasks_screen_regular.dart'; // âœ… New Regular User screen
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -193,7 +193,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     final user = supabase.auth.currentUser;
                     if (user != null) {
                       // Ensure row exists, then force-update role
-                      await ProfileService.ensureProfileExists(supabase, role: role);
+                      await ProfileService.ensureProfileExists(
+                        supabase,
+                        role: role,
+                      );
                       await ProfileService.upsertProfile(
                         supabase,
                         id: user.id,
@@ -231,5 +234,3 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     );
   }
 }
-
-

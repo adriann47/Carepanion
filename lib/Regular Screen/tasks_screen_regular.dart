@@ -35,7 +35,8 @@ class _TasksScreenState extends State<TasksScreenRegular> {
 
   List<Map<String, dynamic>> _completedNotifications = [];
 
-  int? _streak; // null = loading; we’ll show 0 only when the DB actually says 0.
+  int?
+  _streak; // null = loading; we’ll show 0 only when the DB actually says 0.
 
   @override
   void initState() {
@@ -57,7 +58,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
   // ---------- STREAK (user_streaks.current_streak) ----------
   Future<void> _bindStreak() async {
     await _fetchStreakFromDb(); // initial load
-    _subscribeStreakChanges();   // live updates
+    _subscribeStreakChanges(); // live updates
   }
 
   Future<void> _fetchStreakFromDb() async {
@@ -88,8 +89,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     final user = client.auth.currentUser;
     if (user == null) return;
 
-    _streakChannel = client
-        .channel('public:user_streaks:user:${user.id}')
+    _streakChannel = client.channel('public:user_streaks:user:${user.id}')
       ..onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
@@ -231,9 +231,7 @@ class _TasksScreenState extends State<TasksScreenRegular> {
     } else if (index == 3) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => const NotificationScreen(),
-        ),
+        MaterialPageRoute(builder: (_) => const NotificationScreen()),
       );
     } else if (index == 4) {
       Navigator.pushReplacement(
@@ -274,7 +272,10 @@ class _TasksScreenState extends State<TasksScreenRegular> {
               // --- STREAK CARD ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   border: Border.all(color: Colors.orange.shade200),
@@ -289,7 +290,11 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.emoji_events, color: Colors.orange, size: 30),
+                    const Icon(
+                      Icons.emoji_events,
+                      color: Colors.orange,
+                      size: 30,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -301,7 +306,10 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                                 SizedBox(
                                   width: 14,
                                   height: 14,
-                                  child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.orange.shade400),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: Colors.orange.shade400,
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
@@ -318,7 +326,9 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                             Text(
                               shownStreak <= 0
                                   ? "NO STREAK YET"
-                                  : (shownStreak == 1 ? "1 DAY STREAK!" : "$shownStreak DAYS STREAK!"),
+                                  : (shownStreak == 1
+                                        ? "1 DAY STREAK!"
+                                        : "$shownStreak DAYS STREAK!"),
                               style: GoogleFonts.nunito(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 14,
@@ -328,7 +338,10 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                           const SizedBox(height: 4),
                           Text(
                             "Thanks for showing up today! Consistency is the key to forming strong habits.",
-                            style: GoogleFonts.nunito(fontSize: 12, color: const Color(0xFF4A4A4A)),
+                            style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              color: const Color(0xFF4A4A4A),
+                            ),
                           ),
                         ],
                       ),
@@ -403,11 +416,16 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                           children: [
                             CircleAvatar(
                               radius: 20,
-                              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                              backgroundImage:
+                                  avatarUrl != null && avatarUrl.isNotEmpty
                                   ? NetworkImage(avatarUrl)
                                   : null,
                               child: avatarUrl == null || avatarUrl.isEmpty
-                                  ? const Icon(Icons.person, size: 20, color: Colors.grey)
+                                  ? const Icon(
+                                      Icons.person,
+                                      size: 20,
+                                      color: Colors.grey,
+                                    )
                                   : null,
                             ),
                             const SizedBox(width: 12),
@@ -427,7 +445,9 @@ class _TasksScreenState extends State<TasksScreenRegular> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    time.isNotEmpty ? _formatTime(time) : 'Just now',
+                                    time.isNotEmpty
+                                        ? _formatTime(time)
+                                        : 'Just now',
                                     style: GoogleFonts.nunito(
                                       fontSize: 12,
                                       color: const Color(0xFF6B7280),
@@ -465,9 +485,21 @@ class _TasksScreenState extends State<TasksScreenRegular> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Menu', isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Companion', isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
+          _navItem(
+            Icons.calendar_today,
+            'Menu',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Companion',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -489,7 +521,11 @@ class _TasksScreenState extends State<TasksScreenRegular> {
           color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
         ),
         child: Center(
-          child: Icon(icon, size: 28, color: isSelected ? Colors.pink : Colors.black87),
+          child: Icon(
+            icon,
+            size: 28,
+            color: isSelected ? Colors.pink : Colors.black87,
+          ),
         ),
       ),
     );
@@ -546,12 +582,14 @@ class _UserHeaderCard extends StatelessWidget {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: (avatarUrl != null && avatarUrl!.isNotEmpty)
-                      ? Image.network(
-                          avatarUrl!,
-                          fit: BoxFit.cover,
-                        )
+                      ? Image.network(avatarUrl!, fit: BoxFit.cover)
                       : const Center(
-                          child: Icon(Icons.person, size: 44, color: Color(0xFF8E4A1E))),
+                          child: Icon(
+                            Icons.person,
+                            size: 44,
+                            color: Color(0xFF8E4A1E),
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 14),
 
@@ -660,7 +698,6 @@ class _TodayTasksStream extends StatefulWidget {
 }
 
 class _TodayTasksStreamState extends State<_TodayTasksStream> {
-  List<String> _assistedUserIds = [];
   bool _loadingAssisted = true;
 
   @override
@@ -677,18 +714,8 @@ class _TodayTasksStreamState extends State<_TodayTasksStream> {
         if (mounted) setState(() => _loadingAssisted = false);
         return;
       }
-
-      final assisted = await ProfileService.fetchAssistedsForGuardian(client, guardianUserId: user.id);
-      final ids = assisted.map((p) => p['id'] as String).toList();
-      // Include the guardian's own tasks as well
-      ids.add(user.id);
-
-      if (mounted) {
-        setState(() {
-          _assistedUserIds = ids;
-          _loadingAssisted = false;
-        });
-      }
+      // We no longer need assisted users list for this screen; only show own tasks
+      if (mounted) setState(() => _loadingAssisted = false);
     } catch (_) {
       if (mounted) setState(() => _loadingAssisted = false);
     }
@@ -706,10 +733,9 @@ class _TodayTasksStreamState extends State<_TodayTasksStream> {
     final supabase = Supabase.instance.client;
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final baseStream = supabase.from('tasks').stream(primaryKey: ['id']);
-
-    // Fetch tasks for all assisted users (including guardian)
-    final stream = _assistedUserIds.isNotEmpty
-        ? baseStream.inFilter('user_id', _assistedUserIds)
+    final currentUserId = supabase.auth.currentUser?.id;
+    final stream = currentUserId != null
+        ? baseStream.eq('user_id', currentUserId)
         : baseStream;
 
     return StreamBuilder<List<Map<String, dynamic>>>(
@@ -758,7 +784,11 @@ class _TodayTasksStreamState extends State<_TodayTasksStream> {
         return Column(
           children: [
             for (final t in tasks)
-              _TaskTile(key: ValueKey(t['id']), task: t, onEdited: widget.onEdited),
+              _TaskTile(
+                key: ValueKey(t['id']),
+                task: t,
+                onEdited: widget.onEdited,
+              ),
           ],
         );
       },
@@ -829,11 +859,15 @@ class _TaskTileState extends State<_TaskTile> {
       // Record an outcome notification for regular users as well (to own page)
       try {
         if (value) {
-          final assistedId = (widget.task['user_id'] ?? supabase.auth.currentUser?.id ?? '').toString();
+          final assistedId =
+              (widget.task['user_id'] ?? supabase.auth.currentUser?.id ?? '')
+                  .toString();
           final sa = widget.task['start_at'];
           DateTime? scheduled;
           if (sa != null) {
-            try { scheduled = DateTime.parse(sa.toString()); } catch (_) {}
+            try {
+              scheduled = DateTime.parse(sa.toString());
+            } catch (_) {}
           }
           await GuardianNotificationService.recordTaskOutcome(
             taskId: id.toString(),
@@ -848,9 +882,9 @@ class _TaskTileState extends State<_TaskTile> {
     } catch (e) {
       if (mounted) {
         setState(() => _done = prev);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update task: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update task: $e')));
       }
     }
   }
@@ -958,7 +992,8 @@ class _TaskTileState extends State<_TaskTile> {
                             child: Checkbox(
                               value: _done,
                               onChanged: (v) => _toggleDone(v ?? false),
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
                               visualDensity: const VisualDensity(
                                 horizontal: -4,
                                 vertical: -4,
@@ -989,11 +1024,16 @@ class _TaskTileState extends State<_TaskTile> {
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: catColor.withOpacity(0.12),
                                     borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(color: catColor.withOpacity(0.45)),
+                                    border: Border.all(
+                                      color: catColor.withOpacity(0.45),
+                                    ),
                                   ),
                                   child: Text(
                                     catLabel,
@@ -1010,11 +1050,16 @@ class _TaskTileState extends State<_TaskTile> {
                           ),
 
                           IconButton(
-                            icon: const Icon(Icons.edit, size: 18, color: Color(0xFF36495A)),
+                            icon: const Icon(
+                              Icons.edit,
+                              size: 18,
+                              color: Color(0xFF36495A),
+                            ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: () async {
-                              final taskUserId = widget.task['user_id'] as String?;
+                              final taskUserId =
+                                  widget.task['user_id'] as String?;
                               final changed = await Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -1034,7 +1079,8 @@ class _TaskTileState extends State<_TaskTile> {
                       const SizedBox(height: 8),
 
                       _infoLine(label: 'TIME', value: time),
-                      if ((note).isNotEmpty) _infoLine(label: 'NOTE', value: note),
+                      if ((note).isNotEmpty)
+                        _infoLine(label: 'NOTE', value: note),
                     ],
                   ),
                 ),

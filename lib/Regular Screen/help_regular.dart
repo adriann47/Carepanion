@@ -36,7 +36,9 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     } else if (index == 3) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => NotificationScreen(notifications: const [])),
+        MaterialPageRoute(
+          builder: (context) => NotificationScreen(notifications: const []),
+        ),
       );
     } else if (index == 4) {
       Navigator.pushReplacement(
@@ -52,7 +54,10 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
       context: context,
       builder: (context) {
         return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 25,
+            vertical: 40,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -77,9 +82,10 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("• ",
-                            style: TextStyle(
-                                fontSize: 16, color: Colors.black87)),
+                        const Text(
+                          "• ",
+                          style: TextStyle(fontSize: 16, color: Colors.black87),
+                        ),
                         Expanded(
                           child: Text(
                             answer,
@@ -104,7 +110,9 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                         borderRadius: BorderRadius.circular(25),
                       ),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 35, vertical: 14),
+                        horizontal: 35,
+                        vertical: 14,
+                      ),
                     ),
                     onPressed: () => Navigator.pop(context),
                     child: const Text(
@@ -147,11 +155,15 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const ProfileScreen()),
+                          builder: (context) => const ProfileScreen(),
+                        ),
                       );
                     },
-                    child: const Icon(Icons.arrow_back,
-                        color: Colors.black87, size: 30),
+                    child: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.black87,
+                      size: 30,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -198,7 +210,8 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                       ],
                     ),
                     child: const _FaqQuestion(
-                        "HOW TO CONNECT TO A GUARDIAN/ASSISTED USER ?"),
+                      "HOW TO CONNECT TO A GUARDIAN/ASSISTED USER ?",
+                    ),
                   ),
                   const Divider(thickness: 1, color: Colors.black26),
                   GestureDetector(
@@ -209,7 +222,8 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                       ],
                     ),
                     child: const _FaqQuestion(
-                        "HOW CAN I VIEW ALL OF MY COMPANIONS?"),
+                      "HOW CAN I VIEW ALL OF MY COMPANIONS?",
+                    ),
                   ),
                   const Divider(thickness: 1, color: Colors.black26),
                   GestureDetector(
@@ -231,7 +245,8 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                       ],
                     ),
                     child: const _FaqQuestion(
-                        "HOW TO CONTACT CUSTOMER SERVICE?"),
+                      "HOW TO CONTACT CUSTOMER SERVICE?",
+                    ),
                   ),
                   const Divider(thickness: 1, color: Colors.black26),
                 ],
@@ -253,18 +268,33 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Calendar', isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Companions', isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
-          
+          _navItem(
+            Icons.calendar_today,
+            'Calendar',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Companions',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
+
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
     );
   }
 
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {required bool isSelected}) {
+  static BottomNavigationBarItem _navItem(
+    IconData icon,
+    String label, {
+    required bool isSelected,
+  }) {
     return BottomNavigationBarItem(
       label: label,
       icon: Container(

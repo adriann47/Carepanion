@@ -64,7 +64,7 @@ class ReminderService {
       _alerted.clear();
       _scheduledForToday = false;
     }
-    final nowStr = DateFormat('HH:mm:ss').format(now);
+    // final nowStr = DateFormat('HH:mm:ss').format(now); // unused
 
     // Determine role once per user and cache guardian full name for assisted
     if (_guardianCacheForUserId != user.id || _guardianFullNameCache == null) {
@@ -85,16 +85,16 @@ class ReminderService {
       } catch (_) {}
     }
 
-    // Fetch today's tasks for the signed-in user (only tasks assigned to them).
+    // Fetch today's tasks relevant to the signed-in user.
     List<dynamic> rows;
     try {
       rows = await client
           .from('tasks')
           .select(
-            'id,title,description,start_at,end_at,due_date,status,user_id',
+            'id,title,description,start_at,end_at,due_date,status,user_id,created_by',
           )
           .eq('due_date', today)
-          .eq('user_id', user.id)
+          .eq('user_id', user.id) // Only tasks assigned to me
           .limit(200);
     } catch (_) {
       return;
@@ -129,9 +129,15 @@ class ReminderService {
 
     for (final raw in rows) {
       if (raw is! Map) continue;
-      final task = Map<String, dynamic>.from(raw as Map);
+      final task = Map<String, dynamic>.from(raw);
       final id = task['id'].toString();
       final key = '${id}_$today';
+
+      // Skip tasks already completed or skipped
+      final status = (task['status'] ?? '').toString();
+      if (status == 'done' || status == 'skip' || status == 'skipped') {
+        continue;
+      }
 
       final startAt = task['start_at'];
       if (startAt == null) continue;
@@ -143,12 +149,10 @@ class ReminderService {
       }
 
       final triggerTime = _deferUntil[id] ?? startLocal;
-      final bool inWindow = triggerTime.isAfter(
-            now.subtract(const Duration(seconds: 1)),
-          ) &&
-          triggerTime.isBefore(
-            now.add(const Duration(seconds: 1)),
-          );
+      // Allow a forgiving window so we don't miss due times because of timer drift
+      // Trigger when now is at or after the scheduled time, within a short grace period
+      final int diffSec = now.difference(triggerTime).inSeconds;
+      final bool inWindow = diffSec >= 0 && diffSec <= 60;
       if (!inWindow) continue;
 
       DateTime dueDate;
@@ -169,52 +173,60 @@ class ReminderService {
         'tts_enabled': NotificationPreferences.ttsEnabled.value,
         'vibration_enabled': NotificationPreferences.vibrationEnabled.value,
         'guardian_cached': _guardianFullNameCache != null,
-        'deferred_from_start_seconds':
-            triggerTime.difference(startLocal).inSeconds,
+        'deferred_from_start_seconds': triggerTime
+            .difference(startLocal)
+            .inSeconds,
       };
 
-      final decision =
-          await ReinforcementLearningService.chooseReminderAction(
+      final decision = await ReinforcementLearningService.chooseReminderAction(
         taskRow: task,
         dueDate: dueDate,
         startAtLocal: triggerTime,
         context: contextPayload,
       );
 
+      // Determine if this task is mine (assigned to me or created by me)
+      final meId = user.id;
+      final isMyTask =
+          (task['user_id']?.toString() == meId) ||
+          (task['created_by']?.toString() == meId);
+
       if (decision.action == ReminderAction.deferShort ||
           decision.action == ReminderAction.deferLong) {
-        final waitFor = decision.deferDuration ??
-            (decision.action == ReminderAction.deferShort
-                ? const Duration(minutes: 10)
-                : const Duration(minutes: 30));
-        _deferUntil[id] = DateTime.now().add(waitFor);
-        unawaited(
-          ReinforcementLearningService.markReminderDecisionResult(
-            decision.eventId,
-            result: 'deferred',
-            extra: {
-              'delay_seconds': waitFor.inSeconds,
-            },
-          ),
-        );
-        continue;
+        // Always show the popup for my tasks (assignee's device), do not auto-defer.
+        if (!isMyTask) {
+          final waitFor =
+              decision.deferDuration ??
+              (decision.action == ReminderAction.deferShort
+                  ? const Duration(minutes: 10)
+                  : const Duration(minutes: 30));
+          _deferUntil[id] = DateTime.now().add(waitFor);
+          unawaited(
+            ReinforcementLearningService.markReminderDecisionResult(
+              decision.eventId,
+              result: 'deferred',
+              extra: {'delay_seconds': waitFor.inSeconds},
+            ),
+          );
+          continue;
+        }
       }
 
       _deferUntil.remove(id);
 
       if (decision.action == ReminderAction.escalateGuardian) {
-        _alerted.add(key);
-        unawaited(
-          ReinforcementLearningService.escalateReminder(
-            taskRow: task,
-            metadata: {
-              ...contextPayload,
-              'reason': 'policy_escalation',
-            },
-            decisionEventId: decision.eventId,
-          ),
-        );
-        continue;
+        // Always prefer showing the popup for my tasks; escalate only if not my task (shouldn't happen with our fetch).
+        if (!isMyTask) {
+          _alerted.add(key);
+          unawaited(
+            ReinforcementLearningService.escalateReminder(
+              taskRow: task,
+              metadata: {...contextPayload, 'reason': 'policy_escalation'},
+              decisionEventId: decision.eventId,
+            ),
+          );
+          continue;
+        }
       }
 
       if (_alerted.contains(key)) continue;
@@ -222,7 +234,19 @@ class ReminderService {
 
       final title = (task['title'] ?? 'Task').toString();
       final note = (task['description'] ?? '').toString();
-      final List<SnoozeOption> snoozeOptions = decision.recommendedSnoozes;
+      List<SnoozeOption> snoozeOptions = decision.recommendedSnoozes;
+      // Ensure snooze options exist for all users so assisted users can snooze.
+      if (snoozeOptions.isEmpty) {
+        snoozeOptions = [
+          SnoozeOption(duration: const Duration(minutes: 5), label: '5 min'),
+          SnoozeOption(
+            duration: const Duration(minutes: 10),
+            label: '10 min',
+            isPreferred: true,
+          ),
+          SnoozeOption(duration: const Duration(minutes: 30), label: '30 min'),
+        ];
+      }
 
       // Speak if enabled (log errors so we can diagnose when speech fails)
       try {
@@ -359,7 +383,10 @@ class ReminderService {
           onSnooze: handleSnooze,
           onSkip: () async {
             try {
-              await client.from('tasks').update({'status': 'skip'}).eq('id', id);
+              await client
+                  .from('tasks')
+                  .update({'status': 'skip'})
+                  .eq('id', id);
               final sa = task['start_at'];
               if (sa != null) {
                 try {
@@ -398,8 +425,9 @@ class ReminderService {
                   taskId: id,
                   assistedId: (task['user_id'] ?? '').toString(),
                   title: (task['title'] ?? 'Task').toString(),
-                  scheduledAt:
-                      sa != null ? DateTime.tryParse(sa.toString()) : null,
+                  scheduledAt: sa != null
+                      ? DateTime.tryParse(sa.toString())
+                      : null,
                   action: 'skipped',
                   actionAt: nowTs.toUtc(),
                 );
@@ -408,7 +436,10 @@ class ReminderService {
           },
           onDone: () async {
             try {
-              await client.from('tasks').update({'status': 'done'}).eq('id', id);
+              await client
+                  .from('tasks')
+                  .update({'status': 'done'})
+                  .eq('id', id);
               final sa = task['start_at'];
               if (sa != null) {
                 try {
@@ -450,8 +481,9 @@ class ReminderService {
                   taskId: id,
                   assistedId: (task['user_id'] ?? '').toString(),
                   title: (task['title'] ?? 'Task').toString(),
-                  scheduledAt:
-                      sa != null ? DateTime.tryParse(sa.toString()) : null,
+                  scheduledAt: sa != null
+                      ? DateTime.tryParse(sa.toString())
+                      : null,
                   action: 'done',
                   actionAt: nowTs.toUtc(),
                 );
@@ -483,6 +515,7 @@ class ReminderService {
       if (data != null) r = Map<String, dynamic>.from(data);
     } catch (_) {}
     if (r == null) return;
+    final Map<String, dynamic> taskRec = r;
 
     final navigatorState = navKey.currentState;
     final ctx = navigatorState?.overlay?.context;
@@ -495,6 +528,18 @@ class ReminderService {
     if (_alerted.contains(dupKey)) return;
     _alerted.add(dupKey);
     _popupActive = true;
+
+    // Speak TTS for this reminder (when launched from a notification/alarm)
+    try {
+      if (!kIsWeb && NotificationPreferences.ttsEnabled.value) {
+        final title = (taskRec['title'] ?? 'Task').toString();
+        final note = (taskRec['description'] ?? '').toString();
+        try {
+          await _tts.awaitSpeakCompletion(true);
+        } catch (_) {}
+        await _tts.speak('Reminder: $title. ${note.isNotEmpty ? note : ""}');
+      }
+    } catch (_) {}
 
     String? popupGuardianName;
     try {
@@ -522,7 +567,7 @@ class ReminderService {
     } catch (_) {}
 
     DateTime? triggerTime;
-    final startAt = r!['start_at'];
+    final startAt = taskRec['start_at'];
     if (startAt != null) {
       try {
         triggerTime = DateTime.parse(startAt.toString()).toLocal();
@@ -538,23 +583,62 @@ class ReminderService {
       regularRole = ((role ?? '').toLowerCase() == 'regular');
     } catch (_) {}
 
+    // Build default snooze options for this path as RL context is not available here
+    List<SnoozeOption> defaultSnoozes = [
+      SnoozeOption(duration: const Duration(minutes: 5), label: '5 min'),
+      SnoozeOption(
+        duration: const Duration(minutes: 10),
+        label: '10 min',
+        isPreferred: true,
+      ),
+      SnoozeOption(duration: const Duration(minutes: 30), label: '30 min'),
+    ];
+
+    Future<void> handleSnooze(SnoozeOption option) async {
+      final now = DateTime.now();
+      final nextTrigger = now.add(option.duration);
+      try {
+        // Cancel any existing notification for the original start time
+        final sa = taskRec['start_at'];
+        if (sa != null) {
+          try {
+            final dt = DateTime.parse(sa.toString()).toLocal();
+            await NotificationService.cancel(_notifIdFor(dt));
+          } catch (_) {}
+        }
+        // Schedule new notification for snoozed time
+        await NotificationService.scheduleAt(
+          id: _notifIdFor(nextTrigger),
+          whenLocal: nextTrigger,
+          title: 'Task Reminder: ${(taskRec['title'] ?? 'Task').toString()}',
+          body: (taskRec['description'] ?? '').toString().isNotEmpty
+              ? taskRec['description'].toString()
+              : "It's time to do this task.",
+          payload: '{"task_id":"$taskId"}',
+        );
+      } catch (_) {}
+    }
+
     // ignore: use_build_context_synchronously
     await showDialog(
       context: ctx,
       barrierDismissible: false,
       builder: (dialogCtx) => _ReminderDialog(
-        task: r!,
+        task: taskRec,
         guardianFullName: popupGuardianName,
         showGuardian: !regularRole,
-        snoozeOptions: const [],
-        onSnooze: (_) async {},
+        snoozeOptions: defaultSnoozes,
+        onSnooze: (opt) async {
+          Navigator.of(dialogCtx).pop();
+          await handleSnooze(opt);
+        },
         onSkip: () async {
           try {
             await client
                 .from('tasks')
                 .update({'status': 'skip'})
                 .eq('id', taskId);
-            final sa = r!['start_at'];
+            final sa = taskRec['start_at'];
             if (sa != null) {
               try {
                 final dt = DateTime.parse(sa.toString()).toLocal();
@@ -562,8 +646,9 @@ class ReminderService {
               } catch (_) {}
             }
             final nowTs = DateTime.now();
-            final latency =
-                triggerTime != null ? nowTs.difference(triggerTime!) : null;
+            final latency = triggerTime != null
+                ? nowTs.difference(triggerTime)
+                : null;
             unawaited(
               ReinforcementLearningService.logReminderOutcome(
                 taskId: taskId,
@@ -584,10 +669,11 @@ class ReminderService {
             try {
               await GuardianNotificationService.recordTaskOutcome(
                 taskId: taskId,
-                assistedId: (r!['user_id'] ?? '').toString(),
-                title: (r!['title'] ?? 'Task').toString(),
-                scheduledAt:
-                    sa != null ? DateTime.tryParse(sa.toString()) : null,
+                assistedId: (taskRec['user_id'] ?? '').toString(),
+                title: (taskRec['title'] ?? 'Task').toString(),
+                scheduledAt: sa != null
+                    ? DateTime.tryParse(sa.toString())
+                    : null,
                 action: 'skipped',
                 actionAt: nowTs.toUtc(),
               );
@@ -600,7 +686,7 @@ class ReminderService {
                 .from('tasks')
                 .update({'status': 'done'})
                 .eq('id', taskId);
-            final sa = r!['start_at'];
+            final sa = taskRec['start_at'];
             if (sa != null) {
               try {
                 final dt = DateTime.parse(sa.toString()).toLocal();
@@ -608,8 +694,9 @@ class ReminderService {
               } catch (_) {}
             }
             final nowTs = DateTime.now();
-            final latency =
-                triggerTime != null ? nowTs.difference(triggerTime!) : null;
+            final latency = triggerTime != null
+                ? nowTs.difference(triggerTime)
+                : null;
             unawaited(
               ReinforcementLearningService.logReminderOutcome(
                 taskId: taskId,
@@ -633,10 +720,11 @@ class ReminderService {
             try {
               await GuardianNotificationService.recordTaskOutcome(
                 taskId: taskId,
-                assistedId: (r!['user_id'] ?? '').toString(),
-                title: (r!['title'] ?? 'Task').toString(),
-                scheduledAt:
-                    sa != null ? DateTime.tryParse(sa.toString()) : null,
+                assistedId: (taskRec['user_id'] ?? '').toString(),
+                title: (taskRec['title'] ?? 'Task').toString(),
+                scheduledAt: sa != null
+                    ? DateTime.tryParse(sa.toString())
+                    : null,
                 action: 'done',
                 actionAt: nowTs.toUtc(),
               );
@@ -665,14 +753,17 @@ class ReminderService {
         callback: (payload) async {
           try {
             final rec = payload.newRecord;
-            if (rec['user_id']?.toString() != user.id) return;
+            final assignedTo = rec['user_id']?.toString();
+            // Only schedule for tasks assigned to the current user
+            if (assignedTo != user.id) return;
             if (rec['due_date']?.toString() != today) return;
             final startAt = rec['start_at'];
             if (startAt == null) return;
             final dt = DateTime.parse(startAt.toString()).toLocal();
             if (dt.isBefore(DateTime.now())) return;
             final status = (rec['status'] ?? '').toString();
-            if (status == 'done' || status == 'skip' || status == 'skipped') return;
+            if (status == 'done' || status == 'skip' || status == 'skipped')
+              return;
             await NotificationService.scheduleAt(
               id: _notifIdFor(dt),
               whenLocal: dt,
@@ -693,7 +784,9 @@ class ReminderService {
           try {
             final oldRec = payload.oldRecord;
             final newRec = payload.newRecord;
-            if (newRec['user_id']?.toString() != user.id) return;
+            final assignedTo = newRec['user_id']?.toString();
+            // Only handle updates for tasks assigned to the current user
+            if (assignedTo != user.id) return;
             final oldStart = oldRec['start_at'];
             if (oldStart != null) {
               final oldDt = DateTime.parse(oldStart.toString()).toLocal();
@@ -701,7 +794,8 @@ class ReminderService {
             }
 
             final status = (newRec['status'] ?? '').toString();
-            if (status == 'done' || status == 'skip' || status == 'skipped') return;
+            if (status == 'done' || status == 'skip' || status == 'skipped')
+              return;
             if (newRec['due_date']?.toString() != today) return;
             final startAt = newRec['start_at'];
             if (startAt == null) return;
@@ -726,7 +820,9 @@ class ReminderService {
         callback: (payload) async {
           try {
             final oldRec = payload.oldRecord;
-            if (oldRec['user_id']?.toString() != user.id) return;
+            final assignedTo = oldRec['user_id']?.toString();
+            // Only handle deletes for tasks assigned to the current user
+            if (assignedTo != user.id) return;
             final startAt = oldRec['start_at'];
             if (startAt == null) return;
             final dt = DateTime.parse(startAt.toString()).toLocal();
@@ -796,6 +892,7 @@ class _ReminderDialog extends StatelessWidget {
       final seconds = option.duration.inSeconds;
       return '${seconds}s';
     }
+
     final time = s.isEmpty && e.isEmpty
         ? 'All day'
         : (s.isNotEmpty && e.isNotEmpty ? '$s - $e' : (s + e));
@@ -923,8 +1020,9 @@ class _ReminderDialog extends StatelessWidget {
                       final label = snoozeLabel(option);
                       return ActionChip(
                         label: Text(label),
-                        backgroundColor:
-                            option.isPreferred ? const Color(0xFFE2F5F6) : const Color(0xFFF2F4F7),
+                        backgroundColor: option.isPreferred
+                            ? const Color(0xFFE2F5F6)
+                            : const Color(0xFFF2F4F7),
                         onPressed: () {
                           Navigator.of(context).pop();
                           onSnooze(option);
@@ -941,4 +1039,3 @@ class _ReminderDialog extends StatelessWidget {
     );
   }
 }
-

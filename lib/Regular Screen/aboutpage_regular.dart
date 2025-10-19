@@ -18,7 +18,7 @@ class _AboutPageState extends State<AboutPage> {
   void _onTabTapped(int index) {
     setState(() => _currentIndex = index);
 
-   if (index == 0) {
+    if (index == 0) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const TasksScreenRegular()),
@@ -75,11 +75,15 @@ class _AboutPageState extends State<AboutPage> {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const ProfileScreen()),
+                          builder: (context) => const ProfileScreen(),
+                        ),
                       );
                     },
-                    child: const Icon(Icons.arrow_back,
-                        color: Colors.black87, size: 28),
+                    child: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.black87,
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(height: 18),
                   const Text(
@@ -99,9 +103,9 @@ class _AboutPageState extends State<AboutPage> {
             /// --- MAIN CONTENT ---
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 22).copyWith(
-                  bottom: 24,
-                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                ).copyWith(bottom: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -198,12 +202,21 @@ class _AboutPageState extends State<AboutPage> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Calendar',
-              isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Alert',
-              isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications',
-              isSelected: _currentIndex == 3),
+          _navItem(
+            Icons.calendar_today,
+            'Calendar',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Alert',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -223,8 +236,7 @@ class _AboutPageState extends State<AboutPage> {
         height: 55,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color:
-              isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
+          color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
         ),
         child: Center(
           child: Icon(

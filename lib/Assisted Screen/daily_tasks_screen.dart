@@ -9,7 +9,11 @@ class DailyTasksScreen extends StatefulWidget {
   final DateTime selectedDate;
   final String? forUserId; // optional: show tasks for this user id
 
-  const DailyTasksScreen({super.key, required this.selectedDate, this.forUserId});
+  const DailyTasksScreen({
+    super.key,
+    required this.selectedDate,
+    this.forUserId,
+  });
 
   @override
   State<DailyTasksScreen> createState() => _DailyTasksScreenState();
@@ -17,7 +21,7 @@ class DailyTasksScreen extends StatefulWidget {
 
 class _DailyTasksScreenState extends State<DailyTasksScreen> {
   // layout constants
-  static const double _headerHeight = 110;        // ample space for date title
+  static const double _headerHeight = 110; // ample space for date title
   static const double _pageSidePadding = 16;
   static const double _sectionGap = 24;
   static const double _labelToTilesGap = 12;
@@ -76,7 +80,10 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
             // --- BODY (scrollable sections) ---
             Expanded(
               child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: TaskService.getTasksForDate(widget.selectedDate, forUserId: widget.forUserId),
+                future: TaskService.getTasksForDate(
+                  widget.selectedDate,
+                  forUserId: widget.forUserId,
+                ),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -147,7 +154,10 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
 
                   return SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(
-                      _pageSidePadding, 0, _pageSidePadding, 28,
+                      _pageSidePadding,
+                      0,
+                      _pageSidePadding,
+                      28,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,16 +168,18 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
                         if (todo.isEmpty)
                           _emptyHint('No tasks to do')
                         else
-                          ...todo.map((t) => _taskCard(
-                                task: t,
-                                isDone: _isDone(t),
-                                onToggleDone: (value) => _toggleStatus(t, value),
-                                onTap: () => _openEdit(t),
-                                onSkip: () => _setSkip(t),
-                                colorA: const Color(0xFFBEE6FF),
-                                colorB: const Color(0xFF9ED8FF),
-                                textColor: const Color(0xFF163047),
-                              )),
+                          ...todo.map(
+                            (t) => _taskCard(
+                              task: t,
+                              isDone: _isDone(t),
+                              onToggleDone: (value) => _toggleStatus(t, value),
+                              onTap: () => _openEdit(t),
+                              onSkip: () => _setSkip(t),
+                              colorA: const Color(0xFFBEE6FF),
+                              colorB: const Color(0xFF9ED8FF),
+                              textColor: const Color(0xFF163047),
+                            ),
+                          ),
 
                         const SizedBox(height: _sectionGap),
 
@@ -177,15 +189,17 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
                         if (done.isEmpty)
                           _emptyHint('No tasks done yet')
                         else
-                          ...done.map((t) => _taskCard(
-                                task: t,
-                                isDone: true,
-                                onToggleDone: (value) => _toggleStatus(t, value),
-                                onTap: () => _openEdit(t),
-                                colorA: const Color(0xFFCFF8C8),
-                                colorB: const Color(0xFFB6F0AD),
-                                textColor: const Color(0xFF14391D),
-                              )),
+                          ...done.map(
+                            (t) => _taskCard(
+                              task: t,
+                              isDone: true,
+                              onToggleDone: (value) => _toggleStatus(t, value),
+                              onTap: () => _openEdit(t),
+                              colorA: const Color(0xFFCFF8C8),
+                              colorB: const Color(0xFFB6F0AD),
+                              textColor: const Color(0xFF14391D),
+                            ),
+                          ),
 
                         const SizedBox(height: _sectionGap),
 
@@ -195,15 +209,17 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
                         if (skip.isEmpty)
                           _emptyHint('No skipped tasks')
                         else
-                          ...skip.map((t) => _taskCard(
-                                task: t,
-                                isDone: _isDone(t),
-                                onToggleDone: (value) => _toggleStatus(t, value),
-                                onTap: () => _openEdit(t),
-                                colorA: const Color(0xFFFFC7B8),
-                                colorB: const Color(0xFFFFB6A3),
-                                textColor: const Color(0xFF4A1E1A),
-                              )),
+                          ...skip.map(
+                            (t) => _taskCard(
+                              task: t,
+                              isDone: _isDone(t),
+                              onToggleDone: (value) => _toggleStatus(t, value),
+                              onTap: () => _openEdit(t),
+                              colorA: const Color(0xFFFFC7B8),
+                              colorB: const Color(0xFFFFB6A3),
+                              textColor: const Color(0xFF4A1E1A),
+                            ),
+                          ),
                       ],
                     ),
                   );
@@ -221,7 +237,12 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
   void _openEdit(Map<String, dynamic> t) async {
     final changed = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => EditTaskScreen(task: t, forUserId: widget.forUserId ?? t['user_id'] as String?)),
+      MaterialPageRoute(
+        builder: (_) => EditTaskScreen(
+          task: t,
+          forUserId: widget.forUserId ?? t['user_id'] as String?,
+        ),
+      ),
     );
     if (changed == true) setState(() {});
   }
@@ -230,7 +251,9 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
     final status = (t['status'] ?? '').toString().toLowerCase();
     if (status == 'done') return true;
     final raw = t['is_done'] ?? t['done'] ?? false;
-    return raw is bool ? raw : (raw.toString() == 'true' || raw.toString() == '1');
+    return raw is bool
+        ? raw
+        : (raw.toString() == 'true' || raw.toString() == '1');
   }
 
   Future<void> _toggleStatus(Map<String, dynamic> t, bool value) async {
@@ -240,9 +263,9 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
       if (mounted) setState(() {});
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update task: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update task: $e')));
     }
   }
 
@@ -253,9 +276,9 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
       if (mounted) setState(() {});
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to skip task: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to skip task: $e')));
     }
   }
 
@@ -268,11 +291,15 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
 
     // Legacy fallbacks
     final isSkip = (t['is_skipped'] ?? false);
-    if (isSkip == true || isSkip.toString() == 'true' || isSkip.toString() == '1') {
+    if (isSkip == true ||
+        isSkip.toString() == 'true' ||
+        isSkip.toString() == '1') {
       return _Bucket.skip;
     }
     final isDone = (t['is_done'] ?? t['done'] ?? false);
-    if (isDone == true || isDone.toString() == 'true' || isDone.toString() == '1') {
+    if (isDone == true ||
+        isDone.toString() == 'true' ||
+        isDone.toString() == '1') {
       return _Bucket.done;
     }
     return _Bucket.todo;
@@ -296,10 +323,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Text(
         text,
-        style: GoogleFonts.nunito(
-          fontSize: 13,
-          color: const Color(0xFF8A8A8A),
-        ),
+        style: GoogleFonts.nunito(fontSize: 13, color: const Color(0xFF8A8A8A)),
       ),
     );
   }
@@ -354,8 +378,13 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
                       value: isDone,
                       onChanged: (v) => onToggleDone(v ?? false),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      visualDensity: const VisualDensity(
+                        horizontal: -4,
+                        vertical: -4,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -377,7 +406,10 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
                       onPressed: onSkip,
                       style: TextButton.styleFrom(
                         foregroundColor: textColor,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         minimumSize: Size.zero,
                       ),
                       child: Text(
@@ -469,8 +501,18 @@ class _DailyTasksScreenState extends State<DailyTasksScreen> {
   }
 
   static const List<String> _monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 }
 

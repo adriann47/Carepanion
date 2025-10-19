@@ -30,11 +30,15 @@ class MainActivity : FlutterActivity() {
                         val id = call.argument<Int>("id") ?: 0
                         val payloadArg = call.argument<String>("payload")
                         AlarmScheduler.scheduleExact(this.applicationContext, epoch, id, payloadArg)
+						// Persist this alarm so we can restore after reboot
+						AlarmStore.add(this.applicationContext, id, epoch, payloadArg)
                         result.success(null)
                     }
                     "cancelAlarm" -> {
                         val id = call.argument<Int>("id") ?: 0
                         AlarmScheduler.cancel(this.applicationContext, id)
+						// Remove from store
+						AlarmStore.remove(this.applicationContext, id)
                         result.success(null)
                     }
                     "requestExactAlarmPermissionIfNeeded" -> {
@@ -57,6 +61,76 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         }
                     }
+					"isExactAlarmAllowed" -> {
+						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+							try {
+								val am = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+								result.success(am.canScheduleExactAlarms())
+							} catch (e: Exception) {
+								result.error("exact_alarm_query_error", e.localizedMessage, null)
+							}
+						} else {
+							result.success(true)
+						}
+					}
+					"areNotificationsEnabled" -> {
+						try {
+							val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+							val enabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) nm.areNotificationsEnabled() else true
+							result.success(enabled)
+						} catch (e: Exception) {
+							result.error("notif_query_error", e.localizedMessage, null)
+						}
+					}
+					"openNotificationSettings" -> {
+						try {
+							val intent = Intent().apply {
+								action = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Settings.ACTION_APP_NOTIFICATION_SETTINGS else Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+								if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+									putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+								} else {
+									data = Uri.parse("package:" + packageName)
+								}
+								addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+							}
+							startActivity(intent)
+							result.success(null)
+						} catch (e: Exception) {
+							result.error("notif_settings_error", e.localizedMessage, null)
+						}
+					}
+					"isIgnoringBatteryOptimizations" -> {
+						try {
+							val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+							val ignoring = pm.isIgnoringBatteryOptimizations(packageName)
+							result.success(ignoring)
+						} catch (e: Exception) {
+							result.error("battery_opt_query_error", e.localizedMessage, null)
+						}
+					}
+					"requestIgnoreBatteryOptimizations" -> {
+						try {
+							val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+								data = Uri.parse("package:" + packageName)
+								addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+							}
+							startActivity(intent)
+							result.success(null)
+						} catch (e: Exception) {
+							result.error("battery_opt_request_error", e.localizedMessage, null)
+						}
+					}
+					"openIgnoreBatteryOptimizationSettings" -> {
+						try {
+							val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+								addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+							}
+							startActivity(intent)
+							result.success(null)
+						} catch (e: Exception) {
+							result.error("battery_opt_open_error", e.localizedMessage, null)
+						}
+					}
                     "popSavedReminder" -> {
                         // Read and clear the saved reminder payload from SharedPreferences
                         try {

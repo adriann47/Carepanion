@@ -142,10 +142,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             onChanged: (int? newMonth) {
                               if (newMonth == null) return;
                               setState(() {
-                                _focusedMonth =
-                                    DateTime(year, newMonth, _focusedMonth.day);
-                                _selectedDate =
-                                    DateTime(year, newMonth, _focusedMonth.day);
+                                _focusedMonth = DateTime(
+                                  year,
+                                  newMonth,
+                                  _focusedMonth.day,
+                                );
+                                _selectedDate = DateTime(
+                                  year,
+                                  newMonth,
+                                  _focusedMonth.day,
+                                );
                               });
                             },
                           ),
@@ -174,10 +180,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             onChanged: (int? newYear) {
                               if (newYear == null) return;
                               setState(() {
-                                _focusedMonth =
-                                    DateTime(newYear, month, _focusedMonth.day);
-                                _selectedDate =
-                                    DateTime(newYear, month, _focusedMonth.day);
+                                _focusedMonth = DateTime(
+                                  newYear,
+                                  month,
+                                  _focusedMonth.day,
+                                );
+                                _selectedDate = DateTime(
+                                  newYear,
+                                  month,
+                                  _focusedMonth.day,
+                                );
                               });
                             },
                           ),
@@ -191,7 +203,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         padding: EdgeInsets.symmetric(horizontal: 2 * uiScale),
                         child: Row(
                           children: [
-                            for (final wd in const ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'])
+                            for (final wd in const [
+                              'SU',
+                              'MO',
+                              'TU',
+                              'WE',
+                              'TH',
+                              'FR',
+                              'SA',
+                            ])
                               Expanded(
                                 child: Center(
                                   child: Text(
@@ -213,8 +233,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: gridDates.length,
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 7,
                           // Lower ratio => taller cells (bigger calendar)
                           childAspectRatio: 1.05, // was 1.3

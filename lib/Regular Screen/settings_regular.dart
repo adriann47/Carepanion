@@ -8,7 +8,7 @@ import 'notification_regular.dart';
 import 'tasks_screen_regular.dart';
 import 'calendar_screen_regular.dart';
 import 'profile_screen_regular.dart';
-import 'companion_list.dart'; 
+import 'companion_list.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -67,11 +67,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             final user = Supabase.instance.client.auth.currentUser;
             final text = controller.text.trim();
             if (text.isEmpty) {
-              ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('Please enter a description')));
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                const SnackBar(content: Text('Please enter a description')),
+              );
               return;
             }
             // show loading
-            showDialog(barrierDismissible: false, context: context, builder: (_) => const Center(child: CircularProgressIndicator()));
+            showDialog(
+              barrierDismissible: false,
+              context: context,
+              builder: (_) => const Center(child: CircularProgressIndicator()),
+            );
             try {
               await FeedbackService.submitFeedback(
                 userId: user?.id ?? '',
@@ -80,10 +86,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
               Navigator.pop(context); // remove loading
               Navigator.pop(context); // close the form dialog
-              ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('Bug report submitted. Thank you!')));
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                const SnackBar(
+                  content: Text('Bug report submitted. Thank you!'),
+                ),
+              );
             } catch (e) {
               Navigator.pop(context); // remove loading
-              ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text('Failed to submit bug: $e')));
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(content: Text('Failed to submit bug: $e')),
+              );
             }
           },
         );
@@ -108,11 +120,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final user = Supabase.instance.client.auth.currentUser;
                 final text = controller.text.trim();
                 if (text.isEmpty) {
-                  ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('Please enter feedback')));
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(content: Text('Please enter feedback')),
+                  );
                   return;
                 }
                 // show loading
-                showDialog(barrierDismissible: false, context: context, builder: (_) => const Center(child: CircularProgressIndicator()));
+                showDialog(
+                  barrierDismissible: false,
+                  context: context,
+                  builder: (_) =>
+                      const Center(child: CircularProgressIndicator()),
+                );
                 try {
                   await FeedbackService.submitFeedback(
                     userId: user?.id ?? '',
@@ -122,10 +141,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                   Navigator.pop(context); // remove loading
                   Navigator.pop(context); // close the form dialog
-                  ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('Feedback submitted. Thank you!')));
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Feedback submitted. Thank you!'),
+                    ),
+                  );
                 } catch (e) {
                   Navigator.pop(context); // remove loading
-                  ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text('Failed to submit feedback: $e')));
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(content: Text('Failed to submit feedback: $e')),
+                  );
                 }
               },
             );
@@ -143,9 +168,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required VoidCallback onSubmit,
   }) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -153,11 +176,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style: GoogleFonts.nunito(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                )),
+            Text(
+              title,
+              style: GoogleFonts.nunito(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 16),
             if (extraWidget != null) extraWidget,
             if (extraWidget != null) const SizedBox(height: 12),
@@ -180,11 +205,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFFEE7897), width: 1.5),
+                    side: const BorderSide(
+                      color: Color(0xFFEE7897),
+                      width: 1.5,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 10,
+                    ),
                   ),
                   onPressed: () => Navigator.pop(context),
                   child: Text(
@@ -202,7 +233,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 10,
+                    ),
                   ),
                   onPressed: onSubmit,
                   child: Text(
@@ -267,7 +301,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: w * 0.05, vertical: h * 0.02),
+              padding: EdgeInsets.symmetric(
+                horizontal: w * 0.05,
+                vertical: h * 0.02,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -276,20 +313,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const ProfileScreen(),
+                        ),
                       );
                     },
-                    icon: Icon(Icons.arrow_back,
-                        size: w * 0.07, color: const Color(0xFF3D3D3D)),
+                    icon: Icon(
+                      Icons.arrow_back,
+                      size: w * 0.07,
+                      color: const Color(0xFF3D3D3D),
+                    ),
                   ),
                   SizedBox(height: h * 0.01),
-                  Text("SETTINGS",
-                      style: GoogleFonts.nunito(
-                        fontSize: w * 0.08,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF3D3D3D),
-                        letterSpacing: 1.0,
-                      )),
+                  Text(
+                    "SETTINGS",
+                    style: GoogleFonts.nunito(
+                      fontSize: w * 0.08,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF3D3D3D),
+                      letterSpacing: 1.0,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -298,72 +342,121 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Expanded(
             child: SingleChildScrollView(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: w * 0.06, vertical: h * 0.025),
+                padding: EdgeInsets.symmetric(
+                  horizontal: w * 0.06,
+                  vertical: h * 0.025,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("GENERAL",
-                        style: GoogleFonts.nunito(
-                          fontSize: w * 0.035,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF4A4A4A),
-                          letterSpacing: 0.8,
-                        )),
+                    Text(
+                      "GENERAL",
+                      style: GoogleFonts.nunito(
+                        fontSize: w * 0.035,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF4A4A4A),
+                        letterSpacing: 0.8,
+                      ),
+                    ),
                     SizedBox(height: h * 0.015),
                     InkWell(
                       onTap: () {
-                        Navigator.push(context,
-                            MaterialPageRoute(builder: (context) => const AccountPage()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AccountPage(),
+                          ),
+                        );
                       },
                       child: _buildSettingRow(Icons.person, "ACCOUNT", w, h),
                     ),
                     _divider(w),
                     InkWell(
                       onTap: () {
-                        Navigator.push(context,
-                            MaterialPageRoute(builder: (context) => NotificationPage()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => NotificationPage(),
+                          ),
+                        );
                       },
-                      child: _buildSettingRow(Icons.notifications, "NOTIFICATIONS", w, h),
+                      child: _buildSettingRow(
+                        Icons.notifications,
+                        "NOTIFICATIONS",
+                        w,
+                        h,
+                      ),
+                    ),
+                    _divider(w),
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(context).pushNamed('/reminder_setup');
+                      },
+                      child: _buildSettingRow(
+                        Icons.alarm_on,
+                        "REMINDER SETUP",
+                        w,
+                        h,
+                      ),
                     ),
                     _divider(w),
                     // ✅ LOGOUT functionality added
                     InkWell(
                       onTap: () async {
                         try {
-                          await Supabase.instance.client.auth.signOut(scope: SignOutScope.global);
+                          await Supabase.instance.client.auth.signOut(
+                            scope: SignOutScope.global,
+                          );
                         } catch (_) {
                           // Fallback: local sign out if scope not supported
                           await Supabase.instance.client.auth.signOut();
                         }
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Signed out successfully')),
+                          const SnackBar(
+                            content: Text('Signed out successfully'),
+                          ),
                         );
                         await Future.delayed(const Duration(milliseconds: 300));
                         if (mounted) {
-                          Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            '/signin',
+                            (route) => false,
+                          );
                         }
                       },
                       child: _buildSettingRow(Icons.logout, "LOGOUT", w, h),
                     ),
                     SizedBox(height: h * 0.03),
 
-                    Text("FEEDBACK",
-                        style: GoogleFonts.nunito(
-                          fontSize: w * 0.035,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF4A4A4A),
-                          letterSpacing: 0.8,
-                        )),
+                    Text(
+                      "FEEDBACK",
+                      style: GoogleFonts.nunito(
+                        fontSize: w * 0.035,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF4A4A4A),
+                        letterSpacing: 0.8,
+                      ),
+                    ),
                     SizedBox(height: h * 0.015),
                     InkWell(
                       onTap: () => _showReportBugDialog(context),
-                      child: _buildSettingRow(Icons.bug_report, "REPORT BUG", w, h),
+                      child: _buildSettingRow(
+                        Icons.bug_report,
+                        "REPORT BUG",
+                        w,
+                        h,
+                      ),
                     ),
                     _divider(w),
                     InkWell(
                       onTap: () => _showFeedbackDialog(context),
-                      child: _buildSettingRow(Icons.chat, "SEND FEEDBACK", w, h),
+                      child: _buildSettingRow(
+                        Icons.chat,
+                        "SEND FEEDBACK",
+                        w,
+                        h,
+                      ),
                     ),
                     SizedBox(height: h * 0.05),
                   ],
@@ -386,9 +479,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         showUnselectedLabels: false,
         items: [
           _navItem(Icons.home, 'Home', isSelected: _currentIndex == 0),
-          _navItem(Icons.calendar_today, 'Calendar', isSelected: _currentIndex == 1),
-          _navItem(Icons.family_restroom, 'Alert', isSelected: _currentIndex == 2),
-          _navItem(Icons.notifications, 'Notifications', isSelected: _currentIndex == 3),
+          _navItem(
+            Icons.calendar_today,
+            'Calendar',
+            isSelected: _currentIndex == 1,
+          ),
+          _navItem(
+            Icons.family_restroom,
+            'Alert',
+            isSelected: _currentIndex == 2,
+          ),
+          _navItem(
+            Icons.notifications,
+            'Notifications',
+            isSelected: _currentIndex == 3,
+          ),
           _navItem(Icons.person, 'Profile', isSelected: _currentIndex == 4),
         ],
       ),
@@ -427,16 +532,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _divider(double w) {
     return Padding(
       padding: EdgeInsets.only(left: w * 0.14),
-      child: const Divider(
-        thickness: 1.0,
-        height: 1,
-        color: Color(0xFFE8E2DF),
-      ),
+      child: const Divider(thickness: 1.0, height: 1, color: Color(0xFFE8E2DF)),
     );
   }
 
-  static BottomNavigationBarItem _navItem(IconData icon, String label,
-      {bool isSelected = false}) {
+  static BottomNavigationBarItem _navItem(
+    IconData icon,
+    String label, {
+    bool isSelected = false,
+  }) {
     return BottomNavigationBarItem(
       label: label,
       icon: Container(
@@ -447,8 +551,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: isSelected ? Colors.pink.shade100 : const Color(0xFFE0E0E0),
         ),
         child: Center(
-          child: Icon(icon,
-              size: 28, color: isSelected ? Colors.pink : Colors.black87),
+          child: Icon(
+            icon,
+            size: 28,
+            color: isSelected ? Colors.pink : Colors.black87,
+          ),
         ),
       ),
     );

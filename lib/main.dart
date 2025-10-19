@@ -25,6 +25,7 @@ import 'services/notification_prefs.dart';
 import 'services/notification_service.dart';
 import 'services/guardian_request_service.dart';
 import 'Regular Screen/tasks_screen_regular.dart';
+import 'screen/reminder_setup_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -174,8 +175,8 @@ class CarePanionApp extends StatelessWidget {
         "/settings": (context) => const SettingsScreen(),
         "/notifications": (context) => NotificationPage(),
         "/account": (context) => const AccountPage(),
+        "/reminder_setup": (context) => const ReminderSetupScreen(),
       },
     );
   }
 }
-

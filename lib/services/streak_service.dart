@@ -20,7 +20,8 @@ class StreakService {
           .select('current_streak, streak')
           .eq('user_id', uid)
           .maybeSingle();
-      current.value = row?['current_streak'] as int? ?? row?['streak'] as int? ?? 0;
+      current.value =
+          row?['current_streak'] as int? ?? row?['streak'] as int? ?? 0;
     } catch (_) {
       // Fallback to local calculation if DB query fails
       try {
@@ -32,4 +33,3 @@ class StreakService {
     }
   }
 }
-

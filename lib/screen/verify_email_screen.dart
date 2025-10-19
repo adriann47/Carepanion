@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
@@ -155,10 +155,16 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       if (!mounted) return;
       final msg = e.toString();
       final msgLower = msg.toLowerCase();
-      if (msgLower.contains('rate_limit') || msgLower.contains('send_rate_limit') || msgLower.contains('429')) {
+      if (msgLower.contains('rate_limit') ||
+          msgLower.contains('send_rate_limit') ||
+          msgLower.contains('429')) {
         _startCooldown(30);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please wait 30 seconds before requesting another code.')),
+          const SnackBar(
+            content: Text(
+              'Please wait 30 seconds before requesting another code.',
+            ),
+          ),
         );
         return;
       }
@@ -297,7 +303,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           child: Column(
             children: [
               const SizedBox(height: 40), // Reduced from 60
-
               // Verify your Email Address (bold, multi-line)
               Text(
                 _useSms ? "Verify your Phone Number" : "Verify your Email",
@@ -319,7 +324,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 style: GoogleFonts.nunito(color: primaryTextColor),
               ),
               const SizedBox(height: 40), // Reduced from 60
-
               // OTP section
               Align(
                 alignment: Alignment.centerLeft,

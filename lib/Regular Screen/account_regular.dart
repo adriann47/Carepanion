@@ -57,7 +57,10 @@ class _AccountPageState extends State<AccountPage> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final newVal = controller.text.trim();
@@ -76,7 +79,13 @@ class _AccountPageState extends State<AccountPage> {
                   if (mounted) {
                     setState(() => mobile = newVal);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(ok ? 'Mobile updated' : 'Saved locally; server column missing')),
+                      SnackBar(
+                        content: Text(
+                          ok
+                              ? 'Mobile updated'
+                              : 'Saved locally; server column missing',
+                        ),
+                      ),
                     );
                   }
                 }
@@ -106,9 +115,24 @@ class _AccountPageState extends State<AccountPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label.toUpperCase(), style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black87)),
+                Text(
+                  label.toUpperCase(),
+                  style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(value, style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87), overflow: TextOverflow.ellipsis),
+                Text(
+                  value,
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -132,33 +156,65 @@ class _AccountPageState extends State<AccountPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label.toUpperCase(), style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black87)),
+                Text(
+                  label.toUpperCase(),
+                  style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(value, style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87), overflow: TextOverflow.ellipsis),
+                Text(
+                  value,
+                  style: GoogleFonts.nunito(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
-          IconButton(onPressed: onEdit, icon: const Icon(Icons.edit, color: Colors.black54)),
+          IconButton(
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit, color: Colors.black54),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPasswordField(String hint, TextEditingController controller, {required bool obscure, required VoidCallback onToggle}) {
+  Widget _buildPasswordField(
+    String hint,
+    TextEditingController controller, {
+    required bool obscure,
+    required VoidCallback onToggle,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(color: const Color(0x99B3E5FC), borderRadius: BorderRadius.circular(28)),
+      decoration: BoxDecoration(
+        color: const Color(0x99B3E5FC),
+        borderRadius: BorderRadius.circular(28),
+      ),
       child: TextField(
         controller: controller,
         obscureText: obscure,
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: GoogleFonts.nunito(color: Colors.black.withOpacity(0.4), fontWeight: FontWeight.w600),
+          hintStyle: GoogleFonts.nunito(
+            color: Colors.black.withOpacity(0.4),
+            fontWeight: FontWeight.w600,
+          ),
           filled: true,
           fillColor: const Color(0x66B3E5FC),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 14,
+          ),
           suffixIcon: IconButton(
             tooltip: obscure ? 'Show password' : 'Hide password',
             icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
@@ -174,7 +230,11 @@ class _AccountPageState extends State<AccountPage> {
     final user = client.auth.currentUser;
     if (user == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You must be signed in to change password.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be signed in to change password.'),
+        ),
+      );
       return;
     }
 
@@ -182,7 +242,13 @@ class _AccountPageState extends State<AccountPage> {
       final provider = user.appMetadata['provider']?.toString();
       if ((provider ?? '').toLowerCase() == 'google') {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Password change isn't available for Google sign-in accounts.")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Password change isn't available for Google sign-in accounts.",
+            ),
+          ),
+        );
         return;
       }
     } catch (_) {}
@@ -192,27 +258,37 @@ class _AccountPageState extends State<AccountPage> {
     final confirm = _confirmPass.text.trim();
     if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all password fields.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all password fields.')),
+      );
       return;
     }
     if (newPass != confirm) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('New passwords do not match.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New passwords do not match.')),
+      );
       return;
     }
     if (!RegExp(r'[A-Z]').hasMatch(newPass)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Must contain 1 uppercase letter')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 uppercase letter')),
+      );
       return;
     }
     if (!RegExp(r'[0-9]').hasMatch(newPass)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Must contain 1 number')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Must contain 1 number')));
       return;
     }
     if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(newPass)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Must contain 1 special character')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Must contain 1 special character')),
+      );
       return;
     }
 
@@ -220,17 +296,26 @@ class _AccountPageState extends State<AccountPage> {
     try {
       if ((user.email ?? '').isNotEmpty) {
         try {
-          await client.auth.signInWithPassword(email: user.email!, password: current);
+          await client.auth.signInWithPassword(
+            email: user.email!,
+            password: current,
+          );
         } on AuthException catch (e) {
           if (!mounted) return;
           final msg = e.message.toLowerCase();
-          final friendly = msg.contains('invalid') ? 'Current password is incorrect.' : 'Failed to verify current password.';
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendly)));
+          final friendly = msg.contains('invalid')
+              ? 'Current password is incorrect.'
+              : 'Failed to verify current password.';
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(friendly)));
           return;
         }
       }
 
-      final res = await client.auth.updateUser(UserAttributes(password: newPass));
+      final res = await client.auth.updateUser(
+        UserAttributes(password: newPass),
+      );
       if (res.user == null) throw Exception('Password update failed.');
 
       if (!mounted) return;
@@ -244,21 +329,33 @@ class _AccountPageState extends State<AccountPage> {
           await client.auth.signOut();
         }
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated. Signed out of all devices.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password updated. Signed out of all devices.'),
+          ),
+        );
         await Future.delayed(const Duration(milliseconds: 300));
         if (mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/signin', (route) => false);
         }
         return;
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated successfully.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password updated successfully.')),
+        );
       }
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update password: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update password: $e')));
     } finally {
       if (mounted) setState(() => _savingPassword = false);
     }
@@ -301,54 +398,128 @@ class _AccountPageState extends State<AccountPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back, color: Color(0xFF3D3D3D))),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Color(0xFF3D3D3D),
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text('ACCOUNT', style: GoogleFonts.nunito(fontSize: w * 0.07, fontWeight: FontWeight.w800, color: const Color(0xFF3D3D3D))),
+                  Text(
+                    'ACCOUNT',
+                    style: GoogleFonts.nunito(
+                      fontSize: w * 0.07,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF3D3D3D),
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: w * 0.08, vertical: h * 0.02).copyWith(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
+              padding: EdgeInsets.symmetric(
+                horizontal: w * 0.08,
+                vertical: h * 0.02,
+              ).copyWith(bottom: MediaQuery.of(context).viewInsets.bottom + 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildReadOnlyRow('Email', email ?? ''),
-                  _buildEditableRow('Mobile Number', mobile.isEmpty ? '' : mobile, () {
-                    _editField('Mobile Number', mobile, (val) => setState(() => mobile = val));
-                  }),
+                  _buildEditableRow(
+                    'Mobile Number',
+                    mobile.isEmpty ? '' : mobile,
+                    () {
+                      _editField(
+                        'Mobile Number',
+                        mobile,
+                        (val) => setState(() => mobile = val),
+                      );
+                    },
+                  ),
                   SizedBox(height: h * 0.03),
-                  Center(child: Text('RESET PASSWORD', style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.black87))),
+                  Center(
+                    child: Text(
+                      'RESET PASSWORD',
+                      style: GoogleFonts.nunito(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 14),
-                  _buildPasswordField('CURRENT PASSWORD', _currentPass, obscure: _obscureCurrent, onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent)),
-                  _buildPasswordField('NEW PASSWORD', _newPass, obscure: _obscureNew, onToggle: () => setState(() => _obscureNew = !_obscureNew)),
-                  _buildPasswordField('CONFIRM NEW PASSWORD', _confirmPass, obscure: _obscureConfirm, onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm)),
+                  _buildPasswordField(
+                    'CURRENT PASSWORD',
+                    _currentPass,
+                    obscure: _obscureCurrent,
+                    onToggle: () =>
+                        setState(() => _obscureCurrent = !_obscureCurrent),
+                  ),
+                  _buildPasswordField(
+                    'NEW PASSWORD',
+                    _newPass,
+                    obscure: _obscureNew,
+                    onToggle: () => setState(() => _obscureNew = !_obscureNew),
+                  ),
+                  _buildPasswordField(
+                    'CONFIRM NEW PASSWORD',
+                    _confirmPass,
+                    obscure: _obscureConfirm,
+                    onToggle: () =>
+                        setState(() => _obscureConfirm = !_obscureConfirm),
+                  ),
                   CheckboxListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                     value: _signOutAll,
                     onChanged: (v) => setState(() => _signOutAll = v ?? false),
                     controlAffinity: ListTileControlAffinity.leading,
-                    title: Text('Sign out of all devices after saving', style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w600)),
+                    title: Text(
+                      'Sign out of all devices after saving',
+                      style: GoogleFonts.nunito(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   Center(
                     child: ElevatedButton(
                       onPressed: _savingPassword ? null : _handleSavePassword,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0x99B3E5FC),
-                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                         elevation: 0,
                       ),
                       child: _savingPassword
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : Text('SAVE', style: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: Colors.black87)),
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              'SAVE',
+                              style: GoogleFonts.nunito(
+                                fontWeight: FontWeight.w800,
+                                color: Colors.black87,
+                              ),
+                            ),
                     ),
                   ),
                   SizedBox(height: h * 0.03),
-                  const Divider(color: Colors.black26, thickness: 1, indent: 10, endIndent: 10),
+                  const Divider(
+                    color: Colors.black26,
+                    thickness: 1,
+                    indent: 10,
+                    endIndent: 10,
+                  ),
                   SizedBox(height: h * 0.02),
                 ],
               ),
@@ -359,4 +530,3 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 }
-

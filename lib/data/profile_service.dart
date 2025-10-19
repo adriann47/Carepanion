@@ -75,7 +75,8 @@ class ProfileService {
         final insertPayload = <String, dynamic>{
           'id': user.id,
           if (email != null) 'email': email,
-          if (fullName != null && fullName.trim().isNotEmpty) 'fullname': fullName.trim(),
+          if (fullName != null && fullName.trim().isNotEmpty)
+            'fullname': fullName.trim(),
           if (effectiveRole != null) 'role': effectiveRole,
         };
 
@@ -94,20 +95,24 @@ class ProfileService {
 
       // Set email if currently null and we have one
       final dynamic existingEmail = existing['email'];
-      if ((existingEmail == null || existingEmail.toString().trim().isEmpty) && email != null) {
+      if ((existingEmail == null || existingEmail.toString().trim().isEmpty) &&
+          email != null) {
         updatePayload['email'] = email;
       }
 
       // Set role if currently null and we have one
       final dynamic existingRole = existing['role'];
-      if ((existingRole == null || existingRole.toString().trim().isEmpty) && effectiveRole != null) {
+      if ((existingRole == null || existingRole.toString().trim().isEmpty) &&
+          effectiveRole != null) {
         updatePayload['role'] = effectiveRole;
       }
 
       // Ensure Regular users have public_id; don't touch if it already exists
       final dynamic existingPublicId = existing['public_id'];
-      if ((effectiveRole ?? existingRole?.toString() ?? '').toLowerCase() == 'regular') {
-        if (existingPublicId == null || existingPublicId.toString().trim().isEmpty) {
+      if ((effectiveRole ?? existingRole?.toString() ?? '').toLowerCase() ==
+          'regular') {
+        if (existingPublicId == null ||
+            existingPublicId.toString().trim().isEmpty) {
           final pub = await _generateUniquePublicId(client, table);
           if (pub != null) updatePayload['public_id'] = pub;
         }
@@ -125,15 +130,20 @@ class ProfileService {
 
   /// Generate a unique 8-digit numeric public_id not already present.
   static Future<String?> _generateUniquePublicId(
-      SupabaseClient client, String table) async {
+    SupabaseClient client,
+    String table,
+  ) async {
     final rng = Random.secure();
     const attempts = 6;
     for (var i = 0; i < attempts; i++) {
-      final value =
-          (rng.nextInt(90000000) + 10000000).toString(); // 8-digit number
+      final value = (rng.nextInt(90000000) + 10000000)
+          .toString(); // 8-digit number
       try {
-        final found =
-            await client.from(table).select('id').eq('public_id', value).maybeSingle();
+        final found = await client
+            .from(table)
+            .select('id')
+            .eq('public_id', value)
+            .maybeSingle();
         if (found == null) return value;
       } catch (_) {
         continue;
@@ -192,7 +202,8 @@ class ProfileService {
       throw Exception('Failed to query profile table: $e');
     }
 
-    if (guardian == null) throw Exception('Guardian not found for id $guardianPublicId');
+    if (guardian == null)
+      throw Exception('Guardian not found for id $guardianPublicId');
     final guardianId = guardian['id'] as String;
     final user = client.auth.currentUser;
     if (user == null) throw Exception('Not authenticated');
@@ -220,7 +231,9 @@ class ProfileService {
         'status': 'pending',
       });
     } catch (e) {
-      throw Exception('Failed to create guardian request (assisted_guardians table may be missing): $e');
+      throw Exception(
+        'Failed to create guardian request (assisted_guardians table may be missing): $e',
+      );
     }
   }
 
@@ -271,7 +284,7 @@ class ProfileService {
             .eq('guardian_id', guardianUserId);
       } catch (_) {}
 
-      // 2) Multi-link via assisted_guardians join table
+      // 2) Multi-link via assisted_guardians join table - only accepted status
       final Set<String> ids = <String>{};
       for (final r in legacy) {
         final id = r['id']?.toString();
@@ -281,14 +294,15 @@ class ProfileService {
         final links = await client
             .from('assisted_guardians')
             .select('assisted_id')
-            .eq('guardian_id', guardianUserId);
+            .eq('guardian_id', guardianUserId)
+            .eq('status', 'accepted'); // Only accepted requests
         for (final e in links as List) {
           final v = e['assisted_id']?.toString();
           if (v != null && v.isNotEmpty) ids.add(v);
         }
       } catch (_) {}
 
-  if (ids.isEmpty) return List<Map<String, dynamic>>.from(legacy);
+      if (ids.isEmpty) return List<Map<String, dynamic>>.from(legacy);
 
       // Fetch full profiles for union set
       final rows = await client
@@ -317,8 +331,8 @@ class ProfileService {
     if (fullName != null) payload['fullname'] = fullName;
     if (role != null) payload['role'] = role;
     if (birthday != null) payload['birthday'] = birthday;
-  
-  try {
+
+    try {
       await client.from(table).upsert(payload);
     } catch (e) {
       // Don't let DB policy failures block client flows like registration.
@@ -328,22 +342,22 @@ class ProfileService {
         print('ProfileService.upsertProfile failed: $e');
       }
 
-    if (phone != null) payload['phone'] = phone; // best-effort; may fail if column missing
-    try {
-      await client.from(table).upsert(payload);
-    } catch (_) {
-      // If 'phone' column doesn't exist, ignore; callers can use setPhone for robust writes
-      await client.from(table).upsert({
-        'id': id,
-        if (email != null) 'email': email,
-        if (fullName != null) 'fullname': fullName,
-        if (role != null) 'role': role,
-        if (birthday != null) 'birthday': birthday,
-      });
-
+      if (phone != null)
+        payload['phone'] = phone; // best-effort; may fail if column missing
+      try {
+        await client.from(table).upsert(payload);
+      } catch (_) {
+        // If 'phone' column doesn't exist, ignore; callers can use setPhone for robust writes
+        await client.from(table).upsert({
+          'id': id,
+          if (email != null) 'email': email,
+          if (fullName != null) 'fullname': fullName,
+          if (role != null) 'role': role,
+          if (birthday != null) 'birthday': birthday,
+        });
+      }
     }
-}
-}
+  }
 
   /// Fetch the profile row for the supplied [id] or the current auth user.
   static Future<Map<String, dynamic>?> fetchProfile(
@@ -490,12 +504,42 @@ class ProfileService {
     try {
       final dt = DateTime.parse(raw);
       final months = [
-        '', 'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        '',
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
       ];
       return '${months[dt.month]} ${dt.day}, ${dt.year}';
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Best-effort helper to set guardian_id on the assisted user's profile row.
+  /// Uses the resolved profile table name and ignores errors if the column is
+  /// missing or RLS prevents the write.
+  static Future<void> setGuardianIdForAssisted(
+    SupabaseClient client, {
+    required String assistedUserId,
+    required String guardianUserId,
+  }) async {
+    try {
+      final table = await _resolveTable(client);
+      await client
+          .from(table)
+          .update({'guardian_id': guardianUserId})
+          .eq('id', assistedUserId);
+    } catch (_) {
+      // ignore
     }
   }
 }

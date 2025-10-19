@@ -70,9 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required VoidCallback onSubmit,
   }) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -120,7 +118,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 10,
+                    ),
                   ),
                   onPressed: () {
                     Navigator.pop(context);
@@ -142,7 +143,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 10,
+                    ),
                   ),
                   onPressed: onSubmit,
                   child: Text(
@@ -209,7 +213,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: w * 0.05, vertical: h * 0.02),
+              padding: EdgeInsets.symmetric(
+                horizontal: w * 0.05,
+                vertical: h * 0.02,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -218,7 +225,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const ProfileScreen(),
+                        ),
                       );
                     },
                     icon: Icon(
@@ -246,7 +255,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Expanded(
             child: SingleChildScrollView(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: w * 0.06, vertical: h * 0.025),
+                padding: EdgeInsets.symmetric(
+                  horizontal: w * 0.06,
+                  vertical: h * 0.025,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -265,10 +277,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const AccountPage()),
+                          MaterialPageRoute(
+                            builder: (context) => const AccountPage(),
+                          ),
                         );
                       },
                       child: _buildSettingRow(Icons.person, "ACCOUNT", w, h),
+                    ),
+                    _divider(w),
+
+                    // Navigate to Reminder Setup (permissions + test button)
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(context).pushNamed('/reminder_setup');
+                      },
+                      child: _buildSettingRow(
+                        Icons.alarm_on,
+                        "REMINDER SETUP",
+                        w,
+                        h,
+                      ),
                     ),
                     _divider(w),
 
@@ -276,28 +304,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => NotificationPage()),
+                          MaterialPageRoute(
+                            builder: (context) => NotificationPage(),
+                          ),
                         );
                       },
-                      child: _buildSettingRow(Icons.notifications, "NOTIFICATIONS", w, h),
+                      child: _buildSettingRow(
+                        Icons.notifications,
+                        "NOTIFICATIONS",
+                        w,
+                        h,
+                      ),
                     ),
                     _divider(w),
 
                     InkWell(
                       onTap: () async {
                         try {
-                          await Supabase.instance.client.auth.signOut(scope: SignOutScope.global);
+                          await Supabase.instance.client.auth.signOut(
+                            scope: SignOutScope.global,
+                          );
                         } catch (_) {
                           // Fallback: local sign out if scope not supported
                           await Supabase.instance.client.auth.signOut();
                         }
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Signed out successfully')),
+                          const SnackBar(
+                            content: Text('Signed out successfully'),
+                          ),
                         );
                         await Future.delayed(const Duration(milliseconds: 300));
                         if (mounted) {
-                          Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            '/signin',
+                            (route) => false,
+                          );
                         }
                       },
                       child: _buildSettingRow(Icons.logout, "LOGOUT", w, h),
@@ -318,13 +360,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                     InkWell(
                       onTap: () => _showReportBugDialog(context),
-                      child: _buildSettingRow(Icons.bug_report, "REPORT BUG", w, h),
+                      child: _buildSettingRow(
+                        Icons.bug_report,
+                        "REPORT BUG",
+                        w,
+                        h,
+                      ),
                     ),
                     _divider(w),
 
                     InkWell(
                       onTap: () => _showFeedbackDialog(context),
-                      child: _buildSettingRow(Icons.chat, "SEND FEEDBACK", w, h),
+                      child: _buildSettingRow(
+                        Icons.chat,
+                        "SEND FEEDBACK",
+                        w,
+                        h,
+                      ),
                     ),
                     SizedBox(height: h * 0.05),
                   ],
@@ -372,11 +424,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _divider(double w) {
     return Padding(
       padding: EdgeInsets.only(left: w * 0.14),
-      child: const Divider(
-        thickness: 1.0,
-        height: 1,
-        color: Color(0xFFE8E2DF),
-      ),
+      child: const Divider(thickness: 1.0, height: 1, color: Color(0xFFE8E2DF)),
     );
   }
 }
