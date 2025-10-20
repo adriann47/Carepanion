@@ -7,6 +7,7 @@ import android.util.Log
 import android.os.Build
 import android.provider.Settings
 import android.net.Uri
+import androidx.core.content.ContextCompat
 import org.json.JSONObject
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -139,11 +140,11 @@ class MainActivity : FlutterActivity() {
 							result.error("battery_opt_open_error", e.localizedMessage, null)
 						}
 					}
-                    "popSavedReminder" -> {
-                        // Read and clear the saved reminder payload from SharedPreferences
-                        try {
-                            val prefs = this.getSharedPreferences("carepanion_prefs", Context.MODE_PRIVATE)
-                            val saved = prefs.getString("saved_reminder", null)
+					"popSavedReminder" -> {
+						// Read and clear the saved reminder payload from SharedPreferences
+						try {
+							val prefs = this.getSharedPreferences("carepanion_prefs", Context.MODE_PRIVATE)
+							val saved = prefs.getString("saved_reminder", null)
 							if (saved != null) {
 								prefs.edit().remove("saved_reminder").apply()
 							}
@@ -151,6 +152,34 @@ class MainActivity : FlutterActivity() {
 						} catch (e: Exception) {
 							result.error("prefs_error", e.localizedMessage, null)
 						}
+					}
+					"startReminderForegroundService" -> {
+						try {
+							if (!ReminderForegroundService.isRunning()) {
+								val intent = Intent(this.applicationContext, ReminderForegroundService::class.java)
+								if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+									ContextCompat.startForegroundService(this.applicationContext, intent)
+								} else {
+									startService(intent)
+								}
+							}
+							result.success(true)
+						} catch (e: Exception) {
+							Log.e("MainActivity", "startReminderForegroundService failed", e)
+							result.error("foreground_start_error", e.localizedMessage, null)
+						}
+					}
+					"stopReminderForegroundService" -> {
+						try {
+							val stopped = stopService(Intent(this.applicationContext, ReminderForegroundService::class.java))
+							result.success(stopped)
+						} catch (e: Exception) {
+							Log.e("MainActivity", "stopReminderForegroundService failed", e)
+							result.error("foreground_stop_error", e.localizedMessage, null)
+						}
+					}
+					"isReminderForegroundServiceRunning" -> {
+						result.success(ReminderForegroundService.isRunning())
 					}
 					else -> result.notImplemented()
 				}

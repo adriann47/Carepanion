@@ -29,6 +29,8 @@ class ReminderService {
   static int _notifIdFor(DateTime dt) => dt.millisecondsSinceEpoch % 2147483647;
 
   static void start() {
+    // Ensure native foreground service keeps the process alive for background alerts
+    unawaited(NotificationService.ensureForegroundService());
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     _setupRealtime();
@@ -49,6 +51,7 @@ class ReminderService {
       } catch (_) {}
       _taskChannel = null;
     }
+    unawaited(NotificationService.stopForegroundService());
   }
 
   static Future<void> _tick() async {

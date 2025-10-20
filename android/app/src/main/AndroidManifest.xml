@@ -13,6 +13,9 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Receive boot completed to reschedule alarms after reboot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Keep background reminder sync running via foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:label="CarePanion"
@@ -69,7 +72,7 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        
+
     <!-- Receiver used by native AlarmManager to launch full-screen reminder -->
     <receiver android:name=".ReminderAlarmReceiver" android:exported="true" />
     <receiver
@@ -81,6 +84,11 @@
             <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
         </intent-filter>
     </receiver>
+    <service
+        android:name=".ReminderForegroundService"
+        android:exported="false"
+        android:stopWithTask="false"
+        android:foregroundServiceType="dataSync" />
     </application>
 
     <!-- Required to query activities that can process text, see:

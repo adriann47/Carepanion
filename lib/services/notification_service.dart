@@ -111,6 +111,10 @@ class NotificationService {
           IOSFlutterLocalNotificationsPlugin
         >();
     await iosImpl?.requestPermissions(alert: true, badge: true, sound: true);
+
+    // Keep the native foreground service running so reminder logic stays active
+    await ensureForegroundService();
+
     _initialized = true;
   }
 
@@ -127,6 +131,32 @@ class NotificationService {
       }
     } catch (_) {}
     return null;
+  }
+
+  static Future<void> ensureForegroundService() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _native.invokeMethod('startReminderForegroundService');
+    } catch (_) {}
+  }
+
+  static Future<void> stopForegroundService() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _native.invokeMethod('stopReminderForegroundService');
+    } catch (_) {}
+  }
+
+  static Future<bool> isForegroundServiceRunning() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      final result = await _native.invokeMethod<bool>(
+        'isReminderForegroundServiceRunning',
+      );
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   static NotificationDetails _details({
