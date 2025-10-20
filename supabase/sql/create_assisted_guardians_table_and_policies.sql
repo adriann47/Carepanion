@@ -21,6 +21,8 @@ drop policy if exists assisted_guardians_select_guardian_requests on public.assi
 drop policy if exists assisted_guardians_insert_own_requests on public.assisted_guardians;
 drop policy if exists assisted_guardians_update_guardian_responses on public.assisted_guardians;
 drop policy if exists assisted_guardians_update_assisted_cancellation on public.assisted_guardians;
+drop policy if exists assisted_guardians_delete_own_links on public.assisted_guardians;
+drop policy if exists assisted_guardians_delete_guardian_links on public.assisted_guardians;
 
 -- Policy: Assisted users can view their own guardian requests
 create policy assisted_guardians_select_own_requests
@@ -59,6 +61,20 @@ create policy assisted_guardians_update_assisted_cancellation
   using (auth.uid() = assisted_id and status = 'pending')
   with check (auth.uid() = assisted_id and status in ('rejected'));
 
+-- Policy: Assisted users can delete their own links (any status)
+create policy assisted_guardians_delete_own_links
+  on public.assisted_guardians
+  for delete
+  to authenticated
+  using (auth.uid() = assisted_id);
+
+-- Optional: Guardians can also delete links directed to them (any status)
+create policy assisted_guardians_delete_guardian_links
+  on public.assisted_guardians
+  for delete
+  to authenticated
+  using (auth.uid() = guardian_id);
+
 -- Create indexes for better performance
 create index if not exists idx_assisted_guardians_assisted_id on public.assisted_guardians(assisted_id);
 create index if not exists idx_assisted_guardians_guardian_id on public.assisted_guardians(guardian_id);
@@ -78,3 +94,17 @@ drop trigger if exists update_assisted_guardians_updated_at on public.assisted_g
 create trigger update_assisted_guardians_updated_at
   before update on public.assisted_guardians
   for each row execute function update_updated_at_column();
+
+-- Ensure this table is included in the supabase_realtime publication so inserts/updates
+-- are broadcast to clients (required for guardian accept/reject popup to trigger).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'assisted_guardians'
+  ) then
+    alter publication supabase_realtime add table public.assisted_guardians;
+  end if;
+end $$;

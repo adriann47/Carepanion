@@ -184,7 +184,10 @@ class ProfileService {
   /// request was created.
   /// Create a guardian request row in `assisted_guardians` with status 'pending'.
   /// Throws an exception with a helpful message on failure.
-  static Future<void> requestGuardianByPublicId(
+  /// Create or reuse a guardian request row. Returns a map with:
+  /// { 'guardianId': <uuid>, 'status': 'pending'|'accepted'|'rejected' }
+  /// If a row already exists, returns its current status without inserting a new one.
+  static Future<Map<String, String>> requestGuardianByPublicId(
     SupabaseClient client, {
     required String guardianPublicId,
   }) async {
@@ -208,20 +211,24 @@ class ProfileService {
     final user = client.auth.currentUser;
     if (user == null) throw Exception('Not authenticated');
 
-    // Prevent duplicate pending requests to same guardian
+    // Check if a link already exists (any status)
     try {
-      final exists = await client
+      final existing = await client
           .from('assisted_guardians')
-          .select('id')
+          .select('status')
           .eq('assisted_id', user.id)
           .eq('guardian_id', guardianId)
-          .eq('status', 'pending')
-          .limit(1)
           .maybeSingle();
-      if (exists != null) return; // already pending
+      if (existing != null) {
+        final st = (existing['status'] ?? 'pending').toString();
+        return {'guardianId': guardianId, 'status': st};
+      }
     } catch (e) {
-      throw Exception('Failed to check existing requests: $e');
+      // continue to attempt insert
     }
+
+    // Prevent duplicate pending requests to same guardian
+    // If no row exists, create a pending request
 
     // Insert request row
     try {
@@ -230,7 +237,21 @@ class ProfileService {
         'guardian_id': guardianId,
         'status': 'pending',
       });
+      return {'guardianId': guardianId, 'status': 'pending'};
     } catch (e) {
+      // If a concurrent insert happened, fall back to reading existing status
+      try {
+        final existing = await client
+            .from('assisted_guardians')
+            .select('status')
+            .eq('assisted_id', user.id)
+            .eq('guardian_id', guardianId)
+            .maybeSingle();
+        if (existing != null) {
+          final st = (existing['status'] ?? 'pending').toString();
+          return {'guardianId': guardianId, 'status': st};
+        }
+      } catch (_) {}
       throw Exception(
         'Failed to create guardian request (assisted_guardians table may be missing): $e',
       );
@@ -241,6 +262,7 @@ class ProfileService {
   /// Returns 'accepted'|'rejected'|'timeout'.
   static Future<String> waitForGuardianResponse(
     SupabaseClient client, {
+    String? guardianUserId,
     Duration timeout = const Duration(minutes: 5),
     Duration pollInterval = const Duration(seconds: 3),
   }) async {
@@ -250,10 +272,14 @@ class ProfileService {
     final end = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(end)) {
       try {
-        final row = await client
+        var query = client
             .from('assisted_guardians')
             .select('status')
-            .eq('assisted_id', user.id)
+            .eq('assisted_id', user.id);
+        if (guardianUserId != null && guardianUserId.isNotEmpty) {
+          query = query.eq('guardian_id', guardianUserId);
+        }
+        final row = await query
             .order('created_at', ascending: false)
             .limit(1)
             .maybeSingle();

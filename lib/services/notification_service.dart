@@ -163,8 +163,20 @@ class NotificationService {
     required String body,
     String? payload,
     String channelId = 'carepanion_reminders',
+    bool ignorePrefs = false,
   }) async {
-    if (!NotificationPreferences.pushEnabled.value) return;
+    // Allow callers to force showing a notification regardless of the in-app toggle
+    if (!ignorePrefs && !NotificationPreferences.pushEnabled.value) return;
+    // Best-effort: on Android, (re-)request permission right before showing
+    if (Platform.isAndroid) {
+      try {
+        final androidImpl = _plugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+        await androidImpl?.requestNotificationsPermission();
+      } catch (_) {}
+    }
     // Enrich payload with title/body so native side can do TTS when app isn't active
     String enrichedPayload;
     try {

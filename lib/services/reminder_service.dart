@@ -314,6 +314,7 @@ class ReminderService {
           title: 'Task Reminder: $title',
           body: note.isNotEmpty ? note : 'It\'s time to do this task.',
           payload: '{"task_id":"$id"}',
+          ignorePrefs: true,
         );
         unawaited(
           ReinforcementLearningService.markReminderDecisionResult(
@@ -327,6 +328,16 @@ class ReminderService {
 
       // Popup path
       _popupActive = true;
+      // Also post a system notification so there's always a visible push in the shade
+      try {
+        await NotificationService.showNow(
+          id: _notifIdFor(triggerTime),
+          title: 'Task Reminder: $title',
+          body: note.isNotEmpty ? note : "It's time to do this task.",
+          payload: '{"task_id":"$id"}',
+          ignorePrefs: true,
+        );
+      } catch (_) {}
       unawaited(
         ReinforcementLearningService.markReminderDecisionResult(
           decision.eventId,
@@ -528,6 +539,32 @@ class ReminderService {
     if (_alerted.contains(dupKey)) return;
     _alerted.add(dupKey);
     _popupActive = true;
+
+    // Ensure there's also a system notification visible alongside the popup.
+    // This matches the in-app tick path and guarantees Assisted users see a push
+    // notification even when the popup is presented via native full-screen alarm.
+    try {
+      final title = (taskRec['title'] ?? 'Task').toString();
+      final note = (taskRec['description'] ?? '').toString();
+      // Try to use the scheduled start time as the notification id for consistency
+      DateTime? notifTime;
+      final saForId = taskRec['start_at'];
+      if (saForId != null) {
+        try {
+          notifTime = DateTime.parse(saForId.toString()).toLocal();
+        } catch (_) {
+          notifTime = null;
+        }
+      }
+      final nid = notifTime != null ? _notifIdFor(notifTime) : DateTime.now().millisecondsSinceEpoch % 2147483647;
+      await NotificationService.showNow(
+        id: nid,
+        title: 'Task Reminder: $title',
+        body: note.isNotEmpty ? note : "It's time to do this task.",
+        payload: '{"task_id":"$taskId"}',
+        ignorePrefs: true,
+      );
+    } catch (_) {}
 
     // Speak TTS for this reminder (when launched from a notification/alarm)
     try {

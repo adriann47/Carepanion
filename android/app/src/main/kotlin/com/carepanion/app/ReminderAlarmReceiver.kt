@@ -14,11 +14,25 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
     companion object {
         const val CHANNEL_ID = "carepanion_reminders"
         const val NOTIF_ID = 1001
+        const val STICKY_BASE_ID = 2000
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         val payload = intent.getStringExtra("payload")
         val id = intent.getIntExtra("id", -1)
+        if (intent.action == "com.carepanion.app.ACTION_DISMISS") {
+            try {
+                if (id >= 0) {
+                    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    nm.cancel(2000 + id)
+                    AlarmScheduler.cancel(context, id)
+                    AlarmStore.remove(context, id)
+                }
+            } catch (e: Exception) {
+                Log.w("ReminderAlarmReceiver", "dismiss action failed", e)
+            }
+            return
+        }
         Log.i("ReminderAlarmReceiver", "onReceive payload=$payload")
         if (id != -1) {
             try { AlarmStore.remove(context, id) } catch (_: Exception) {}
@@ -79,5 +93,55 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         // Post the notification (this will also trigger the full-screen intent on supported devices)
         nm.notify(NOTIF_ID + (System.currentTimeMillis() % 1000).toInt(), notif)
         Log.i("ReminderAlarmReceiver", "Posted full-screen notification for payload")
+
+        // Additionally, post a regular sticky notification that remains visible in the shade.
+        // Some OEMs auto-clear the full-screen entry; this ensures a persistent banner remains.
+        val mainIntent = Intent(context, MainActivity::class.java).apply {
+            putExtra("reminder_payload", payload)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        val mainPendingIntent = PendingIntent.getActivity(
+            context,
+            (id.takeIf { it >= 0 } ?: 0) + 1,
+            mainIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            else
+                PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        // Provide an explicit "Dismiss" action to cancel the notification and any pending alarm
+        val dismissIntent = Intent(context, ReminderAlarmReceiver::class.java).apply {
+            action = "com.carepanion.app.ACTION_DISMISS"
+            putExtra("id", id)
+        }
+        val dismissPendingIntent = PendingIntent.getBroadcast(
+            context,
+            (id.takeIf { it >= 0 } ?: 0) + 2,
+            dismissIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            else
+                PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val sticky = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(notifTitle)
+            .setContentText(notifBody)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(notifBody))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setOnlyAlertOnce(true)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setContentIntent(mainPendingIntent)
+            .addAction(0, "Dismiss", dismissPendingIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
+        val stickyId = if (id >= 0) STICKY_BASE_ID + id else STICKY_BASE_ID
+        nm.notify(stickyId, sticky)
+        Log.i("ReminderAlarmReceiver", "Posted sticky reminder notification id=$stickyId")
     }
 }

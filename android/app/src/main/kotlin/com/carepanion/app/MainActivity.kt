@@ -39,6 +39,14 @@ class MainActivity : FlutterActivity() {
                         AlarmScheduler.cancel(this.applicationContext, id)
 						// Remove from store
 						AlarmStore.remove(this.applicationContext, id)
+						// Also cancel any sticky reminder notification posted by the receiver
+						try {
+							val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+							val stickyId = 2000 + id
+							nm.cancel(stickyId)
+						} catch (e: Exception) {
+							Log.w("MainActivity", "failed to cancel sticky notif for id=$id", e)
+						}
                         result.success(null)
                     }
                     "requestExactAlarmPermissionIfNeeded" -> {

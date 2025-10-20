@@ -34,13 +34,16 @@ class MultiGuardianService {
     final assistedId = assistedUserId ?? client.auth.currentUser?.id;
     if (assistedId == null) return <String>{};
     final Set<String> idSet = <String>{};
+    bool joinAvailable = false;
 
     // 1) Read join table links if available
     try {
       final links = await client
           .from('assisted_guardians')
-          .select('guardian_id')
-          .eq('assisted_id', assistedId);
+          .select('guardian_id, status')
+          .eq('assisted_id', assistedId)
+          .eq('status', 'accepted');
+      joinAvailable = true;
       for (final e in links as List) {
         final v = e['guardian_id']?.toString();
         if (v != null && v.isNotEmpty) idSet.add(v);
@@ -49,17 +52,19 @@ class MultiGuardianService {
       // table missing or RLS blocked; continue with legacy
     }
 
-    // 2) Also include legacy single guardian from own profile.guardian_id
-    try {
-      final profileTable = await _resolveProfileTable(client);
-      final me = await client
-          .from(profileTable)
-          .select('guardian_id')
-          .eq('id', assistedId)
-          .maybeSingle();
-      final gid = me?['guardian_id']?.toString();
-      if (gid != null && gid.isNotEmpty) idSet.add(gid);
-    } catch (_) {}
+    // 2) Legacy fallback only if join table isn't available
+    if (!joinAvailable) {
+      try {
+        final profileTable = await _resolveProfileTable(client);
+        final me = await client
+            .from(profileTable)
+            .select('guardian_id')
+            .eq('id', assistedId)
+            .maybeSingle();
+        final gid = me?['guardian_id']?.toString();
+        if (gid != null && gid.isNotEmpty) idSet.add(gid);
+      } catch (_) {}
+    }
 
     return idSet;
   }
@@ -124,13 +129,25 @@ class MultiGuardianService {
     final assistedId = assistedUserId ?? client.auth.currentUser?.id;
     if (assistedId == null) return false;
     try {
-      final List res = await client
+      // Perform delete without requiring SELECT privileges on the table.
+      await client
           .from('assisted_guardians')
           .delete()
           .eq('assisted_id', assistedId)
-          .eq('guardian_id', guardianId)
-          .select('guardian_id');
-      return res.isNotEmpty;
+          .eq('guardian_id', guardianId);
+
+      // Best-effort: also clear legacy single-link if present
+      try {
+        final table = await _resolveProfileTable(client);
+        // Only clear guardian_id if it matches the one we're removing
+        await client
+            .from(table)
+            .update({'guardian_id': null})
+            .eq('id', assistedId)
+            .eq('guardian_id', guardianId);
+      } catch (_) {}
+
+      return true;
     } catch (_) {
       return false;
     }
@@ -147,11 +164,14 @@ class MultiGuardianService {
     try {
       // 1) Collect from join table
       final Set<String> idSet = <String>{};
+      bool joinAvailable = false;
       try {
         final links = await client
             .from('assisted_guardians')
-            .select('guardian_id')
-            .eq('assisted_id', assistedId);
+            .select('guardian_id, status')
+            .eq('assisted_id', assistedId)
+            .eq('status', 'accepted');
+        joinAvailable = true;
         for (final e in links) {
           final v = e['guardian_id']?.toString();
           if (v != null && v.isNotEmpty) idSet.add(v);
@@ -160,16 +180,18 @@ class MultiGuardianService {
         // join table may be missing; proceed to fallback
       }
 
-      // 2) Also include legacy single guardian from profile.guardian_id if present
-      try {
-        final me = await client
-            .from(profileTable)
-            .select('guardian_id')
-            .eq('id', assistedId)
-            .maybeSingle();
-        final gid = me?['guardian_id']?.toString();
-        if (gid != null && gid.isNotEmpty) idSet.add(gid);
-      } catch (_) {}
+      // 2) Legacy fallback only if join table isn't available
+      if (!joinAvailable) {
+        try {
+          final me = await client
+              .from(profileTable)
+              .select('guardian_id')
+              .eq('id', assistedId)
+              .maybeSingle();
+          final gid = me?['guardian_id']?.toString();
+          if (gid != null && gid.isNotEmpty) idSet.add(gid);
+        } catch (_) {}
+      }
 
       if (idSet.isEmpty) return [];
       final rows = await client

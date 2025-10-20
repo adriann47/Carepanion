@@ -34,6 +34,7 @@ class _GuardianInputScreenState extends State<GuardianInputScreen> {
     setState(() => _isLoading = true);
     final supabase = Supabase.instance.client;
     try {
+      // First create the guardian request
       await ProfileService.requestGuardianByPublicId(
         supabase,
         guardianPublicId: val,
